@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files for both backend and frontend
+COPY backend/package*.json ./backend/
+COPY frontend/package*.json ./frontend/
+COPY backend/prisma ./backend/prisma/
+
+# Install all dependencies
+RUN cd backend && npm ci
+RUN cd frontend && npm ci
+
+# Copy source code
+COPY backend ./backend
+COPY frontend ./frontend
+
+# Build frontend
+WORKDIR /app/frontend
+RUN npm run build
+
+# Build backend
+WORKDIR /app/backend
+RUN npm run build
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Production image
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install production dependencies only
+COPY backend/package*.json ./
+COPY backend/prisma ./prisma/
+RUN npm ci --only=production
+
+# Copy built assets from builder
+COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/frontend/dist ./public
+
+# Generate Prisma client in production
+RUN npx prisma generate
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
+
+USER nodejs
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start:prod"]

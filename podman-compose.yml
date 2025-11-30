@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: probe-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-probe_game}
+      POSTGRES_USER: ${DB_USER:-probe_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me_in_production}
+    volumes:
+      - probe-db-data:/var/lib/postgresql/data
+      - ./containers/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-probe_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - probe-network
+
+  app:
+    build:
+      context: .
+      dockerfile: ./containers/app/Containerfile
+    container_name: probe-app
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-probe_user}:${DB_PASSWORD:-change_me_in_production}@postgres:5432/${DB_NAME:-probe_game}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-change_me_in_production}
+      PORT: 3000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - probe-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: probe-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./containers/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - probe-network
+
+volumes:
+  probe-db-data:
+    driver: local
+
+networks:
+  probe-network:
+    driver: bridge
