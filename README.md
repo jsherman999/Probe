@@ -1,23 +1,24 @@
 # Probe - Multiplayer Word Game
 
-A modern, multiplayer implementation of the classic Probe word game (Parker Brothers, 1964).
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-green.svg)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 
-## Features
+A modern, real-time multiplayer implementation of the classic Parker Brothers (1964) word guessing board game Probe. Built with React, Node.js, Socket.io, and PostgreSQL.
 
-- 🎮 Real-time multiplayer (2-4 players)
-- 📱 Responsive design (works on iPhone and all browsers)
-- 🎯 Classic Probe gameplay mechanics
-- 🔐 Secure game state management
-- 🚀 WebSocket-based real-time updates
+## 🎮 Features
 
-## Tech Stack
+- **Real-time Multiplayer**: 2-4 players per game with WebSocket communication
+- **Mobile & Desktop**: Responsive design works on iPhone and browsers
+- **Turn-based Gameplay**: Classic Probe rules with letter guessing and scoring
+- **Secure Authentication**: JWT-based user authentication
+- **Room System**: Create or join games with 6-character room codes
+- **Live Updates**: Real-time game state synchronization
+- **Reconnection Handling**: Automatic reconnection with state recovery
+- **Modern UI**: Tailwind CSS with smooth animations
 
-- **Frontend**: React 18 + TypeScript + Tailwind CSS + Vite
-- **Backend**: Node.js + Express + Socket.io
-- **Database**: PostgreSQL + Prisma ORM
-- **Deployment**: Podman containers
-
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
@@ -25,141 +26,159 @@ A modern, multiplayer implementation of the classic Probe word game (Parker Brot
 - PostgreSQL 16+
 - npm or yarn
 
-### Development Setup
+### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone <repo-url>
+   git clone https://github.com/jsherman999/Probe.git
    cd Probe
    ```
 
-2. **Setup environment**
+2. **Run automated setup**
    ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
+   ./scripts/setup.sh
    ```
 
-3. **Install dependencies**
+3. **Start development servers**
    ```bash
-   # Backend
-   cd backend
-   npm install
-   
-   # Frontend
-   cd ../frontend
-   npm install
+   ./scripts/start.sh
    ```
 
-4. **Setup database**
-   ```bash
-   cd backend
-   npx prisma generate
-   npx prisma migrate dev
-   ```
-
-5. **Start development servers**
-   ```bash
-   # Backend (from backend directory)
-   npm run dev
-   
-   # Frontend (from frontend directory, new terminal)
-   npm run dev
-   ```
-
-6. **Access the application**
+4. **Access the application**
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:3000
 
-## Deployment
+## 🎯 How to Play
 
-### Podman (Recommended for Mac Mini M4 Pro)
+1. **Create or Join a Game**
+   - Create a new game or enter a 6-character room code
+   - Wait for 2-4 players to join
 
-```bash
-# Build containers
-podman-compose build
+2. **Select Your Word**
+   - Choose a secret word (4-12 letters)
+   - Game starts when all players are ready
 
-# Start services
-podman-compose up -d
+3. **Guess Letters**
+   - Take turns guessing letters in opponents' words
+   - Earn points based on letter value × occurrences
+   - Continue your turn on correct guesses
 
-# View logs
-podman-compose logs -f
+4. **Win the Game**
+   - Last player with an unrevealed word wins
+   - Or highest score when all words are revealed
+
+## 🏗️ Architecture
+
+### Frontend
+- **React 18** with TypeScript
+- **Redux Toolkit** for state management
+- **Socket.io-client** for real-time communication
+- **Tailwind CSS** for styling
+- **Vite** for fast development and building
+
+### Backend
+- **Node.js 20** with Express
+- **Socket.io** for WebSocket server
+- **Prisma** ORM with PostgreSQL
+- **JWT** authentication
+- **TypeScript** for type safety
+
+### Database Schema
+```
+User -> GamePlayer <- Game
+Game -> GameTurn
+Game -> GameResult
 ```
 
-### Native Deployment
-
-```bash
-# Run setup script
-./scripts/setup.sh
-
-# Start application
-./scripts/start.sh
-```
-
-## Game Rules
-
-1. Each player selects a secret word (4-12 letters)
-2. Players take turns guessing letters in opponents' words
-3. Correct guesses reveal the letter and award points
-4. Turn continues until an incorrect guess
-5. Game ends when all words are revealed
-6. Highest score wins!
-
-### Letter Point Values
-
-- 1 point: E, A, I, O, N, R, T, L, S, U
-- 2 points: D, G
-- 3 points: B, C, M, P
-- 4 points: F, H, V, W, Y
-- 5 points: K
-- 8 points: J, X
-- 10 points: Q, Z
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 Probe/
-├── backend/           # Node.js backend
+├── backend/
 │   ├── src/
-│   │   ├── server.ts
-│   │   ├── game/      # Game logic
-│   │   ├── routes/    # API routes
-│   │   └── socket/    # Socket.io handlers
-│   ├── prisma/        # Database schema
+│   │   ├── game/          # Game logic (GameManager, Scoring, Validation)
+│   │   ├── routes/        # API routes
+│   │   ├── socket/        # WebSocket handlers
+│   │   ├── middleware/    # Auth middleware
+│   │   ├── services/      # Business logic services
+│   │   └── __tests__/     # Unit tests
+│   ├── prisma/            # Database schema
 │   └── package.json
-├── frontend/          # React frontend
+├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── store/     # Redux store
-│   │   └── App.tsx
+│   │   ├── components/    # React components
+│   │   ├── pages/         # Page components
+│   │   ├── hooks/         # Custom hooks
+│   │   ├── store/         # Redux store
+│   │   ├── services/      # API & Socket services
+│   │   └── __tests__/     # Component tests
 │   └── package.json
-├── containers/        # Docker/Podman configs
-├── scripts/           # Setup & deployment scripts
-└── GAME_PLAN.md      # Detailed implementation plan
+├── containers/            # Docker/Podman configs
+├── scripts/               # Automation scripts
+└── DEPLOYMENT.md          # Deployment guide
 ```
 
-## Testing
+## 🧪 Testing
 
+Run all tests:
 ```bash
-# Backend tests
+./scripts/test.sh
+```
+
+Backend tests only:
+```bash
 cd backend
 npm test
-
-# Frontend tests
-cd frontend
-npm test
-
-# E2E tests
-npm run test:e2e
 ```
 
-## Documentation
+Frontend tests only:
+```bash
+cd frontend
+npm test
+```
 
-- [Game Plan](./GAME_PLAN.md) - Comprehensive implementation plan
-- [API Documentation](./backend/docs/API.md) - API endpoints
-- [Game Rules](./docs/RULES.md) - Detailed game rules
+With coverage:
+```bash
+cd backend
+npm run test:coverage
+```
 
-## Contributing
+## 🔧 Development Scripts
+
+| Script | Description |
+|--------|-------------|
+| `./scripts/setup.sh` | Initial project setup |
+| `./scripts/start.sh` | Start dev servers |
+| `./scripts/test.sh` | Run all tests |
+| `./scripts/build.sh` | Production build |
+| `./scripts/lint.sh` | Code quality checks |
+| `./scripts/deploy.sh` | Deploy with Podman |
+
+## 🐳 Deployment
+
+### Option 1: Podman (Containerized)
+```bash
+./scripts/deploy.sh
+```
+
+### Option 2: Native (macOS)
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+
+## 📊 Scoring System
+
+| Letters | Points |
+|---------|--------|
+| E, A, I, O, N, R, T, L, S, U | 1 |
+| D, G | 2 |
+| B, C, M, P | 3 |
+| F, H, V, W, Y | 4 |
+| K | 5 |
+| J, X | 8 |
+| Q, Z | 10 |
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
 
 1. Fork the repository
 2. Create a feature branch
@@ -167,14 +186,30 @@ npm run test:e2e
 4. Add tests
 5. Submit a pull request
 
-## License
+## 📝 License
 
-MIT License - See LICENSE file for details
+MIT License - see [LICENSE](LICENSE) file for details.
 
-## Credits
+## 🙏 Acknowledgments
 
-Based on the Probe word game by Parker Brothers (1964)
+- Original game design by Parker Brothers (1964)
+- Built with modern web technologies
+- Inspired by classic board game mechanics
 
-## Support
+## 📞 Support
 
-For issues and questions, please open a GitHub issue.
+- **Issues**: [GitHub Issues](https://github.com/jsherman999/Probe/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/jsherman999/Probe/discussions)
+
+## 🗺️ Roadmap
+
+- [ ] Game statistics and leaderboards
+- [ ] Tournament mode
+- [ ] Custom word lists
+- [ ] Spectator mode
+- [ ] Replay system
+- [ ] Mobile native apps
+
+---
+
+Built with ❤️ using React, Node.js, and Socket.io
