@@ -137,10 +137,56 @@ export function setupSocketHandlers(io: Server) {
       }
     });
 
-    // Disconnect
-    socket.on('disconnect', () => {
-      console.log(`✗ User disconnected: ${socket.username} (${socket.userId})`);
-      // Handle cleanup if needed
+    // Ping for connection health check
+    socket.on('ping', (callback) => {
+      callback({ pong: true, timestamp: Date.now() });
     });
+
+    // Handle reconnection
+    socket.on('reconnect', async (data: { roomCode?: string }, callback) => {
+      try {
+        console.log(`🔄 User reconnecting: ${socket.username}`);
+        
+        if (data.roomCode) {
+          // Rejoin the room
+          socket.join(data.roomCode);
+          
+          // Get current game state
+          const game = await gameManager.getGameByRoomCode(data.roomCode);
+          
+          callback({ success: true, game });
+        } else {
+          callback({ success: true });
+        }
+      } catch (error: any) {
+        callback({ success: false, error: error.message });
+      }
+    });
+
+    // Disconnect
+    socket.on('disconnect', (reason) => {
+      console.log(`✗ User disconnected: ${socket.username} (${socket.userId}) - Reason: ${reason}`);
+      
+      // Notify rooms about disconnection
+      const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
+      rooms.forEach(roomCode => {
+        io.to(roomCode).emit('playerDisconnected', {
+          userId: socket.userId,
+          username: socket.username,
+          reason,
+        });
+      });
+    });
+
+    // Handle errors
+    socket.on('error', (error) => {
+      console.error(`❌ Socket error for ${socket.username}:`, error);
+      socket.emit('error', { message: error.message });
+    });
+  });
+
+  // Global error handler
+  io.on('error', (error) => {
+    console.error('❌ Socket.IO server error:', error);
   });
 }

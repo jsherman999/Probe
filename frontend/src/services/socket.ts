@@ -2,8 +2,25 @@ import { io, Socket } from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
 
+interface SocketConfig {
+  reconnectionAttempts: number;
+  reconnectionDelay: number;
+  reconnectionDelayMax: number;
+  timeout: number;
+}
+
+const DEFAULT_CONFIG: SocketConfig = {
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 20000,
+};
+
 class SocketService {
   private socket: Socket | null = null;
+  private reconnectAttempts = 0;
+  private config: SocketConfig = DEFAULT_CONFIG;
+  private eventHandlers = new Map<string, Set<(...args: any[]) => void>>();
 
   connect(token: string): Socket {
     if (this.socket?.connected) {
@@ -13,29 +30,79 @@ class SocketService {
     this.socket = io(SOCKET_URL, {
       auth: { token },
       reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: this.config.reconnectionAttempts,
+      reconnectionDelay: this.config.reconnectionDelay,
+      reconnectionDelayMax: this.config.reconnectionDelayMax,
+      timeout: this.config.timeout,
+      transports: ['websocket', 'polling'],
     });
+
+    this.setupEventHandlers();
+    return this.socket;
+  }
+
+  private setupEventHandlers(): void {
+    if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log('✓ Socket connected');
+      console.log('✅ Socket connected:', this.socket?.id);
+      this.reconnectAttempts = 0;
+      this.reattachEventHandlers();
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('✗ Socket disconnected');
+    this.socket.on('disconnect', (reason) => {
+      console.warn('⚠️ Socket disconnected:', reason);
+      
+      if (reason === 'io server disconnect') {
+        // Server initiated disconnect, manually reconnect
+        this.socket?.connect();
+      }
     });
 
-    this.socket.on('error', (error: any) => {
-      console.error('Socket error:', error);
+    this.socket.on('connect_error', (error) => {
+      console.error('❌ Connection error:', error.message);
+      this.reconnectAttempts++;
+      
+      if (this.reconnectAttempts >= this.config.reconnectionAttempts) {
+        console.error('Max reconnection attempts reached');
+      }
     });
 
-    return this.socket;
+    this.socket.on('reconnect', (attemptNumber) => {
+      console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+    });
+
+    this.socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log('🔄 Reconnection attempt', attemptNumber);
+    });
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('❌ Reconnection error:', error.message);
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('❌ Reconnection failed - max attempts reached');
+    });
+
+    this.socket.on('error', (error) => {
+      console.error('❌ Socket error:', error);
+    });
+  }
+
+  private reattachEventHandlers(): void {
+    this.eventHandlers.forEach((callbacks, event) => {
+      callbacks.forEach(callback => {
+        this.socket?.on(event, callback);
+      });
+    });
   }
 
   disconnect(): void {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
+      this.reconnectAttempts = 0;
+      this.eventHandlers.clear();
     }
   }
 
@@ -43,22 +110,85 @@ class SocketService {
     return this.socket;
   }
 
+  isConnected(): boolean {
+    return this.socket?.connected || false;
+  }
+
   emit(event: string, data?: any): void {
-    if (this.socket) {
-      this.socket.emit(event, data);
+    if (!this.socket || !this.isConnected()) {
+      console.warn('Cannot emit - socket not connected');
+      return;
     }
+    this.socket.emit(event, data);
+  }
+
+  // Emit with callback and error handling
+  emitWithAck(event: string, data?: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.isConnected()) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
+
+      this.socket.emit(event, data, (response: any) => {
+        if (response?.error) {
+          reject(new Error(response.error));
+        } else {
+          resolve(response);
+        }
+      });
+
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        reject(new Error('Request timeout'));
+      }, 10000);
+    });
   }
 
   on(event: string, callback: (...args: any[]) => void): void {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, new Set());
+    }
+    this.eventHandlers.get(event)!.add(callback);
+
     if (this.socket) {
       this.socket.on(event, callback);
     }
   }
 
   off(event: string, callback?: (...args: any[]) => void): void {
-    if (this.socket) {
-      this.socket.off(event, callback);
+    if (callback) {
+      this.eventHandlers.get(event)?.delete(callback);
+      if (this.socket) {
+        this.socket.off(event, callback);
+      }
+    } else {
+      this.eventHandlers.delete(event);
+      if (this.socket) {
+        this.socket.off(event);
+      }
     }
+  }
+
+  // Helper to ping server for latency check
+  async ping(): Promise<number> {
+    const startTime = Date.now();
+    
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.isConnected()) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
+
+      this.socket.emit('ping', (response: any) => {
+        const latency = Date.now() - startTime;
+        resolve(latency);
+      });
+
+      setTimeout(() => {
+        reject(new Error('Ping timeout'));
+      }, 5000);
+    });
   }
 }
 
