@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(uuid())
+  username    String   @unique
+  displayName String
+  createdAt   DateTime @default(now())
+  lastSeen    DateTime @default(now())
+
+  hostedGames   Game[]        @relation("HostedGames")
+  gamePlayers   GamePlayer[]
+  turnsPlayed   GameTurn[]    @relation("PlayerTurns")
+  turnsTargeted GameTurn[]    @relation("TargetedTurns")
+  gameResults   GameResult[]
+
+  @@map("users")
+}
+
+model Game {
+  id                  String    @id @default(uuid())
+  roomCode            String    @unique
+  status              String    // WAITING, WORD_SELECTION, ACTIVE, COMPLETED
+  hostId              String?
+  maxPlayers          Int       @default(4)
+  currentTurnPlayerId String?
+  roundNumber         Int       @default(1)
+  createdAt           DateTime  @default(now())
+  startedAt           DateTime?
+  completedAt         DateTime?
+
+  host    User?        @relation("HostedGames", fields: [hostId], references: [id])
+  players GamePlayer[]
+  turns   GameTurn[]
+  results GameResult[]
+
+  @@map("games")
+}
+
+model GamePlayer {
+  id                String   @id @default(uuid())
+  gameId            String
+  userId            String
+  turnOrder         Int
+  secretWord        String?
+  secretWordHash    String?
+  revealedPositions Json     @default("[]")
+  totalScore        Int      @default(0)
+  isEliminated      Boolean  @default(false)
+  joinedAt          DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([gameId, userId])
+  @@map("game_players")
+}
+
+model GameTurn {
+  id                String   @id @default(uuid())
+  gameId            String
+  playerId          String
+  targetPlayerId    String
+  guessedLetter     String
+  isCorrect         Boolean
+  positionsRevealed Int[]    @default([])
+  pointsScored      Int      @default(0)
+  turnNumber        Int
+  createdAt         DateTime @default(now())
+
+  game         Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player       User @relation("PlayerTurns", fields: [playerId], references: [id])
+  targetPlayer User @relation("TargetedTurns", fields: [targetPlayerId], references: [id])
+
+  @@map("game_turns")
+}
+
+model GameResult {
+  id         String   @id @default(uuid())
+  gameId     String
+  playerId   String
+  finalScore Int
+  placement  Int
+  createdAt  DateTime @default(now())
+
+  game   Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player User @relation(fields: [playerId], references: [id])
+
+  @@map("game_results")
+}
