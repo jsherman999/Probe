@@ -33,7 +33,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
       REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-change_me_in_production}
       PORT: 3000
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5200}
     ports:
       - "3000:3000"
     depends_on:

@@ -44,8 +44,8 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
    ./scripts/start.sh
    ```
 
-4. **Access the application**
-   - Frontend: http://localhost:5173
+5. **Access the application**
+   - Frontend: http://localhost:5200
    - Backend API: http://localhost:3000
 
 ## 🎯 How to Play

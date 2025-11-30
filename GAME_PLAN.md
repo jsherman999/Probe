@@ -1016,7 +1016,7 @@ BACKEND_PID=$!
 sleep 3
 
 # Serve frontend (production)
-echo "Frontend available at http://localhost:5173"
+echo "Frontend available at http://localhost:5200"
 
 echo "✅ Application running!"
 echo "Backend PID: $BACKEND_PID"

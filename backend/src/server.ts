@@ -23,7 +23,7 @@ const httpServer = createServer(app);
 // Initialize Socket.io
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'],
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5200'],
     credentials: true,
   },
   pingTimeout: parseInt(process.env.SOCKET_PING_TIMEOUT || '60000'),
@@ -34,7 +34,7 @@ const io = new Server(httpServer, {
 app.use(helmet());
 app.use(compression());
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5173'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:5200'],
   credentials: true,
 }));
 app.use(express.json());

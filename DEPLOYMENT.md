@@ -32,8 +32,8 @@
    ./scripts/start.sh
    ```
 
-5. **Access the application**
-   - Frontend: http://localhost:5173
+4. **Access the application**
+   - Frontend: http://localhost:5200
    - Backend API: http://localhost:3000
    - Health check: http://localhost:3000/health
 
