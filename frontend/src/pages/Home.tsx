@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAppSelector } from '../store/hooks';
 import socketService from '../services/socket';
 
@@ -10,22 +10,68 @@ export default function Home() {
   const navigate = useNavigate();
   const { token, user } = useAppSelector((state) => state.auth);
 
+  // Ref to prevent multiple emissions in React StrictMode
+  const isCreatingGame = useRef(false);
+
+  // Ensure socket is connected when component mounts
+  useEffect(() => {
+    if (token) {
+      socketService.connect(token);
+    }
+  }, [token]);
+
   const handleCreateGame = () => {
+    // Prevent multiple emissions
+    if (isCreatingGame.current) {
+      console.log('⚠️ Already creating game, ignoring duplicate call');
+      return;
+    }
+
+    isCreatingGame.current = true;
     setLoading(true);
     setError('');
 
     const socket = socketService.connect(token!);
 
-    socket.once('gameCreated', (game: any) => {
-      navigate(`/lobby/${game.roomCode}`);
-    });
-
-    socket.once('error', (err: any) => {
-      setError(err.message);
+    // Set up listeners before emitting
+    const onGameCreated = (game: any) => {
+      console.log('✅ Game created:', game);
+      isCreatingGame.current = false;
       setLoading(false);
-    });
+      socketService.off('gameCreated', onGameCreated);
+      socketService.off('error', onError);
+      navigate(`/lobby/${game.roomCode}`);
+    };
 
-    socket.emit('createGame');
+    const onError = (err: any) => {
+      console.error('❌ Error creating game:', err);
+      setError(err.message);
+      isCreatingGame.current = false;
+      setLoading(false);
+      socketService.off('gameCreated', onGameCreated);
+      socketService.off('error', onError);
+    };
+
+    // Use socketService.on() to ensure handlers are tracked
+    socketService.on('gameCreated', onGameCreated);
+    socketService.on('error', onError);
+
+    // Wait for connection if needed
+    if (socket.connected) {
+      console.log('📤 Socket connected, emitting createGame');
+      socket.emit('createGame');
+    } else {
+      console.log('⏳ Waiting for socket connection...');
+      socket.once('connect', () => {
+        // Double-check we haven't already created a game
+        if (!isCreatingGame.current) {
+          console.log('⚠️ Game creation was cancelled');
+          return;
+        }
+        console.log('📤 Socket connected, emitting createGame');
+        socket.emit('createGame');
+      });
+    }
   };
 
   const handleJoinGame = (e: React.FormEvent) => {
@@ -97,7 +143,7 @@ export default function Home() {
           <div className="space-y-3 text-sm text-text-secondary">
             <div>
               <h3 className="font-semibold text-text-primary mb-1">Setup</h3>
-              <p>Each player selects a secret word (4-12 letters). Your word is hidden from other players.</p>
+              <p>Each player selects a secret word (4-12 letters). Add blank padding at front/back to hide your word position! Your word is hidden from other players.</p>
             </div>
             <div>
               <h3 className="font-semibold text-text-primary mb-1">Gameplay</h3>
@@ -105,7 +151,7 @@ export default function Home() {
             </div>
             <div>
               <h3 className="font-semibold text-text-primary mb-1">Scoring</h3>
-              <p>Letter values range from 1-10 points. Rare letters like Q and Z are worth more!</p>
+              <p>Points are based on letter position: 5, 10, 15 (repeating). Position 1 = 5pts, Position 2 = 10pts, Position 3 = 15pts, etc.</p>
             </div>
             <div>
               <h3 className="font-semibold text-text-primary mb-1">Winning</h3>
@@ -113,6 +159,13 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <Link
+          to="/history"
+          className="block w-full text-center py-3 text-text-secondary hover:text-accent transition-colors"
+        >
+          View Game History &rarr;
+        </Link>
       </div>
     </div>
   );

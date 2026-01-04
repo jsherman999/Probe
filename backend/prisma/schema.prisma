@@ -24,16 +24,18 @@ model User {
 }
 
 model Game {
-  id                  String    @id @default(uuid())
-  roomCode            String    @unique
-  status              String    // WAITING, WORD_SELECTION, ACTIVE, COMPLETED
-  hostId              String?
-  maxPlayers          Int       @default(4)
-  currentTurnPlayerId String?
-  roundNumber         Int       @default(1)
-  createdAt           DateTime  @default(now())
-  startedAt           DateTime?
-  completedAt         DateTime?
+  id                   String    @id @default(uuid())
+  roomCode             String    @unique
+  status               String    // WAITING, WORD_SELECTION, ACTIVE, COMPLETED
+  hostId               String?
+  maxPlayers           Int       @default(4)
+  currentTurnPlayerId  String?
+  roundNumber          Int       @default(1)
+  turnTimerSeconds     Int       @default(300) // 5 minutes default, min 10 seconds
+  currentTurnStartedAt DateTime?
+  createdAt            DateTime  @default(now())
+  startedAt            DateTime?
+  completedAt          DateTime?
 
   host    User?        @relation("HostedGames", fields: [hostId], references: [id])
   players GamePlayer[]
@@ -50,7 +52,11 @@ model GamePlayer {
   turnOrder         Int
   secretWord        String?
   secretWordHash    String?
+  paddedWord        String?  // Word with padding (e.g., "...LION....")
+  frontPadding      Int      @default(0) // Number of blanks at front
+  backPadding       Int      @default(0) // Number of blanks at back
   revealedPositions Json     @default("[]")
+  missedLetters     String[] @default([]) // Letters guessed incorrectly against this player
   totalScore        Int      @default(0)
   isEliminated      Boolean  @default(false)
   joinedAt          DateTime @default(now())

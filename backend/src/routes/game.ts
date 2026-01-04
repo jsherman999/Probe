@@ -2,8 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../server';
+import { GameManager } from '../game/GameManager';
 
 const router = Router();
+const gameManager = new GameManager();
 
 // Middleware to verify JWT
 const authenticate = (req: any, res: any, next: any) => {
@@ -82,6 +84,30 @@ router.get('/:roomCode/history', authenticate, async (req: any, res) => {
 
     res.json(turns);
   } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all archived games
+router.get('/history/all', authenticate, async (req: any, res) => {
+  try {
+    const games = await gameManager.getGameHistoryList();
+    res.json(games);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get specific archived game by room code
+router.get('/history/game/:roomCode', authenticate, async (req: any, res) => {
+  try {
+    const { roomCode } = req.params;
+    const game = await gameManager.getGameHistoryByRoomCode(roomCode);
+    res.json(game);
+  } catch (error: any) {
+    if (error.message === 'Game history not found') {
+      return res.status(404).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message });
   }
 });

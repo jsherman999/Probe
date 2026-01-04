@@ -6,7 +6,10 @@ interface Player {
   displayName: string;
   wordLength: number;
   hasSelectedWord: boolean;
+  frontPadding: number;
+  backPadding: number;
   revealedPositions: (string | null)[];
+  missedLetters: string[];
   totalScore: number;
   isEliminated: boolean;
   turnOrder: number;
@@ -20,6 +23,8 @@ interface GameState {
   players: Player[];
   currentTurnPlayerId: string | null;
   roundNumber: number;
+  turnTimerSeconds: number;
+  currentTurnStartedAt: string | null;
 }
 
 const initialState: GameState = {
@@ -30,6 +35,8 @@ const initialState: GameState = {
   players: [],
   currentTurnPlayerId: null,
   roundNumber: 1,
+  turnTimerSeconds: 300,
+  currentTurnStartedAt: null,
 };
 
 const gameSlice = createSlice({

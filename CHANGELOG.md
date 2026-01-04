@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-01-03 - Phase 7: Enhanced Gameplay Features
+
+### Added
+- **Position-Based Scoring**: Points now follow a 5/10/15 repeating pattern based on letter position
+  - Position 1 = 5 pts, Position 2 = 10 pts, Position 3 = 15 pts (repeating)
+- **Word Padding (Blanks)**: Players can add blank padding to disguise word position
+  - Configurable front and back padding (up to 12 total characters)
+  - Visual preview during word selection
+  - Special "BLANK" button for guessing padding positions
+  - Blanks score 0 points when revealed
+- **Missed Letters Display**: Incorrect guesses are tracked and shown on player cards
+  - Red "Missed" section shows all letters guessed incorrectly against that player
+- **Game History System**: Complete game archival and viewing
+  - Games automatically archived to JSON when completed
+  - New `/history` page lists all past games
+  - Detailed view shows players, secret words, turn-by-turn history, and final scores
+  - Link to history from home page
+- **Turn Timer System**: Configurable countdown per turn
+  - Host can configure timer in lobby (10 sec - 30 min, default 5 min)
+  - Preset buttons (30s, 1m, 2m, 5m, 10m) plus custom time input
+  - Real-time countdown display during active game
+  - Timer color changes: normal -> yellow at 30s -> red/pulsing at 10s
+  - Server-side timeout handling ensures fairness
+  - Toast notification when any player's turn times out
+- **Game Over Screen**: Shows winner and final standings with View Details button
+
+### Changed
+- Updated game rules text on home page to reflect new scoring system
+- Enhanced GameManager with timer and padding logic
+- Socket handlers now manage turn timers server-side
+
+### Technical
+- New database fields: `turnTimerSeconds`, `currentTurnStartedAt`, `paddedWord`, `frontPadding`, `backPadding`, `missedLetters`
+- Game archival stored in `/data/games/` as JSON files
+- New API routes: `GET /game/history/all`, `GET /game/history/game/:roomCode`
+- New socket events: `turnTimeout`, `timerSettingsUpdated`, `updateTimerSettings`
+
 ### Phase 6 - Deployment Ready
 - Production deployment configurations
 - Environment variable documentation

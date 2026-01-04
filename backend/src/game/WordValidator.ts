@@ -1,69 +1,66 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
 export class WordValidator {
-  private dictionary: Set<string> = new Set();
-  private isLoaded = false;
+  private validWordCache: Set<string> = new Set();
+  private invalidWordCache: Set<string> = new Set();
+  private apiTimeout = 3000; // 3 seconds
 
-  async loadDictionary(): Promise<void> {
-    if (this.isLoaded) return;
+  async isValidWord(word: string): Promise<boolean> {
+    const upperWord = word.toUpperCase();
 
-    // For now, use a basic word list
-    // In production, load from a proper dictionary file
-    const commonWords = [
-      'PROBE', 'GAME', 'WORD', 'PLAY', 'SCORE', 'LETTER', 'PLAYER', 'BOARD',
-      'GUESS', 'TURN', 'ROUND', 'POINT', 'MATCH', 'WINNER', 'START', 'FINISH',
-      'COMPLETE', 'REVEAL', 'HIDDEN', 'SECRET', 'CHALLENGE', 'COMPETE',
-      'STRATEGY', 'PUZZLE', 'BRAIN', 'THINK', 'SMART', 'CLEVER', 'QUICK',
-      'FAST', 'SLOW', 'EASY', 'HARD', 'DIFFICULT', 'SIMPLE', 'COMPLEX',
-      'BASIC', 'ADVANCED', 'EXPERT', 'NOVICE', 'BEGINNER', 'MASTER',
-      'CHAMPION', 'VICTORY', 'DEFEAT', 'SUCCESS', 'FAILURE', 'ATTEMPT',
-      'HOUSE', 'MOUSE', 'COMPUTER', 'KEYBOARD', 'MONITOR', 'SCREEN',
-      'WINDOW', 'DOOR', 'TABLE', 'CHAIR', 'DESK', 'LAMP', 'LIGHT',
-      'DARK', 'BRIGHT', 'COLOR', 'BLACK', 'WHITE', 'GREEN', 'BLUE',
-      'YELLOW', 'ORANGE', 'PURPLE', 'BROWN', 'GRAY', 'SILVER', 'GOLD',
-      'DIAMOND', 'RUBY', 'EMERALD', 'SAPPHIRE', 'PEARL', 'CRYSTAL',
-      'WATER', 'FIRE', 'EARTH', 'WIND', 'STORM', 'RAIN', 'SNOW',
-      'CLOUD', 'THUNDER', 'LIGHTNING', 'SUNSHINE', 'MOONLIGHT', 'STARLIGHT',
-      'MOUNTAIN', 'VALLEY', 'RIVER', 'OCEAN', 'FOREST', 'DESERT',
-      'ISLAND', 'BEACH', 'CASTLE', 'PALACE', 'TOWER', 'BRIDGE',
-      'ROAD', 'PATH', 'TRAIL', 'JOURNEY', 'ADVENTURE', 'QUEST',
-      'MISSION', 'TASK', 'PROJECT', 'WORK', 'JOB', 'CAREER',
-      'BUSINESS', 'COMPANY', 'OFFICE', 'MEETING', 'CONFERENCE', 'PRESENTATION',
-      'REPORT', 'DOCUMENT', 'FILE', 'FOLDER', 'ARCHIVE', 'DATABASE',
-      'SYSTEM', 'NETWORK', 'SERVER', 'CLIENT', 'APPLICATION', 'SOFTWARE',
-      'HARDWARE', 'DEVICE', 'MACHINE', 'ROBOT', 'ARTIFICIAL', 'INTELLIGENCE',
-      'TECHNOLOGY', 'SCIENCE', 'MATHEMATICS', 'PHYSICS', 'CHEMISTRY', 'BIOLOGY',
-      'HISTORY', 'GEOGRAPHY', 'LITERATURE', 'MUSIC', 'ART', 'CULTURE',
-      'SOCIETY', 'COMMUNITY', 'FAMILY', 'FRIEND', 'NEIGHBOR', 'STRANGER',
-      'PERSON', 'HUMAN', 'ANIMAL', 'PLANT', 'FLOWER', 'TREE',
-      'FRUIT', 'VEGETABLE', 'FOOD', 'DRINK', 'MEAL', 'BREAKFAST',
-      'LUNCH', 'DINNER', 'SNACK', 'DESSERT', 'CAKE', 'COOKIE',
-      'BREAD', 'BUTTER', 'CHEESE', 'MILK', 'JUICE', 'COFFEE',
-      'SEASON', 'SPRING', 'SUMMER', 'AUTUMN', 'WINTER', 'MONTH',
-      'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'JUNE', 'JULY',
-      'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER', 'MONDAY',
-      'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY',
-      'MORNING', 'AFTERNOON', 'EVENING', 'NIGHT', 'MIDNIGHT', 'NOON',
-      'CLOCK', 'WATCH', 'TIMER', 'ALARM', 'CALENDAR', 'SCHEDULE',
-      'HAPPY', 'JOYFUL', 'EXCITED', 'PLEASED', 'CONTENT', 'SATISFIED',
-      'PEACEFUL', 'CALM', 'QUIET', 'SILENT', 'LOUD', 'NOISY',
-      'BEAUTIFUL', 'PRETTY', 'LOVELY', 'GORGEOUS', 'HANDSOME', 'ATTRACTIVE',
-      'STRONG', 'POWERFUL', 'MIGHTY', 'BRAVE', 'COURAGEOUS', 'FEARLESS',
-      'HONEST', 'TRUTHFUL', 'LOYAL', 'FAITHFUL', 'TRUSTWORTHY', 'RELIABLE',
-      'KIND', 'GENTLE', 'CARING', 'LOVING', 'TENDER', 'COMPASSIONATE',
-      'GENEROUS', 'GIVING', 'SHARING', 'HELPFUL', 'SUPPORTIVE', 'ENCOURAGING',
-      'CREATIVE', 'INNOVATIVE', 'ORIGINAL', 'UNIQUE', 'SPECIAL', 'REMARKABLE',
-      'EXCELLENT', 'OUTSTANDING', 'SUPERB', 'MAGNIFICENT', 'WONDERFUL', 'AMAZING',
-      'FANTASTIC', 'INCREDIBLE', 'EXTRAORDINARY', 'EXCEPTIONAL', 'PERFECT', 'IDEAL',
-    ];
+    // Basic validation first
+    if (!this.isValidLength(word) || !this.hasValidCharacters(word)) {
+      return false;
+    }
 
-    commonWords.forEach(word => this.dictionary.add(word.toUpperCase()));
-    this.isLoaded = true;
+    // Check cache first
+    if (this.validWordCache.has(upperWord)) {
+      return true;
+    }
+    if (this.invalidWordCache.has(upperWord)) {
+      return false;
+    }
+
+    // Try online dictionary API
+    try {
+      const isValid = await this.checkDictionaryAPI(word.toLowerCase());
+
+      // Cache the result
+      if (isValid) {
+        this.validWordCache.add(upperWord);
+      } else {
+        this.invalidWordCache.add(upperWord);
+      }
+
+      return isValid;
+    } catch (error) {
+      // API failed - fallback to accepting the word
+      console.warn(`Dictionary API failed for "${word}", accepting word as fallback:`, error);
+      this.validWordCache.add(upperWord); // Cache as valid since we're accepting it
+      return true;
+    }
   }
 
-  isValidWord(word: string): boolean {
-    return this.dictionary.has(word.toUpperCase());
+  private async checkDictionaryAPI(word: string): Promise<boolean> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.apiTimeout);
+
+    try {
+      const response = await fetch(
+        `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,
+        { signal: controller.signal }
+      );
+
+      clearTimeout(timeoutId);
+
+      // 200 = word found, 404 = word not found
+      return response.ok;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+
+      if (error.name === 'AbortError') {
+        throw new Error('Dictionary API timeout');
+      }
+      throw error;
+    }
   }
 
   isValidLength(word: string): boolean {
@@ -72,6 +69,26 @@ export class WordValidator {
   }
 
   hasValidCharacters(word: string): boolean {
-    return /^[A-Z]+$/i.test(word);
+    // Only letters A-Z, no digits or special characters
+    return /^[A-Za-z]+$/.test(word);
+  }
+
+  // No-op - kept for interface compatibility
+  async loadDictionary(): Promise<void> {
+    // Dictionary is now validated via API
+  }
+
+  // Utility to clear caches if needed
+  clearCache(): void {
+    this.validWordCache.clear();
+    this.invalidWordCache.clear();
+  }
+
+  // Get cache stats for debugging
+  getCacheStats(): { valid: number; invalid: number } {
+    return {
+      valid: this.validWordCache.size,
+      invalid: this.invalidWordCache.size,
+    };
   }
 }

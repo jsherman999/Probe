@@ -1,42 +1,44 @@
 export class ScoringEngine {
-  private letterValues: Map<string, number>;
+  // Position-based scoring: 5, 10, 15 repeating pattern
+  private readonly POSITION_POINTS = [5, 10, 15];
 
-  constructor() {
-    this.letterValues = new Map([
-      // 1 point letters
-      ['E', 1], ['A', 1], ['I', 1], ['O', 1], ['N', 1],
-      ['R', 1], ['T', 1], ['L', 1], ['S', 1], ['U', 1],
-      
-      // 2 point letters
-      ['D', 2], ['G', 2],
-      
-      // 3 point letters
-      ['B', 3], ['C', 3], ['M', 3], ['P', 3],
-      
-      // 4 point letters
-      ['F', 4], ['H', 4], ['V', 4], ['W', 4], ['Y', 4],
-      
-      // 5 point letters
-      ['K', 5],
-      
-      // 8 point letters
-      ['J', 8], ['X', 8],
-      
-      // 10 point letters
-      ['Q', 10], ['Z', 10],
-    ]);
+  /**
+   * Get points for a specific position (0-indexed)
+   * Position 0 = 5 pts, Position 1 = 10 pts, Position 2 = 15 pts
+   * Position 3 = 5 pts, Position 4 = 10 pts, Position 5 = 15 pts (repeating)
+   */
+  getPositionPoints(position: number): number {
+    return this.POSITION_POINTS[position % 3];
   }
 
-  calculateScore(letter: string, occurrences: number): number {
-    const value = this.getLetterValue(letter);
-    return value * occurrences;
+  /**
+   * Calculate score for revealed positions
+   * @param positions Array of position indices that were revealed
+   * @param isBlank Optional function to check if a position is a blank (blanks score 0)
+   */
+  calculateScore(positions: number[], isBlank?: (pos: number) => boolean): number {
+    return positions.reduce((total, pos) => {
+      // Blanks always score 0
+      if (isBlank && isBlank(pos)) {
+        return total;
+      }
+      return total + this.getPositionPoints(pos);
+    }, 0);
   }
 
-  getLetterValue(letter: string): number {
-    return this.letterValues.get(letter.toUpperCase()) || 0;
+  /**
+   * Get all position points for a given word length (for UI display)
+   */
+  getPositionPointsArray(wordLength: number): number[] {
+    return Array.from({ length: wordLength }, (_, i) => this.getPositionPoints(i));
   }
 
-  getAllLetterValues(): Map<string, number> {
-    return new Map(this.letterValues);
+  /**
+   * Legacy method for backwards compatibility - now calculates based on positions
+   * @deprecated Use calculateScore with positions instead
+   */
+  calculateScoreLegacy(_letter: string, occurrences: number): number {
+    // For backwards compatibility, assume average position value
+    return occurrences * 10; // Average of 5+10+15 = 30/3 = 10
   }
 }

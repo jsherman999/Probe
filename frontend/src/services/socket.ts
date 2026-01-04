@@ -21,12 +21,24 @@ class SocketService {
   private reconnectAttempts = 0;
   private config: SocketConfig = DEFAULT_CONFIG;
   private eventHandlers = new Map<string, Set<(...args: any[]) => void>>();
+  private onAuthError: (() => void) | null = null;
 
   connect(token: string): Socket {
+    // If already connected, reuse
     if (this.socket?.connected) {
+      console.log('🔄 Reusing existing socket connection');
       return this.socket;
     }
 
+    // Clean up any existing stale socket
+    if (this.socket) {
+      console.log('🧹 Cleaning up stale socket');
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+
+    console.log('🔌 Creating new socket connection to', SOCKET_URL);
     this.socket = io(SOCKET_URL, {
       auth: { token },
       reconnection: true,
@@ -62,7 +74,16 @@ class SocketService {
     this.socket.on('connect_error', (error) => {
       console.error('❌ Connection error:', error.message);
       this.reconnectAttempts++;
-      
+
+      // Check for auth errors and trigger callback
+      if (error.message.includes('Invalid') || error.message.includes('token') || error.message.includes('Authentication')) {
+        console.error('🔒 Auth error detected, triggering re-login');
+        if (this.onAuthError) {
+          this.onAuthError();
+        }
+        return;
+      }
+
       if (this.reconnectAttempts >= this.config.reconnectionAttempts) {
         console.error('Max reconnection attempts reached');
       }
@@ -104,6 +125,10 @@ class SocketService {
       this.reconnectAttempts = 0;
       this.eventHandlers.clear();
     }
+  }
+
+  setAuthErrorHandler(callback: () => void): void {
+    this.onAuthError = callback;
   }
 
   getSocket(): Socket | null {
