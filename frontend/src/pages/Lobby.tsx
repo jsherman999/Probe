@@ -158,7 +158,7 @@ export default function Lobby() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold">Game Lobby</h1>
-            <p className="text-text-secondary">Room Code: <span className="text-accent font-mono text-2xl">{roomCode}</span></p>
+            <p className="text-text-secondary">Game Code: <span className="text-accent font-mono text-2xl">{roomCode}</span></p>
           </div>
           <button onClick={handleLeave} className="btn-secondary">
             Leave
@@ -287,7 +287,7 @@ export default function Lobby() {
 
         <div className="mt-6 pt-6 border-t border-tile-border">
           <p className="text-sm text-text-muted text-center">
-            Share the room code with your friends to play together!
+            Share the game code with your friends to play together!
           </p>
         </div>
       </div>

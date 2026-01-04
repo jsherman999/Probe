@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAppSelector } from '../store/hooks';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 interface GameSummary {
   roomCode: string;
@@ -57,7 +57,7 @@ function GameHistoryList() {
   useEffect(() => {
     const fetchGames = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/game/history/all`, {
+        const response = await fetch(`${API_URL}/game/history/all`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -78,6 +78,28 @@ function GameHistoryList() {
 
     fetchGames();
   }, [token]);
+
+  const handleRemoveHistory = async (roomCode: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Remove game history for ${roomCode}?`)) return;
+
+    try {
+      const response = await fetch(`${API_URL}/game/history/${roomCode}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setGames(prev => prev.filter(g => g.roomCode !== roomCode));
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to remove game history');
+      }
+    } catch (err) {
+      console.error('Error removing game history:', err);
+      setError('Failed to remove game history');
+    }
+  };
 
   if (loading) {
     return (
@@ -120,17 +142,26 @@ function GameHistoryList() {
               >
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-bold text-lg">Room: {game.roomCode}</p>
+                    <p className="font-bold text-lg">Game: {game.roomCode}</p>
                     <p className="text-text-muted text-sm">
                       {new Date(game.completedAt).toLocaleDateString()} at{' '}
                       {new Date(game.completedAt).toLocaleTimeString()}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-accent font-bold">{game.winner}</p>
-                    <p className="text-text-secondary">
-                      {game.winnerScore} pts | {game.playerCount} players
-                    </p>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-accent font-bold">{game.winner}</p>
+                      <p className="text-text-secondary">
+                        {game.winnerScore} pts | {game.playerCount} players
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => handleRemoveHistory(game.roomCode, e)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 rounded transition-colors"
+                      title="Remove from history"
+                    >
+                      ✕
+                    </button>
                   </div>
                 </div>
               </div>
@@ -151,7 +182,7 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
   useEffect(() => {
     const fetchGame = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/game/history/game/${roomCode}`, {
+        const response = await fetch(`${API_URL}/game/history/game/${roomCode}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -210,7 +241,7 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
         </Link>
 
         <div className="card mb-6">
-          <h1 className="text-3xl font-bold mb-2">Room: {game.roomCode}</h1>
+          <h1 className="text-3xl font-bold mb-2">Game: {game.roomCode}</h1>
           <p className="text-text-muted">
             Completed: {new Date(game.completedAt).toLocaleDateString()} at{' '}
             {new Date(game.completedAt).toLocaleTimeString()}
@@ -321,6 +352,39 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
             </div>
           )}
         </div>
+
+        {/* Viewer Guesses */}
+        {game.viewerGuesses && game.viewerGuesses.length > 0 && (
+          <div className="card mt-6">
+            <h2 className="text-xl font-bold mb-4">👁️ Viewer Guesses</h2>
+            <div className="space-y-2">
+              {game.viewerGuesses.map((guess: any, index: number) => (
+                <div
+                  key={index}
+                  className={`flex justify-between items-center p-3 rounded ${
+                    guess.isCorrect ? 'bg-green-600/20' : 'bg-red-600/20'
+                  }`}
+                >
+                  <div>
+                    <span className="font-semibold">{guess.viewerName}</span>
+                    <span className="text-text-muted"> guessed </span>
+                    <span className="font-mono font-bold">{guess.guessedWord}</span>
+                    <span className="text-text-muted"> for </span>
+                    <span className="font-semibold">{guess.targetPlayerName}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className={guess.isCorrect ? 'text-green-400' : 'text-red-400'}>
+                      {guess.isCorrect ? '✓ Correct' : '✗ Wrong'}
+                    </span>
+                    <div className="text-xs text-text-muted">
+                      {new Date(guess.submittedAt).toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

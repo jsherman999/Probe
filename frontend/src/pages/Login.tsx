@@ -32,7 +32,13 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="card w-full max-w-md">
-        <h1 className="text-4xl font-bold text-center mb-2">PROBE</h1>
+        <h1 className="text-4xl font-bold text-center mb-2">
+          <span className="text-yellow-400">P</span>
+          <span className="text-blue-400">R</span>
+          <span className="text-green-400">O</span>
+          <span className="text-red-400">B</span>
+          <span className="text-purple-400">E</span>
+        </h1>
         <p className="text-text-secondary text-center mb-8">Multiplayer Word Game</p>
 
         <form onSubmit={handleLogin} className="space-y-4">

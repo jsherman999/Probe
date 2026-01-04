@@ -81,6 +81,22 @@ All 6 development phases have been successfully implemented and committed to Git
 ✅ Security best practices
 ✅ Production deployment checklist
 
+### Phase 7: Enhanced Gameplay Features (Commit 6)
+
+✅ Position-based scoring (5/10/15 pattern)
+✅ Word padding with blanks
+✅ Missed letters display
+✅ Game history system
+✅ Turn timer system
+
+### Phase 8: Observer Mode (Commit 7)
+
+✅ Observer mode for non-players watching games
+✅ Viewer word guessing feature
+✅ "Watch Games in Progress" lobby section
+✅ Privacy protection (guesses revealed at game end)
+✅ Game history includes viewer guesses
+
 ---
 
 ## 🏗️ Architecture Overview
@@ -294,8 +310,8 @@ The following features are documented but not yet implemented:
 - [ ] Game statistics and leaderboards
 - [ ] Tournament mode
 - [ ] Custom word lists (themes)
-- [ ] Spectator mode
-- [ ] Game replay system
+- [x] Spectator mode (Observer Mode with viewer guessing)
+- [x] Game history system
 - [ ] Mobile native apps (React Native)
 - [ ] Chat/emoji reactions
 - [ ] Player avatars

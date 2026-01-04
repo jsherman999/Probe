@@ -24,6 +24,85 @@ const authenticate = (req: any, res: any, next: any) => {
   }
 };
 
+// Get all archived games - MUST be before /:roomCode to avoid matching "history" as roomCode
+router.get('/history/all', authenticate, async (req: any, res) => {
+  try {
+    const games = await gameManager.getGameHistoryList();
+    res.json(games);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get specific archived game by room code - MUST be before /:roomCode
+router.get('/history/game/:roomCode', authenticate, async (req: any, res) => {
+  try {
+    const { roomCode } = req.params;
+    const game = await gameManager.getGameHistoryByRoomCode(roomCode);
+    res.json(game);
+  } catch (error: any) {
+    if (error.message === 'Game history not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all waiting games (lobby) - MUST be before /:roomCode
+router.get('/lobby/all', authenticate, async (req: any, res) => {
+  try {
+    const games = await prisma.game.findMany({
+      where: { status: 'WAITING' },
+      include: {
+        players: true,
+        host: { select: { displayName: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(games.map(g => ({
+      roomCode: g.roomCode,
+      hostName: (g as any).host?.displayName || 'Unknown',
+      playerCount: g.players.length,
+      maxPlayers: 4,
+      createdAt: g.createdAt
+    })));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all running games (for observer mode) - MUST be before /:roomCode
+router.get('/running/all', authenticate, async (req: any, res) => {
+  try {
+    const games = await prisma.game.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'WORD_SELECTION'] }
+      },
+      include: {
+        players: {
+          include: {
+            user: { select: { displayName: true } }
+          }
+        },
+        host: { select: { displayName: true } }
+      },
+      orderBy: { startedAt: 'desc' }
+    });
+
+    res.json(games.map(g => ({
+      roomCode: g.roomCode,
+      status: g.status,
+      hostName: (g as any).host?.displayName || 'Unknown',
+      playerCount: g.players.length,
+      playerNames: g.players.map(p => (p as any).user?.displayName || 'Unknown'),
+      startedAt: g.startedAt
+    })));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get game by room code
 router.get('/:roomCode', authenticate, async (req: any, res) => {
   try {
@@ -88,26 +167,52 @@ router.get('/:roomCode/history', authenticate, async (req: any, res) => {
   }
 });
 
-// Get all archived games
-router.get('/history/all', authenticate, async (req: any, res) => {
+// Delete a game from the lobby (host or force)
+router.delete('/lobby/:roomCode', authenticate, async (req: any, res) => {
   try {
-    const games = await gameManager.getGameHistoryList();
-    res.json(games);
+    const { roomCode } = req.params;
+    const force = req.query.force === 'true';
+    await gameManager.removeGame(roomCode, req.userId, force);
+    res.json({ success: true, roomCode });
   } catch (error: any) {
+    if (error.message === 'Game not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message === 'Only host can remove the game') {
+      return res.status(403).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get specific archived game by room code
-router.get('/history/game/:roomCode', authenticate, async (req: any, res) => {
+// Delete a game from history (archived files)
+router.delete('/history/:roomCode', authenticate, async (req: any, res) => {
   try {
     const { roomCode } = req.params;
-    const game = await gameManager.getGameHistoryByRoomCode(roomCode);
-    res.json(game);
+    await gameManager.removeGameHistory(roomCode);
+    res.json({ success: true, roomCode });
   } catch (error: any) {
     if (error.message === 'Game history not found') {
       return res.status(404).json({ error: error.message });
     }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Trigger manual cleanup (for admin use)
+router.post('/cleanup', authenticate, async (req: any, res) => {
+  try {
+    const forceAll = req.query.forceAll === 'true';
+
+    if (forceAll) {
+      // Force cleanup ALL non-completed games
+      const result = await gameManager.forceCleanupAllGames();
+      res.json(result);
+    } else {
+      const result = await gameManager.cleanupStaleGames();
+      res.json(result);
+    }
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });

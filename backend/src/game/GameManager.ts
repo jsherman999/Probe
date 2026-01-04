@@ -27,9 +27,22 @@ interface PlayerState {
   isEliminated: boolean;
 }
 
+// Viewer guess stored in memory during game
+interface ViewerGuess {
+  viewerId: string;
+  viewerName: string;
+  targetPlayerId: string;
+  targetPlayerName: string;
+  guessedWord: string;
+  isCorrect: boolean;
+  submittedAt: Date;
+}
+
 export class GameManager {
   private wordValidator: WordValidator;
   private scoringEngine: ScoringEngine;
+  // Map of roomCode -> array of viewer guesses
+  private viewerGuesses: Map<string, ViewerGuess[]> = new Map();
 
   constructor() {
     this.wordValidator = new WordValidator();
@@ -37,17 +50,26 @@ export class GameManager {
     this.wordValidator.loadDictionary();
   }
 
-  private generateRoomCode(): string {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
+  private generateRoomCode(username: string): string {
+    // Format: username_yymmddhhmm
+    const now = new Date();
+    const yy = String(now.getFullYear()).slice(-2);
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+
+    // Sanitize username: lowercase, remove special chars, limit length
+    const sanitizedUsername = username
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 20);
+
+    return `${sanitizedUsername}_${yy}${mm}${dd}${hh}${min}`;
   }
 
-  async createGame(userId: string, turnTimerSeconds?: number): Promise<any> {
-    const roomCode = this.generateRoomCode();
+  async createGame(userId: string, username: string, turnTimerSeconds?: number): Promise<any> {
+    const roomCode = this.generateRoomCode(username);
 
     // Validate timer: minimum 10 seconds, maximum 30 minutes
     const validTimer = turnTimerSeconds
@@ -155,11 +177,13 @@ export class GameManager {
     }
   }
 
-  async leaveGame(roomCode: string, userId: string): Promise<void> {
+  async leaveGame(roomCode: string, userId: string): Promise<{ gameEnded: boolean; game: any | null }> {
     const game = await prisma.game.findUnique({
       where: { roomCode },
       include: {
-        players: true,
+        players: {
+          include: { user: true }
+        },
       },
     });
 
@@ -172,24 +196,167 @@ export class GameManager {
       throw new Error('Not in this game');
     }
 
-    await prisma.gamePlayer.delete({
-      where: { id: player.id },
-    });
+    // If game is in WAITING status, simply remove the player
+    if (game.status === 'WAITING') {
+      await prisma.gamePlayer.delete({
+        where: { id: player.id },
+      });
 
-    // If host left, assign new host or delete game if no players
-    if (game.hostId === userId) {
-      const remainingPlayers = game.players.filter(p => p.userId !== userId);
-      if (remainingPlayers.length > 0) {
+      // If host left, assign new host or delete game if no players
+      if (game.hostId === userId) {
+        const remainingPlayers = game.players.filter(p => p.userId !== userId);
+        if (remainingPlayers.length > 0) {
+          await prisma.game.update({
+            where: { id: game.id },
+            data: { hostId: remainingPlayers[0].userId },
+          });
+          const updatedGame = await this.getGameByRoomCode(roomCode);
+          return { gameEnded: false, game: updatedGame };
+        } else {
+          await prisma.game.delete({
+            where: { id: game.id },
+          });
+          return { gameEnded: true, game: null };
+        }
+      }
+      const updatedGame = await this.getGameByRoomCode(roomCode);
+      return { gameEnded: false, game: updatedGame };
+    }
+
+    // For active/word selection games, eliminate the player instead of removing
+    if (game.status === 'ACTIVE' || game.status === 'WORD_SELECTION') {
+      // Mark player as eliminated
+      await prisma.gamePlayer.update({
+        where: { id: player.id },
+        data: { isEliminated: true },
+      });
+
+      // Check if game should end (only one active player left)
+      const activePlayers = game.players.filter(p => p.userId !== userId && !p.isEliminated);
+
+      if (activePlayers.length <= 1) {
+        // Game over - the remaining player wins
         await prisma.game.update({
           where: { id: game.id },
-          data: { hostId: remainingPlayers[0].userId },
+          data: {
+            status: 'COMPLETED',
+            completedAt: new Date(),
+          },
         });
-      } else {
-        await prisma.game.delete({
+
+        // Record results
+        const allPlayers = await prisma.gamePlayer.findMany({
+          where: { gameId: game.id },
+        });
+        const sortedPlayers = [...allPlayers].sort((a, b) => b.totalScore - a.totalScore);
+        await Promise.all(
+          sortedPlayers.map(async (p, index) =>
+            prisma.gameResult.create({
+              data: {
+                gameId: game.id,
+                playerId: p.userId,
+                finalScore: p.totalScore,
+                placement: index + 1,
+              },
+            })
+          )
+        );
+
+        try {
+          await this.archiveGame(game.id);
+        } catch (err) {
+          console.error('Failed to archive game:', err);
+        }
+
+        const updatedGame = await this.getGameByRoomCode(roomCode);
+        return { gameEnded: true, game: updatedGame };
+      }
+
+      // If leaving player was current turn, advance to next player
+      if (game.currentTurnPlayerId === userId) {
+        const currentIndex = game.players.findIndex(p => p.userId === userId);
+        let nextIndex = (currentIndex + 1) % game.players.length;
+        let nextPlayer = game.players[nextIndex];
+
+        // Find next non-eliminated player
+        while (nextPlayer.isEliminated || nextPlayer.userId === userId) {
+          nextIndex = (nextIndex + 1) % game.players.length;
+          nextPlayer = game.players[nextIndex];
+        }
+
+        await prisma.game.update({
           where: { id: game.id },
+          data: {
+            currentTurnPlayerId: nextPlayer.userId,
+            currentTurnStartedAt: new Date(),
+          },
         });
       }
+
+      const updatedGame = await this.getGameByRoomCode(roomCode);
+      return { gameEnded: false, game: updatedGame };
     }
+
+    // For completed games, just return
+    return { gameEnded: false, game: null };
+  }
+
+  // Force end a game (host/admin only)
+  async endGame(roomCode: string, userId: string, force: boolean = false): Promise<any> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: {
+        players: {
+          include: { user: true }
+        },
+      },
+    });
+
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    // Only host can end game (unless force is true for admin)
+    if (!force && game.hostId !== userId) {
+      throw new Error('Only the host can end the game');
+    }
+
+    if (game.status === 'COMPLETED') {
+      throw new Error('Game already completed');
+    }
+
+    // Mark game as completed
+    await prisma.game.update({
+      where: { id: game.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
+    });
+
+    // Record results based on current scores
+    const sortedPlayers = [...game.players].sort((a, b) => b.totalScore - a.totalScore);
+    await Promise.all(
+      sortedPlayers.map(async (p, index) =>
+        prisma.gameResult.create({
+          data: {
+            gameId: game.id,
+            playerId: p.userId,
+            finalScore: p.totalScore,
+            placement: index + 1,
+          },
+        })
+      )
+    );
+
+    try {
+      await this.archiveGame(game.id);
+    } catch (err) {
+      console.error('Failed to archive game:', err);
+    }
+
+    const updatedGame = await this.getGameByRoomCode(roomCode);
+    return updatedGame;
   }
 
   async startGame(roomCode: string, userId: string): Promise<any> {
@@ -402,9 +569,54 @@ export class GameManager {
 
     const isCorrect = positions.length > 0;
     let pointsScored = 0;
+    let blankMissPenalty = false;
+
+    // If BLANK guess with multiple unrevealed blanks, require target player to choose
+    if (isBlankGuess && positions.length > 1) {
+      return {
+        blankSelectionRequired: true,
+        positions,
+        targetPlayerId,
+        guessingPlayerId: playerId,
+        roomCode,
+        letter,
+      };
+    }
+
+    // If regular letter guess with multiple unrevealed positions (duplicate letters),
+    // require target player to choose which one to reveal
+    if (!isBlankGuess && positions.length > 1) {
+      console.log(`🔀 Duplicate letter "${letter}" found at positions ${positions.join(',')} - requiring target to choose`);
+      return {
+        duplicateSelectionRequired: true,
+        positions,
+        targetPlayerId,
+        guessingPlayerId: playerId,
+        roomCode,
+        letter,
+      };
+    }
+
+    // Penalty for guessing BLANK when no blanks are available
+    if (isBlankGuess && positions.length === 0) {
+      blankMissPenalty = true;
+      pointsScored = -50;
+
+      // Deduct points from the guessing player
+      const guessingPlayer = game.players.find(p => p.userId === playerId);
+      if (guessingPlayer) {
+        await prisma.gamePlayer.update({
+          where: { id: guessingPlayer.id },
+          data: {
+            totalScore: Math.max(0, guessingPlayer.totalScore - 50), // Don't go below 0
+          },
+        });
+      }
+    }
 
     if (isCorrect) {
-      // Update revealed positions
+      console.log(`✨ Single position hit: revealing position(s) ${positions.join(',')}`);
+      // Update revealed positions (single position for blanks, or all positions for letters)
       positions.forEach(pos => {
         revealedPositions[pos] = true;
       });
@@ -414,15 +626,28 @@ export class GameManager {
       const isBlankPosition = (pos: number) => word[pos] === this.BLANK_CHAR;
       pointsScored = this.scoringEngine.calculateScore(positions, isBlankPosition);
 
-      // Update player
+      // Update target player's revealed positions and elimination status
       await prisma.gamePlayer.update({
         where: { id: targetPlayer.id },
         data: {
           revealedPositions: JSON.stringify(revealedPositions),
-          totalScore: targetPlayer.totalScore + pointsScored,
           isEliminated: revealedPositions.every(p => p),
         },
       });
+
+      // Award points to the GUESSING player (not the target)
+      if (pointsScored > 0) {
+        const guessingPlayer = game.players.find(p => p.userId === playerId);
+        if (guessingPlayer) {
+          console.log(`💰 Awarding ${pointsScored} points to GUESSING player ${playerId} (was ${guessingPlayer.totalScore}, now ${guessingPlayer.totalScore + pointsScored})`);
+          await prisma.gamePlayer.update({
+            where: { id: guessingPlayer.id },
+            data: {
+              totalScore: guessingPlayer.totalScore + pointsScored,
+            },
+          });
+        }
+      }
     }
 
     // Record turn
@@ -516,6 +741,7 @@ export class GameManager {
       isCorrect,
       positions,
       pointsScored,
+      blankMissPenalty,
       letter,
       targetPlayerId,
       revealedWord: revealedPositions.map((revealed, i) => (revealed ? word[i] : null)),
@@ -524,6 +750,415 @@ export class GameManager {
       finalResults,
       currentTurnPlayerId: isCorrect ? playerId : game.players[(game.players.findIndex(p => p.userId === playerId) + 1) % game.players.length].userId,
       game: updatedGame, // Include full game state for frontend
+    };
+  }
+
+  // Resolve blank selection when target player chooses which blank to reveal
+  async resolveBlankSelection(
+    roomCode: string,
+    guessingPlayerId: string,
+    targetPlayerId: string,
+    selectedPosition: number
+  ): Promise<any> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: {
+        players: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!game || game.status !== 'ACTIVE') {
+      throw new Error('Game not active');
+    }
+
+    const targetPlayer = game.players.find(p => p.userId === targetPlayerId);
+    if (!targetPlayer) {
+      throw new Error('Invalid target player');
+    }
+
+    const word = targetPlayer.paddedWord || targetPlayer.secretWord!;
+    const revealedPositions = JSON.parse(targetPlayer.revealedPositions as any) as boolean[];
+
+    // Validate the selected position is a valid unrevealed blank
+    if (selectedPosition < 0 || selectedPosition >= word.length) {
+      throw new Error('Invalid position');
+    }
+    if (word[selectedPosition] !== this.BLANK_CHAR) {
+      throw new Error('Selected position is not a blank');
+    }
+    if (revealedPositions[selectedPosition]) {
+      throw new Error('Position already revealed');
+    }
+
+    // Reveal only the selected position
+    revealedPositions[selectedPosition] = true;
+
+    // Blanks always score 0 points
+    const pointsScored = 0;
+
+    // Update player
+    await prisma.gamePlayer.update({
+      where: { id: targetPlayer.id },
+      data: {
+        revealedPositions: JSON.stringify(revealedPositions),
+        isEliminated: revealedPositions.every(p => p),
+      },
+    });
+
+    // Record turn
+    await prisma.gameTurn.create({
+      data: {
+        gameId: game.id,
+        playerId: guessingPlayerId,
+        targetPlayerId,
+        guessedLetter: 'BLANK',
+        isCorrect: true,
+        positionsRevealed: [selectedPosition],
+        pointsScored,
+        turnNumber: game.roundNumber,
+      },
+    });
+
+    // Check for game over - fetch fresh player data after update
+    const updatedPlayers = await prisma.gamePlayer.findMany({
+      where: { gameId: game.id },
+    });
+    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
+    const gameOver = activePlayers.length <= 1;
+
+    let finalResults = null;
+    if (gameOver) {
+      await prisma.game.update({
+        where: { id: game.id },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      });
+
+      const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      finalResults = await Promise.all(
+        sortedPlayers.map(async (p, index) =>
+          prisma.gameResult.create({
+            data: {
+              gameId: game.id,
+              playerId: p.userId,
+              finalScore: p.totalScore,
+              placement: index + 1,
+            },
+            include: {
+              player: true,
+            },
+          })
+        )
+      );
+
+      try {
+        await this.archiveGame(game.id);
+      } catch (archiveError) {
+        console.error('Failed to archive game:', archiveError);
+      }
+    }
+
+    const updatedGame = await this.getGameByRoomCode(roomCode);
+
+    return {
+      isCorrect: true,
+      positions: [selectedPosition],
+      pointsScored,
+      letter: 'BLANK',
+      targetPlayerId,
+      revealedWord: revealedPositions.map((revealed, i) => (revealed ? word[i] : null)),
+      wordCompleted: revealedPositions.every(p => p),
+      gameOver,
+      finalResults,
+      currentTurnPlayerId: guessingPlayerId, // Correct guess, same player continues
+      game: updatedGame,
+    };
+  }
+
+  // Resolve duplicate letter selection when target player chooses which duplicate to reveal
+  async resolveDuplicateSelection(
+    roomCode: string,
+    guessingPlayerId: string,
+    targetPlayerId: string,
+    selectedPosition: number,
+    letter: string
+  ): Promise<any> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: {
+        players: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!game || game.status !== 'ACTIVE') {
+      throw new Error('Game not active');
+    }
+
+    const targetPlayer = game.players.find(p => p.userId === targetPlayerId);
+    if (!targetPlayer) {
+      throw new Error('Invalid target player');
+    }
+
+    const word = targetPlayer.paddedWord || targetPlayer.secretWord!;
+    const revealedPositions = JSON.parse(targetPlayer.revealedPositions as any) as boolean[];
+
+    // Validate the selected position is a valid unrevealed position with the letter
+    if (selectedPosition < 0 || selectedPosition >= word.length) {
+      throw new Error('Invalid position');
+    }
+    if (word[selectedPosition].toUpperCase() !== letter.toUpperCase()) {
+      throw new Error('Selected position does not contain the letter');
+    }
+    if (revealedPositions[selectedPosition]) {
+      throw new Error('Position already revealed');
+    }
+
+    // Reveal only the selected position
+    revealedPositions[selectedPosition] = true;
+
+    // Calculate score based on position (5, 10, 15 pattern)
+    const isBlankPosition = (pos: number) => word[pos] === this.BLANK_CHAR;
+    const pointsScored = this.scoringEngine.calculateScore([selectedPosition], isBlankPosition);
+
+    // Update target player's revealed positions
+    await prisma.gamePlayer.update({
+      where: { id: targetPlayer.id },
+      data: {
+        revealedPositions: JSON.stringify(revealedPositions),
+        isEliminated: revealedPositions.every(p => p),
+      },
+    });
+
+    // Award points to the GUESSING player
+    if (pointsScored > 0) {
+      const guessingPlayer = game.players.find(p => p.userId === guessingPlayerId);
+      if (guessingPlayer) {
+        await prisma.gamePlayer.update({
+          where: { id: guessingPlayer.id },
+          data: {
+            totalScore: guessingPlayer.totalScore + pointsScored,
+          },
+        });
+      }
+    }
+
+    // Record turn
+    await prisma.gameTurn.create({
+      data: {
+        gameId: game.id,
+        playerId: guessingPlayerId,
+        targetPlayerId,
+        guessedLetter: letter,
+        isCorrect: true,
+        positionsRevealed: [selectedPosition],
+        pointsScored,
+        turnNumber: game.roundNumber,
+      },
+    });
+
+    // Check for game over
+    const updatedPlayers = await prisma.gamePlayer.findMany({
+      where: { gameId: game.id },
+    });
+    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
+    const gameOver = activePlayers.length <= 1;
+
+    let finalResults = null;
+    if (gameOver) {
+      await prisma.game.update({
+        where: { id: game.id },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      });
+
+      const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      finalResults = await Promise.all(
+        sortedPlayers.map(async (p, index) =>
+          prisma.gameResult.create({
+            data: {
+              gameId: game.id,
+              playerId: p.userId,
+              finalScore: p.totalScore,
+              placement: index + 1,
+            },
+            include: {
+              player: true,
+            },
+          })
+        )
+      );
+
+      try {
+        await this.archiveGame(game.id);
+      } catch (archiveError) {
+        console.error('Failed to archive game:', archiveError);
+      }
+    }
+
+    const updatedGame = await this.getGameByRoomCode(roomCode);
+
+    return {
+      isCorrect: true,
+      positions: [selectedPosition],
+      pointsScored,
+      letter,
+      targetPlayerId,
+      revealedWord: revealedPositions.map((revealed, i) => (revealed ? word[i] : null)),
+      wordCompleted: revealedPositions.every(p => p),
+      gameOver,
+      finalResults,
+      currentTurnPlayerId: guessingPlayerId, // Correct guess, same player continues
+      game: updatedGame,
+    };
+  }
+
+  // Process a full word guess attempt ("Guess Now!" feature)
+  async processWordGuess(
+    roomCode: string,
+    guessingPlayerId: string,
+    targetPlayerId: string,
+    guessedWord: string
+  ): Promise<any> {
+    guessedWord = guessedWord.toUpperCase().trim();
+
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: {
+        players: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!game || game.status !== 'ACTIVE') {
+      throw new Error('Game not active');
+    }
+
+    const targetPlayer = game.players.find(p => p.userId === targetPlayerId);
+    if (!targetPlayer || targetPlayer.isEliminated) {
+      throw new Error('Invalid target player');
+    }
+
+    const guessingPlayer = game.players.find(p => p.userId === guessingPlayerId);
+    if (!guessingPlayer) {
+      throw new Error('Guessing player not found');
+    }
+
+    // Get the actual secret word (without blanks)
+    const actualWord = targetPlayer.secretWord!.toUpperCase();
+    const paddedWord = targetPlayer.paddedWord || actualWord;
+    const revealedPositions = JSON.parse(targetPlayer.revealedPositions as any) as boolean[];
+
+    // Count unrevealed positions (letters + blanks)
+    const unrevealedCount = revealedPositions.filter(r => !r).length;
+
+    // Check if the guess is correct
+    const isCorrect = guessedWord === actualWord;
+
+    let pointsChange = 0;
+    if (isCorrect) {
+      // Correct guess: +100 if 5+ unrevealed, +50 otherwise
+      pointsChange = unrevealedCount >= 5 ? 100 : 50;
+
+      // Reveal all positions and eliminate the target
+      const allRevealed = new Array(paddedWord.length).fill(true);
+      await prisma.gamePlayer.update({
+        where: { id: targetPlayer.id },
+        data: {
+          revealedPositions: JSON.stringify(allRevealed),
+          isEliminated: true,
+        },
+      });
+    } else {
+      // Incorrect guess: -50 points
+      pointsChange = -50;
+    }
+
+    // Update guessing player's score
+    await prisma.gamePlayer.update({
+      where: { id: guessingPlayer.id },
+      data: {
+        totalScore: Math.max(0, guessingPlayer.totalScore + pointsChange),
+      },
+    });
+
+    // Record the word guess as a turn
+    await prisma.gameTurn.create({
+      data: {
+        gameId: game.id,
+        playerId: guessingPlayerId,
+        targetPlayerId,
+        guessedLetter: `WORD:${guessedWord}`,
+        isCorrect,
+        positionsRevealed: isCorrect ? Array.from({ length: paddedWord.length }, (_, i) => i) : [],
+        pointsScored: pointsChange,
+        turnNumber: game.roundNumber,
+      },
+    });
+
+    // Check if game is over
+    const updatedPlayers = await prisma.gamePlayer.findMany({
+      where: { gameId: game.id },
+    });
+
+    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
+    const gameOver = activePlayers.length <= 1;
+
+    let finalResults = null;
+    if (gameOver) {
+      await prisma.game.update({
+        where: { id: game.id },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+        },
+      });
+
+      const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      finalResults = await Promise.all(
+        sortedPlayers.map(async (p, index) =>
+          prisma.gameResult.create({
+            data: {
+              gameId: game.id,
+              playerId: p.userId,
+              finalScore: p.totalScore,
+              placement: index + 1,
+            },
+            include: {
+              player: true,
+            },
+          })
+        )
+      );
+
+      try {
+        await this.archiveGame(game.id);
+      } catch (archiveError) {
+        console.error('Failed to archive game:', archiveError);
+      }
+    }
+
+    const updatedGame = await this.getGameByRoomCode(roomCode);
+
+    return {
+      isCorrect,
+      guessedWord,
+      actualWord: isCorrect ? actualWord : null, // Only reveal if correct
+      targetPlayerId,
+      guessingPlayerId,
+      pointsChange,
+      unrevealedCount,
+      gameOver,
+      finalResults,
+      game: updatedGame,
     };
   }
 
@@ -669,7 +1304,11 @@ export class GameManager {
         finalScore: r.finalScore,
         placement: r.placement,
       })),
+      viewerGuesses: this.viewerGuesses.get(game.roomCode) || [],
     };
+
+    // Clear viewer guesses for this game
+    this.viewerGuesses.delete(game.roomCode);
 
     // Ensure directory exists
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -680,6 +1319,74 @@ export class GameManager {
     await fs.writeFile(filepath, JSON.stringify(archiveData, null, 2));
 
     console.log(`📁 Game archived to ${filepath}`);
+  }
+
+  // Handle viewer (observer) word guess
+  async submitViewerGuess(
+    roomCode: string,
+    viewerId: string,
+    viewerName: string,
+    targetPlayerId: string,
+    guessedWord: string
+  ): Promise<{ isCorrect: boolean; targetPlayerName: string }> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: {
+        players: {
+          include: { user: true },
+        },
+      },
+    });
+
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    if (game.status !== 'ACTIVE') {
+      throw new Error('Game is not active');
+    }
+
+    // Find target player
+    const targetPlayer = game.players.find(p => p.userId === targetPlayerId);
+    if (!targetPlayer) {
+      throw new Error('Target player not found');
+    }
+
+    // Check if viewer is an active player (they shouldn't be able to use viewer guess)
+    const isActivePlayer = game.players.some(p => p.userId === viewerId);
+    if (isActivePlayer) {
+      throw new Error('Active players cannot use viewer guess');
+    }
+
+    // Check if the word is correct
+    const isCorrect = targetPlayer.secretWord?.toUpperCase() === guessedWord.toUpperCase();
+
+    // Store the guess
+    const guess: ViewerGuess = {
+      viewerId,
+      viewerName,
+      targetPlayerId,
+      targetPlayerName: targetPlayer.user?.displayName || 'Unknown',
+      guessedWord: guessedWord.toUpperCase(),
+      isCorrect,
+      submittedAt: new Date(),
+    };
+
+    const existingGuesses = this.viewerGuesses.get(roomCode) || [];
+    existingGuesses.push(guess);
+    this.viewerGuesses.set(roomCode, existingGuesses);
+
+    console.log(`👁️ Viewer ${viewerName} guessed "${guessedWord}" for ${targetPlayer.user?.displayName}'s word - ${isCorrect ? 'CORRECT' : 'INCORRECT'}`);
+
+    return {
+      isCorrect,
+      targetPlayerName: targetPlayer.user?.displayName || 'Unknown',
+    };
+  }
+
+  // Get viewer guesses for a game (for displaying at game end)
+  getViewerGuesses(roomCode: string): ViewerGuess[] {
+    return this.viewerGuesses.get(roomCode) || [];
   }
 
   async getGameHistoryList(): Promise<any[]> {
@@ -723,6 +1430,148 @@ export class GameManager {
     const filepath = path.join(DATA_DIR, matchingFile);
     const content = await fs.readFile(filepath, 'utf-8');
     return JSON.parse(content);
+  }
+
+  // Cleanup stale games (WAITING status older than 30 minutes)
+  async cleanupStaleGames(): Promise<{ removed: number; roomCodes: string[] }> {
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+
+    // Find stale WAITING games (30 minutes old)
+    const staleWaitingGames = await prisma.game.findMany({
+      where: {
+        status: 'WAITING',
+        createdAt: {
+          lt: thirtyMinutesAgo,
+        },
+      },
+    });
+
+    // Find stale ACTIVE/WORD_SELECTION games (2 hours old or no activity)
+    const staleActiveGames = await prisma.game.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'WORD_SELECTION'] },
+        OR: [
+          { createdAt: { lt: twoHoursAgo } },
+          { startedAt: { lt: twoHoursAgo } },
+        ],
+      },
+    });
+
+    const allStaleGames = [...staleWaitingGames, ...staleActiveGames];
+    const roomCodes = allStaleGames.map(g => g.roomCode);
+
+    if (allStaleGames.length > 0) {
+      const gameIds = allStaleGames.map(g => g.id);
+
+      // Delete turns first
+      await prisma.gameTurn.deleteMany({
+        where: { gameId: { in: gameIds } },
+      });
+
+      // Delete results
+      await prisma.gameResult.deleteMany({
+        where: { gameId: { in: gameIds } },
+      });
+
+      // Delete players due to foreign key constraints
+      await prisma.gamePlayer.deleteMany({
+        where: { gameId: { in: gameIds } },
+      });
+
+      // Delete the games
+      await prisma.game.deleteMany({
+        where: { id: { in: gameIds } },
+      });
+
+      console.log(`🧹 Cleaned up ${allStaleGames.length} stale games: ${roomCodes.join(', ')}`);
+    }
+
+    return { removed: allStaleGames.length, roomCodes };
+  }
+
+  // Force cleanup ALL non-completed games (for admin use)
+  async forceCleanupAllGames(): Promise<{ removed: number; roomCodes: string[] }> {
+    console.log('🧹 forceCleanupAllGames called');
+
+    const nonCompletedGames = await prisma.game.findMany({
+      where: {
+        status: { in: ['WAITING', 'ACTIVE', 'WORD_SELECTION'] },
+      },
+    });
+
+    console.log(`🧹 Found ${nonCompletedGames.length} non-completed games:`, nonCompletedGames.map(g => `${g.roomCode}(${g.status})`));
+
+    const roomCodes = nonCompletedGames.map(g => g.roomCode);
+
+    if (nonCompletedGames.length > 0) {
+      const gameIds = nonCompletedGames.map(g => g.id);
+
+      // Delete turns first
+      await prisma.gameTurn.deleteMany({
+        where: { gameId: { in: gameIds } },
+      });
+
+      // Delete results
+      await prisma.gameResult.deleteMany({
+        where: { gameId: { in: gameIds } },
+      });
+
+      // Delete players due to foreign key constraints
+      await prisma.gamePlayer.deleteMany({
+        where: { gameId: { in: gameIds } },
+      });
+
+      // Delete the games
+      await prisma.game.deleteMany({
+        where: { id: { in: gameIds } },
+      });
+
+      console.log(`🧹 FORCE cleaned up ${nonCompletedGames.length} games: ${roomCodes.join(', ')}`);
+    }
+
+    return { removed: nonCompletedGames.length, roomCodes };
+  }
+
+  // Remove a game from the lobby (only host can remove, or force remove for admin)
+  async removeGame(roomCode: string, userId?: string, force: boolean = false): Promise<void> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: { players: true },
+    });
+
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    // Only allow host to remove, unless force is true (admin/cleanup)
+    if (!force && userId && game.hostId !== userId) {
+      throw new Error('Only host can remove the game');
+    }
+
+    // Delete related records first
+    await prisma.gameTurn.deleteMany({ where: { gameId: game.id } });
+    await prisma.gameResult.deleteMany({ where: { gameId: game.id } });
+    await prisma.gamePlayer.deleteMany({ where: { gameId: game.id } });
+    await prisma.game.delete({ where: { id: game.id } });
+
+    console.log(`🗑️ Game ${roomCode} removed`);
+  }
+
+  // Remove a game from history (archived JSON files)
+  async removeGameHistory(roomCode: string): Promise<void> {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+
+    const files = await fs.readdir(DATA_DIR);
+    const matchingFile = files.find(f => f.startsWith(roomCode) && f.endsWith('.json'));
+
+    if (!matchingFile) {
+      throw new Error('Game history not found');
+    }
+
+    const filepath = path.join(DATA_DIR, matchingFile);
+    await fs.unlink(filepath);
+    console.log(`🗑️ Game history ${roomCode} removed from ${filepath}`);
   }
 
   private sanitizeGame(game: any): any {

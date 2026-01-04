@@ -37,6 +37,236 @@ export default function Game() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Blank selection state
+  const [blankSelectionPending, setBlankSelectionPending] = useState<{
+    positions: number[];
+    deadline: number;
+    guessingPlayerId: string;
+  } | null>(null);
+  const [blankSelectionTimeRemaining, setBlankSelectionTimeRemaining] = useState<number>(0);
+
+  // Duplicate letter selection state
+  const [duplicateSelectionPending, setDuplicateSelectionPending] = useState<{
+    positions: number[];
+    deadline: number;
+    guessingPlayerId: string;
+    letter: string;
+  } | null>(null);
+  const [duplicateSelectionTimeRemaining, setDuplicateSelectionTimeRemaining] = useState<number>(0);
+
+  // Word guess state ("Guess Now!" feature)
+  const [wordGuessActive, setWordGuessActive] = useState<{
+    guessingPlayerId: string;
+    guessingPlayerName: string;
+    targetPlayerId: string;
+    deadline: number;
+  } | null>(null);
+  const [wordGuessInput, setWordGuessInput] = useState('');
+  const [wordGuessTimeRemaining, setWordGuessTimeRemaining] = useState<number>(0);
+  const [showWordGuessModal, setShowWordGuessModal] = useState(false);
+
+  // Viewer guess state (for observers)
+  const [viewerGuessTarget, setViewerGuessTarget] = useState<string | null>(null);
+  const [viewerGuessInput, setViewerGuessInput] = useState('');
+  const [viewerGuesses, setViewerGuesses] = useState<Array<{
+    viewerId: string;
+    viewerName: string;
+    targetPlayerId: string;
+    targetPlayerName: string;
+    guessedWord: string;
+    isCorrect: boolean;
+    submittedAt: string;
+  }>>([]);
+  const [myViewerGuesses, setMyViewerGuesses] = useState<Array<{
+    targetPlayerId: string;
+    targetPlayerName: string;
+    guessedWord: string;
+    isCorrect: boolean;
+    submittedAt: Date;
+  }>>([]);
+
+  // Blank selection countdown timer effect
+  useEffect(() => {
+    if (!blankSelectionPending) {
+      setBlankSelectionTimeRemaining(0);
+      return;
+    }
+
+    const updateBlankTimer = () => {
+      const remaining = Math.max(0, Math.floor((blankSelectionPending.deadline - Date.now()) / 1000));
+      setBlankSelectionTimeRemaining(remaining);
+    };
+
+    updateBlankTimer();
+    const interval = setInterval(updateBlankTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [blankSelectionPending]);
+
+  // Duplicate selection countdown timer effect
+  useEffect(() => {
+    if (!duplicateSelectionPending) {
+      setDuplicateSelectionTimeRemaining(0);
+      return;
+    }
+
+    const updateDuplicateTimer = () => {
+      const remaining = Math.max(0, Math.floor((duplicateSelectionPending.deadline - Date.now()) / 1000));
+      setDuplicateSelectionTimeRemaining(remaining);
+    };
+
+    updateDuplicateTimer();
+    const interval = setInterval(updateDuplicateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [duplicateSelectionPending]);
+
+  // Word guess countdown timer effect
+  useEffect(() => {
+    if (!wordGuessActive) {
+      setWordGuessTimeRemaining(0);
+      return;
+    }
+
+    const updateWordGuessTimer = () => {
+      const remaining = Math.max(0, Math.floor((wordGuessActive.deadline - Date.now()) / 1000));
+      setWordGuessTimeRemaining(remaining);
+    };
+
+    updateWordGuessTimer();
+    const interval = setInterval(updateWordGuessTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [wordGuessActive]);
+
+  // Handler to initiate word guess
+  const handleInitiateWordGuess = (targetPlayerId: string) => {
+    console.log('🎯 handleInitiateWordGuess called:', { roomCode, targetPlayerId });
+    if (!roomCode) {
+      console.error('❌ No roomCode for word guess');
+      return;
+    }
+
+    const socket = socketService.getSocket();
+    if (!socket || !socketService.isConnected()) {
+      console.error('❌ Socket not connected for word guess');
+      setError('Connection lost. Please refresh the page.');
+      return;
+    }
+
+    console.log('📤 Emitting initiateWordGuess');
+    socket.emit('initiateWordGuess', {
+      roomCode,
+      targetPlayerId,
+    });
+  };
+
+  // Handler to submit word guess
+  const handleSubmitWordGuess = () => {
+    if (!roomCode || !wordGuessInput.trim()) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('📤 Emitting submitWordGuess:', wordGuessInput.trim().toUpperCase());
+    socket.emit('submitWordGuess', {
+      roomCode,
+      guessedWord: wordGuessInput.trim().toUpperCase(),
+    });
+
+    setWordGuessInput('');
+    setShowWordGuessModal(false);
+  };
+
+  // Handler to cancel word guess
+  const handleCancelWordGuess = () => {
+    if (!roomCode) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('📤 Emitting cancelWordGuess');
+    socket.emit('cancelWordGuess', { roomCode });
+    setShowWordGuessModal(false);
+    setWordGuessInput('');
+  };
+
+  // Handler to select blank position
+  const handleBlankPositionSelect = (position: number) => {
+    if (!blankSelectionPending || !roomCode) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('📤 Emitting selectBlankPosition:', position);
+    socket.emit('selectBlankPosition', {
+      roomCode,
+      position,
+    });
+
+    // Clear pending state immediately for responsive UI
+    setBlankSelectionPending(null);
+  };
+
+  // Handler to select duplicate letter position
+  const handleDuplicatePositionSelect = (position: number) => {
+    if (!duplicateSelectionPending || !roomCode) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('📤 Emitting selectDuplicatePosition:', position);
+    socket.emit('selectDuplicatePosition', {
+      roomCode,
+      position,
+    });
+
+    // Clear pending state immediately for responsive UI
+    setDuplicateSelectionPending(null);
+  };
+
+  // Handler to leave game
+  const handleLeaveGame = () => {
+    if (!roomCode) return;
+    if (!confirm('Are you sure you want to leave this game? You will forfeit if the game is in progress.')) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('📤 Emitting leaveGame');
+    socket.emit('leaveGame', { roomCode });
+  };
+
+  // Handler to end game (host only)
+  const handleEndGame = () => {
+    if (!roomCode) return;
+    if (!confirm('Are you sure you want to end this game? This will declare the current leader as winner.')) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('📤 Emitting endGame');
+    socket.emit('endGame', { roomCode, force: true });
+  };
+
+  // Handler for viewer (observer) to submit a word guess
+  const handleViewerGuessSubmit = () => {
+    if (!roomCode || !viewerGuessTarget || !viewerGuessInput.trim()) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('👁️ Submitting viewer guess:', viewerGuessInput.toUpperCase());
+    socket.emit('viewerGuessWord', {
+      roomCode,
+      targetPlayerId: viewerGuessTarget,
+      guessedWord: viewerGuessInput.trim().toUpperCase(),
+    });
+
+    setViewerGuessInput('');
+    setViewerGuessTarget(null);
+  };
+
   // Calculate and update time remaining
   const updateTimeRemaining = useCallback(() => {
     if (game.status === 'ACTIVE' && game.currentTurnStartedAt && game.turnTimerSeconds) {
@@ -64,6 +294,16 @@ export default function Game() {
     };
   }, [game.status, game.currentTurnStartedAt, game.turnTimerSeconds, updateTimeRemaining]);
 
+  // Auto-select opponent in 2-player games when it's my turn
+  useEffect(() => {
+    if (game.status === 'ACTIVE' && game.currentTurnPlayerId === user?.id) {
+      const otherPlayers = game.players.filter(p => p.userId !== user?.id && !p.isEliminated);
+      if (otherPlayers.length === 1) {
+        setSelectedTarget(otherPlayers[0].userId);
+      }
+    }
+  }, [game.status, game.currentTurnPlayerId, game.players, user?.id]);
+
   // Ensure socket is connected and game state is synced when component mounts
   useEffect(() => {
     if (!token || !roomCode) {
@@ -78,6 +318,10 @@ export default function Game() {
     const onGameState = (data: any) => {
       console.log('📥 Game state received:', data.status);
       dispatch(setGame(data));
+      // Extract viewer guesses if game is completed
+      if (data.viewerGuesses && data.viewerGuesses.length > 0) {
+        setViewerGuesses(data.viewerGuesses);
+      }
     };
 
     // Listen for word selection events
@@ -114,10 +358,144 @@ export default function Game() {
       socket.emit('getGame', { roomCode });
     };
 
+    const onLeftGame = (data: any) => {
+      console.log('🚪 Left game:', data);
+      navigate('/');
+    };
+
+    const onGameEnded = (data: any) => {
+      console.log('🛑 Game ended by host:', data);
+      dispatch(setGame(data.game || data));
+      setToastMessage(`Game ended by ${data.endedBy}`);
+    };
+
+    const onPlayerLeft = (data: any) => {
+      console.log('👋 Player left:', data);
+      if (data.game) {
+        dispatch(setGame(data.game));
+      }
+      setToastMessage(`${data.username} left the game`);
+      if (data.gameEnded) {
+        setToastMessage(`${data.username} left - Game Over!`);
+      }
+    };
+
     const onTurnTimeout = (data: any) => {
       console.log('⏰ Turn timeout:', data);
       dispatch(setGame(data.game));
       setToastMessage(`${data.timedOutPlayerName}'s turn timed out!`);
+    };
+
+    const onBlankSelectionRequired = (data: any) => {
+      console.log('🎲 Blank selection required:', data);
+      // Only set pending if current user is the target
+      if (data.targetPlayerId === user?.id) {
+        setBlankSelectionPending({
+          positions: data.positions,
+          deadline: data.deadline,
+          guessingPlayerId: data.guessingPlayerId,
+        });
+      } else {
+        // Other players see a message
+        setToastMessage('Waiting for opponent to choose which blank to reveal...');
+      }
+    };
+
+    const onBlankSelected = (data: any) => {
+      console.log('🎯 Blank selected:', data);
+      setBlankSelectionPending(null);
+      setToastMessage(null); // Clear the "waiting for opponent" toast
+      dispatch(setGame(data.game || data));
+      if (data.autoSelected) {
+        setToastMessage('Blank auto-selected (timeout)');
+      }
+    };
+
+    const onDuplicateSelectionRequired = (data: any) => {
+      console.log('🎲 Duplicate letter selection required:', data);
+      // Only set pending if current user is the target
+      if (data.targetPlayerId === user?.id) {
+        setDuplicateSelectionPending({
+          positions: data.positions,
+          deadline: data.deadline,
+          guessingPlayerId: data.guessingPlayerId,
+          letter: data.letter,
+        });
+      } else {
+        // Other players see a message
+        setToastMessage(`Waiting for opponent to choose which "${data.letter}" to reveal...`);
+      }
+    };
+
+    const onDuplicateSelected = (data: any) => {
+      console.log('🎯 Duplicate selected:', data);
+      setDuplicateSelectionPending(null);
+      setToastMessage(null); // Clear the "waiting for opponent" toast
+      dispatch(setGame(data.game || data));
+      if (data.autoSelected) {
+        setToastMessage(`"${data.letter}" auto-selected (timeout)`);
+      }
+    };
+
+    // Word guess event handlers
+    const onWordGuessStarted = (data: any) => {
+      console.log('🎲 Word guess started:', data);
+      setWordGuessActive({
+        guessingPlayerId: data.guessingPlayerId,
+        guessingPlayerName: data.guessingPlayerName,
+        targetPlayerId: data.targetPlayerId,
+        deadline: data.deadline,
+      });
+
+      // If current user is the one guessing, show the modal
+      if (data.guessingPlayerId === user?.id) {
+        setShowWordGuessModal(true);
+      } else {
+        setToastMessage(`${data.guessingPlayerName} is guessing someone's word...`);
+      }
+    };
+
+    const onWordGuessResult = (data: any) => {
+      console.log('🎯 Word guess result:', data);
+      setWordGuessActive(null);
+      setShowWordGuessModal(false);
+      setWordGuessInput('');
+      setToastMessage(null);
+      dispatch(setGame(data.game || data));
+
+      // Show result toast
+      if (data.isCorrect) {
+        setToastMessage(`${data.guessingPlayerName} guessed the word correctly! +${data.pointsChange} pts`);
+      } else if (data.timedOut) {
+        setToastMessage(`${data.guessingPlayerName}'s word guess timed out! ${data.pointsChange} pts`);
+      } else {
+        setToastMessage(`${data.guessingPlayerName}'s word guess was wrong! ${data.pointsChange} pts`);
+      }
+    };
+
+    const onWordGuessCancelled = (data: any) => {
+      console.log('❌ Word guess cancelled:', data);
+      setWordGuessActive(null);
+      setShowWordGuessModal(false);
+      setWordGuessInput('');
+      setToastMessage(`${data.guessingPlayerName} cancelled their word guess`);
+    };
+
+    // Viewer guess result (only shown to the viewer who made the guess)
+    const onViewerGuessResult = (data: any) => {
+      console.log('👁️ Viewer guess result:', data);
+      setMyViewerGuesses(prev => [...prev, {
+        targetPlayerId: data.targetPlayerId,
+        targetPlayerName: data.targetPlayerName,
+        guessedWord: data.guessedWord,
+        isCorrect: data.isCorrect,
+        submittedAt: new Date(data.submittedAt),
+      }]);
+      // Show brief feedback toast
+      setToastMessage(data.isCorrect
+        ? `Your guess for ${data.targetPlayerName}'s word was correct! 🎉`
+        : `Your guess for ${data.targetPlayerName}'s word was incorrect.`
+      );
     };
 
     const onError = (err: any) => {
@@ -130,9 +508,20 @@ export default function Game() {
     socket.on('playerReady', onPlayerReady);
     socket.on('gameStarted', onGameStarted);
     socket.on('letterGuessed', onLetterGuessed);
+    socket.on('blankSelectionRequired', onBlankSelectionRequired);
+    socket.on('blankSelected', onBlankSelected);
+    socket.on('duplicateSelectionRequired', onDuplicateSelectionRequired);
+    socket.on('duplicateSelected', onDuplicateSelected);
+    socket.on('wordGuessStarted', onWordGuessStarted);
+    socket.on('wordGuessResult', onWordGuessResult);
+    socket.on('wordGuessCancelled', onWordGuessCancelled);
     socket.on('wordCompleted', onWordCompleted);
     socket.on('gameOver', onGameOver);
+    socket.on('leftGame', onLeftGame);
+    socket.on('gameEnded', onGameEnded);
+    socket.on('playerLeft', onPlayerLeft);
     socket.on('turnTimeout', onTurnTimeout);
+    socket.on('viewerGuessResult', onViewerGuessResult);
     socket.on('error', onError);
 
     // Join room and get current game state when component mounts
@@ -154,13 +543,24 @@ export default function Game() {
       socket.off('playerReady', onPlayerReady);
       socket.off('gameStarted', onGameStarted);
       socket.off('letterGuessed', onLetterGuessed);
+      socket.off('blankSelectionRequired', onBlankSelectionRequired);
+      socket.off('blankSelected', onBlankSelected);
+      socket.off('duplicateSelectionRequired', onDuplicateSelectionRequired);
+      socket.off('duplicateSelected', onDuplicateSelected);
+      socket.off('wordGuessStarted', onWordGuessStarted);
+      socket.off('wordGuessResult', onWordGuessResult);
+      socket.off('wordGuessCancelled', onWordGuessCancelled);
       socket.off('wordCompleted', onWordCompleted);
       socket.off('gameOver', onGameOver);
+      socket.off('leftGame', onLeftGame);
+      socket.off('gameEnded', onGameEnded);
+      socket.off('playerLeft', onPlayerLeft);
       socket.off('turnTimeout', onTurnTimeout);
+      socket.off('viewerGuessResult', onViewerGuessResult);
       socket.off('error', onError);
       socket.off('connect', syncGameState);
     };
-  }, [token, roomCode, dispatch, navigate]);
+  }, [token, roomCode, dispatch, navigate, user?.id]);
 
   // Format time remaining for display
   const formatTime = (seconds: number): string => {
@@ -187,7 +587,7 @@ export default function Game() {
 
     const totalLength = word.length + frontPadding + backPadding;
     if (totalLength > 12) {
-      setError('Total length with padding cannot exceed 12');
+      setError('Total length with blanks cannot exceed 12');
       return;
     }
 
@@ -228,8 +628,8 @@ export default function Game() {
             <p className="text-text-secondary mb-6">
               Waiting for other players to choose their words...
             </p>
-            <div className="space-y-2">
-              {game.players.map(p => (
+            <div className="space-y-2 mb-6">
+              {[...game.players].sort((a, b) => a.turnOrder - b.turnOrder).map(p => (
                 <div key={p.userId} className="flex justify-between items-center p-3 bg-primary-bg rounded">
                   <span>{p.displayName}</span>
                   <span className={p.hasSelectedWord ? 'text-success' : 'text-text-muted'}>
@@ -237,6 +637,22 @@ export default function Game() {
                   </span>
                 </div>
               ))}
+            </div>
+            <div className="flex justify-center gap-2">
+              <button
+                onClick={handleLeaveGame}
+                className="px-4 py-2 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30 transition-colors text-sm font-semibold"
+              >
+                🚪 Leave Game
+              </button>
+              {game.hostId === user?.id && (
+                <button
+                  onClick={handleEndGame}
+                  className="px-4 py-2 bg-orange-600/20 text-orange-400 rounded hover:bg-orange-600/30 transition-colors text-sm font-semibold"
+                >
+                  🛑 End Game
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -251,7 +667,7 @@ export default function Game() {
         <div className="card w-full max-w-md">
           <h2 className="text-2xl font-bold mb-4">Choose Your Secret Word</h2>
           <p className="text-text-secondary mb-6">
-            Select a word between 4-12 letters. Add padding to hide word position!
+            Select a word between 4-12 letters. Add blanks to hide word position!
           </p>
 
           <form onSubmit={handleWordSubmit} className="space-y-4">
@@ -289,11 +705,11 @@ export default function Game() {
               </div>
             )}
 
-            {/* Padding controls */}
+            {/* Blanks controls */}
             {selectedWord.length >= 4 && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Front Padding</label>
+                  <label className="block text-sm font-medium mb-1">Front Blanks</label>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -311,7 +727,7 @@ export default function Game() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Back Padding</label>
+                  <label className="block text-sm font-medium mb-1">Back Blanks</label>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -332,7 +748,7 @@ export default function Game() {
             )}
 
             <div className="text-sm text-text-muted text-center">
-              {selectedWord.length} letters + {frontPadding + backPadding} padding = {totalLength} / 12 total
+              {selectedWord.length} letters + {frontPadding + backPadding} blanks = {totalLength} / 12 total
               {selectedWord.length > 0 && selectedWord.length < 4 && (
                 <span className="text-warning ml-2">(minimum 4 letters)</span>
               )}
@@ -396,6 +812,38 @@ export default function Game() {
             ))}
           </div>
 
+          {/* Viewer guesses section */}
+          {viewerGuesses.length > 0 && (
+            <div className="mb-6 text-left">
+              <h3 className="font-bold mb-3 text-center">👁️ Viewer Guesses</h3>
+              <div className="space-y-2">
+                {viewerGuesses.map((guess, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between p-2 rounded text-sm ${
+                      guess.isCorrect ? 'bg-green-600/20' : 'bg-red-600/20'
+                    }`}
+                  >
+                    <div>
+                      <span className="font-semibold">{guess.viewerName}</span>
+                      <span className="text-text-muted"> guessed </span>
+                      <span className="font-mono">{guess.guessedWord}</span>
+                      <span className="text-text-muted"> for {guess.targetPlayerName}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className={guess.isCorrect ? 'text-green-400' : 'text-red-400'}>
+                        {guess.isCorrect ? '✓' : '✗'}
+                      </span>
+                      <div className="text-xs text-text-muted">
+                        {new Date(guess.submittedAt).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button
               onClick={() => navigate('/')}
@@ -416,7 +864,8 @@ export default function Game() {
   }
 
   // Active game phase
-  const myTurn = game.currentTurnPlayerId === user?.id;
+  const isObserver = !game.players.some(p => p.userId === user?.id);
+  const myTurn = !isObserver && game.currentTurnPlayerId === user?.id;
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   // Determine timer urgency color
@@ -429,17 +878,268 @@ export default function Game() {
 
   return (
     <div className="min-h-screen p-4">
+      {/* Observer banner */}
+      {isObserver && (
+        <div className="fixed top-0 left-0 right-0 bg-green-600 text-white py-2 px-4 text-center z-50 flex items-center justify-center gap-3">
+          <span className="text-lg">👁️</span>
+          <span className="font-semibold">Observer Mode</span>
+          <span className="text-sm opacity-80">You're watching this game</span>
+          <button
+            onClick={() => navigate('/')}
+            className="ml-4 px-3 py-1 bg-white/20 hover:bg-white/30 rounded text-sm transition-colors"
+          >
+            Leave
+          </button>
+        </div>
+      )}
+
       {/* Toast notification for timeouts */}
       {toastMessage && (
         <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
       )}
 
-      <div className="max-w-6xl mx-auto">
+      {/* Blank selection modal */}
+      {blankSelectionPending && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card w-full max-w-md text-center">
+            <h2 className="text-2xl font-bold mb-2">Choose a Blank to Reveal</h2>
+            <p className="text-text-secondary mb-4">
+              Someone guessed BLANK! Select which position to reveal.
+            </p>
+
+            {/* Countdown timer */}
+            <div className={`text-3xl font-mono font-bold mb-4 ${
+              blankSelectionTimeRemaining <= 10 ? 'text-error animate-pulse' :
+              blankSelectionTimeRemaining <= 20 ? 'text-warning' : 'text-accent'
+            }`}>
+              {blankSelectionTimeRemaining}s
+            </div>
+            <p className="text-sm text-text-muted mb-4">
+              (Rightmost blank will be auto-selected on timeout)
+            </p>
+
+            {/* Word display with clickable blanks */}
+            <div className="flex flex-wrap justify-center gap-1 mb-4">
+              {game.players
+                .find(p => p.userId === user?.id)
+                ?.revealedPositions.map((letter, i) => {
+                  const isClickableBlank = blankSelectionPending.positions.includes(i);
+                  const isBlank = letter === 'BLANK';
+
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => isClickableBlank && handleBlankPositionSelect(i)}
+                      disabled={!isClickableBlank}
+                      className={`w-10 h-10 rounded flex items-center justify-center font-bold text-lg transition-all ${
+                        isClickableBlank
+                          ? 'bg-warning text-black cursor-pointer hover:bg-yellow-400 hover:scale-110 ring-2 ring-warning animate-pulse'
+                          : letter
+                            ? isBlank
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                              : 'bg-accent text-white cursor-not-allowed'
+                            : 'bg-secondary-bg text-text-muted cursor-not-allowed'
+                      }`}
+                    >
+                      {isClickableBlank ? '?' : letter ? (isBlank ? '•' : letter) : '?'}
+                    </button>
+                  );
+                })}
+            </div>
+
+            <p className="text-sm text-text-muted">
+              Click on a yellow position to reveal that blank
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate letter selection modal */}
+      {duplicateSelectionPending && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card w-full max-w-md text-center">
+            <h2 className="text-2xl font-bold mb-2">Choose a "{duplicateSelectionPending.letter}" to Reveal</h2>
+            <p className="text-text-secondary mb-4">
+              Someone guessed "{duplicateSelectionPending.letter}"! Select which position to reveal.
+            </p>
+
+            {/* Countdown timer */}
+            <div className={`text-3xl font-mono font-bold mb-4 ${
+              duplicateSelectionTimeRemaining <= 10 ? 'text-error animate-pulse' :
+              duplicateSelectionTimeRemaining <= 20 ? 'text-warning' : 'text-accent'
+            }`}>
+              {duplicateSelectionTimeRemaining}s
+            </div>
+            <p className="text-sm text-text-muted mb-4">
+              (Rightmost position will be auto-selected on timeout)
+            </p>
+
+            {/* Word display with clickable duplicate positions */}
+            <div className="flex flex-wrap justify-center gap-1 mb-4">
+              {game.players
+                .find(p => p.userId === user?.id)
+                ?.revealedPositions.map((letter, i) => {
+                  const isClickableDuplicate = duplicateSelectionPending.positions.includes(i);
+                  const isBlank = letter === 'BLANK';
+
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => isClickableDuplicate && handleDuplicatePositionSelect(i)}
+                      disabled={!isClickableDuplicate}
+                      className={`w-10 h-10 rounded flex items-center justify-center font-bold text-lg transition-all ${
+                        isClickableDuplicate
+                          ? 'bg-warning text-black cursor-pointer hover:bg-yellow-400 hover:scale-110 ring-2 ring-warning animate-pulse'
+                          : letter
+                            ? isBlank
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                              : 'bg-accent text-white cursor-not-allowed'
+                            : 'bg-secondary-bg text-text-muted cursor-not-allowed'
+                      }`}
+                    >
+                      {isClickableDuplicate ? duplicateSelectionPending.letter : letter ? (isBlank ? '•' : letter) : '?'}
+                    </button>
+                  );
+                })}
+            </div>
+
+            <p className="text-sm text-text-muted">
+              Click on a yellow position to reveal that "{duplicateSelectionPending.letter}"
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Word guess modal */}
+      {showWordGuessModal && wordGuessActive && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card w-full max-w-md text-center">
+            <h2 className="text-2xl font-bold mb-2">🎯 Guess the Word!</h2>
+            <p className="text-text-secondary mb-4">
+              Type the word you think {game.players.find(p => p.userId === wordGuessActive.targetPlayerId)?.displayName} has chosen.
+            </p>
+
+            {/* Countdown timer */}
+            <div className={`text-4xl font-mono font-bold mb-4 ${
+              wordGuessTimeRemaining <= 10 ? 'text-error animate-pulse' :
+              wordGuessTimeRemaining <= 20 ? 'text-warning' : 'text-purple-400'
+            }`}>
+              {wordGuessTimeRemaining}s
+            </div>
+
+            {/* Scoring info */}
+            <div className="bg-primary-bg p-3 rounded-lg mb-4 text-sm">
+              <p className="text-green-400">✓ Correct (5+ unrevealed): +100 pts</p>
+              <p className="text-green-300">✓ Correct (&lt;5 unrevealed): +50 pts</p>
+              <p className="text-red-400">✗ Wrong or timeout: -50 pts</p>
+            </div>
+
+            {/* Word input */}
+            <input
+              type="text"
+              value={wordGuessInput}
+              onChange={(e) => setWordGuessInput(e.target.value.toUpperCase())}
+              className="input-field text-center text-2xl tracking-wider mb-4"
+              placeholder="ENTER WORD"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && wordGuessInput.trim()) {
+                  handleSubmitWordGuess();
+                }
+              }}
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelWordGuess}
+                className="flex-1 py-3 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitWordGuess}
+                disabled={!wordGuessInput.trim()}
+                className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded transition-colors"
+              >
+                Submit Guess
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Someone else is guessing - show overlay */}
+      {wordGuessActive && wordGuessActive.guessingPlayerId !== user?.id && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4">
+          <div className="card w-full max-w-md text-center">
+            <h2 className="text-xl font-bold mb-2">🎯 Word Guess in Progress</h2>
+            <p className="text-text-secondary mb-4">
+              {wordGuessActive.guessingPlayerName} is guessing {game.players.find(p => p.userId === wordGuessActive.targetPlayerId)?.displayName}'s word...
+            </p>
+            <div className={`text-3xl font-mono font-bold ${
+              wordGuessTimeRemaining <= 10 ? 'text-error animate-pulse' :
+              wordGuessTimeRemaining <= 20 ? 'text-warning' : 'text-purple-400'
+            }`}>
+              {wordGuessTimeRemaining}s remaining
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Viewer guess modal */}
+      {viewerGuessTarget && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card w-full max-w-md text-center">
+            <h2 className="text-2xl font-bold mb-2">👁️ Viewer Guess</h2>
+            <p className="text-text-secondary mb-4">
+              Guess {game.players.find(p => p.userId === viewerGuessTarget)?.displayName}'s word
+            </p>
+
+            <input
+              type="text"
+              value={viewerGuessInput}
+              onChange={(e) => setViewerGuessInput(e.target.value.toUpperCase())}
+              placeholder="Enter your guess"
+              className="w-full px-4 py-3 bg-primary-bg border border-tile-border rounded-lg text-center text-xl font-mono mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleViewerGuessSubmit()}
+            />
+
+            <p className="text-sm text-text-muted mb-4">
+              Your guess will be hidden from players until the game ends.
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewerGuessTarget(null)}
+                className="flex-1 py-2 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleViewerGuessSubmit}
+                disabled={!viewerGuessInput.trim()}
+                className="flex-1 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:opacity-50 text-white font-bold rounded transition-colors"
+              >
+                Submit Guess
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={`max-w-6xl mx-auto ${isObserver ? 'pt-12' : ''}`}>
         {/* Header */}
         <div className="bg-secondary-bg rounded-xl p-4 mb-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">PROBE</h1>
-            <p className="text-sm text-text-muted">Room: {roomCode}</p>
+            <h1 className="text-2xl font-bold">
+              <span className="text-yellow-400">P</span>
+              <span className="text-blue-400">R</span>
+              <span className="text-green-400">O</span>
+              <span className="text-red-400">B</span>
+              <span className="text-purple-400">E</span>
+            </h1>
+            <p className="text-sm text-text-muted">Game: {roomCode}</p>
           </div>
 
           {/* Timer display */}
@@ -460,9 +1160,29 @@ export default function Game() {
           </div>
         </div>
 
+        {/* Game controls */}
+        {!isObserver && game.status === 'ACTIVE' && (
+          <div className="flex justify-end gap-2 mb-4">
+            <button
+              onClick={handleLeaveGame}
+              className="px-4 py-2 bg-red-600/20 text-red-400 rounded hover:bg-red-600/30 transition-colors text-sm font-semibold"
+            >
+              🚪 Leave Game
+            </button>
+            {game.hostId === user?.id && (
+              <button
+                onClick={handleEndGame}
+                className="px-4 py-2 bg-orange-600/20 text-orange-400 rounded hover:bg-orange-600/30 transition-colors text-sm font-semibold"
+              >
+                🛑 End Game
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Player boards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          {game.players.map((player) => {
+          {[...game.players].sort((a, b) => a.turnOrder - b.turnOrder).map((player) => {
             const isMe = player.userId === user?.id;
             const isTarget = selectedTarget === player.userId;
             const isActive = game.currentTurnPlayerId === player.userId;
@@ -473,7 +1193,7 @@ export default function Game() {
                 onClick={() => !isMe && !player.isEliminated && myTurn && setSelectedTarget(player.userId)}
                 className={`card cursor-pointer transition-all ${
                   isTarget ? 'ring-4 ring-warning' : ''
-                } ${isActive ? 'ring-2 ring-player-active' : ''} ${
+                } ${isActive && !isTarget ? 'ring-2 ring-green-500' : ''} ${
                   player.isEliminated ? 'opacity-50' : ''
                 }`}
               >
@@ -490,18 +1210,27 @@ export default function Game() {
                 <div className="flex flex-wrap gap-1">
                   {player.revealedPositions.map((letter, i) => {
                     const isBlank = letter === 'BLANK';
+                    // Calculate point value: 5, 10, 15 repeating pattern
+                    const pointValues = [5, 10, 15];
+                    const pointValue = pointValues[i % 3];
+
                     return (
-                      <div
-                        key={i}
-                        className={
-                          letter
-                            ? isBlank
-                              ? 'letter-tile-revealed bg-gray-600 text-gray-400'
-                              : 'letter-tile-revealed'
-                            : 'letter-tile-concealed'
-                        }
-                      >
-                        {letter ? (isBlank ? '\u2022' : letter) : '?'}
+                      <div key={i} className="flex flex-col items-center">
+                        <div
+                          className={
+                            letter
+                              ? isBlank
+                                ? 'letter-tile-revealed bg-gray-600 text-gray-400'
+                                : 'letter-tile-revealed'
+                              : 'letter-tile-concealed'
+                          }
+                        >
+                          {letter ? (isBlank ? '\u2022' : letter) : '?'}
+                        </div>
+                        {/* Show point value for unrevealed positions */}
+                        {!letter && (
+                          <span className="text-xs text-text-muted mt-0.5">{pointValue}</span>
+                        )}
                       </div>
                     );
                   })}
@@ -512,9 +1241,35 @@ export default function Game() {
                   <div className="mt-2 text-sm">
                     <span className="text-red-400">Missed: </span>
                     <span className="text-red-300 font-mono">
-                      {player.missedLetters.sort().join(', ')}
+                      {[...player.missedLetters].sort().join(', ')}
                     </span>
                   </div>
+                )}
+
+                {/* Guess Now button - only for other players who aren't eliminated (not for observers) */}
+                {!isObserver && !isMe && !player.isEliminated && !wordGuessActive && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleInitiateWordGuess(player.userId);
+                    }}
+                    className="mt-3 w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded transition-colors text-sm"
+                  >
+                    🎯 Guess Word!
+                  </button>
+                )}
+
+                {/* Viewer Guess button - only for observers */}
+                {isObserver && !player.isEliminated && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setViewerGuessTarget(player.userId);
+                    }}
+                    className="mt-3 w-full py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded transition-colors text-sm"
+                  >
+                    👁️ Guess Word
+                  </button>
                 )}
               </div>
             );
@@ -538,7 +1293,7 @@ export default function Game() {
                   {letter}
                 </button>
               ))}
-              {/* BLANK button for guessing padding */}
+              {/* BLANK button for guessing blanks */}
               <button
                 onClick={() => handleLetterGuess('BLANK')}
                 disabled={!selectedTarget}
@@ -547,6 +1302,34 @@ export default function Game() {
                 BLANK
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Observer's guesses section */}
+        {isObserver && myViewerGuesses.length > 0 && (
+          <div className="card mt-4">
+            <h3 className="font-bold mb-3">👁️ Your Guesses</h3>
+            <div className="space-y-2">
+              {myViewerGuesses.map((guess, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between p-2 rounded ${
+                    guess.isCorrect ? 'bg-green-600/20' : 'bg-red-600/20'
+                  }`}
+                >
+                  <div>
+                    <span className="font-mono">{guess.guessedWord}</span>
+                    <span className="text-text-muted ml-2">for {guess.targetPlayerName}</span>
+                  </div>
+                  <span className={guess.isCorrect ? 'text-green-400' : 'text-red-400'}>
+                    {guess.isCorrect ? '✓ Correct' : '✗ Wrong'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted mt-2">
+              These will be revealed to all players when the game ends.
+            </p>
           </div>
         )}
 

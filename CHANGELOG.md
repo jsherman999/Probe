@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-01-04 - Phase 8: Observer Mode
+
+### Added
+- **Observer Mode**: Non-players can watch games in progress
+  - "Observer Mode" banner displayed when viewing a game as a non-participant
+  - Real-time game state synchronization for observers
+- **Viewer Word Guessing**: Observers can guess secret words
+  - "Guess Word" buttons appear on player cards for observers
+  - Modal with word input and privacy notice
+  - Guesses are private until game ends (revealed with game history)
+  - "Your Guesses" section shows observer's submitted guesses with status
+- **Watch Games Feature**: Active games visible on home page
+  - "Watch Games in Progress" section shows joinable/watchable games
+  - Quick access to observe ongoing matches
+- **Game History Viewer Guesses**: Completed games show all viewer guesses
+  - New section displays which observers guessed which words
+  - Shows correct/incorrect status for each viewer guess
+
+### Changed
+- Home page layout updated with "Watch Games in Progress" section
+- Game history detail page now includes viewer guesses section
+- Player cards display "Guess Word" button for observer users
+
+### Technical
+- New socket event: `viewerGuessWord` for submitting viewer guesses
+- New socket event: `viewerGuessResult` for receiving guess feedback
+- GameManager method: `submitViewerGuess()` for validation and storage
+- Viewer guesses stored in memory during game, archived with game history
+
 ## [0.6.0] - 2025-01-03 - Phase 7: Enhanced Gameplay Features
 
 ### Added

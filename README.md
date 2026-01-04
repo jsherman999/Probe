@@ -13,9 +13,11 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
 - **Mobile & Desktop**: Responsive design works on iPhone and browsers
 - **Turn-based Gameplay**: Classic Probe rules with letter guessing and scoring
 - **Secure Authentication**: JWT-based user authentication
-- **Room System**: Create or join games with 6-character room codes
+- **Room System**: Create or join games with username-based room codes
 - **Live Updates**: Real-time game state synchronization
 - **Reconnection Handling**: Automatic reconnection with state recovery
+- **Observer Mode**: Watch games in progress and guess secret words
+- **Game History**: View completed games with turn-by-turn replays
 - **Modern UI**: Tailwind CSS with smooth animations
 
 ## 🚀 Quick Start
@@ -206,8 +208,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 - [ ] Game statistics and leaderboards
 - [ ] Tournament mode
 - [ ] Custom word lists
-- [ ] Spectator mode
-- [ ] Replay system
+- [x] Spectator mode (Observer Mode with viewer guessing)
+- [x] Game history (Completed games with replay)
 - [ ] Mobile native apps
 
 ---
