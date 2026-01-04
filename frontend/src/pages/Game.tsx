@@ -36,6 +36,7 @@ export default function Game() {
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [showMyWord, setShowMyWord] = useState(false);
 
   // Blank selection state
   const [blankSelectionPending, setBlankSelectionPending] = useState<{
@@ -864,7 +865,10 @@ export default function Game() {
   }
 
   // Active game phase
-  const isObserver = !game.players.some(p => p.userId === user?.id);
+  // Only mark as observer if game data has actually loaded (has players)
+  // and user is confirmed not in the players list
+  const gameLoaded = game.players.length > 0 && game.id !== null;
+  const isObserver = gameLoaded && !game.players.some(p => p.userId === user?.id);
   const myTurn = !isObserver && game.currentTurnPlayerId === user?.id;
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -1203,9 +1207,29 @@ export default function Game() {
                     {player.isEliminated && (
                       <span className="text-xs text-player-eliminated">Eliminated</span>
                     )}
+                    {/* Show secret word toggle for own player */}
+                    {isMe && player.mySecretWord && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowMyWord(!showMyWord);
+                        }}
+                        className="text-xs text-accent hover:text-accent/80 underline ml-2"
+                      >
+                        {showMyWord ? 'Hide' : 'Show'} my word
+                      </button>
+                    )}
                   </div>
                   <p className="text-2xl font-bold text-accent">{player.totalScore}</p>
                 </div>
+
+                {/* Display own secret word when toggled */}
+                {isMe && showMyWord && player.mySecretWord && (
+                  <div className="mb-3 p-2 bg-accent/20 rounded text-center">
+                    <span className="text-sm text-text-muted">Your word: </span>
+                    <span className="font-bold text-accent tracking-wider">{player.mySecretWord}</span>
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-1">
                   {player.revealedPositions.map((letter, i) => {

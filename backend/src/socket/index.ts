@@ -196,7 +196,8 @@ export function setupSocketHandlers(io: Server) {
     socket.on('getGame', async (data: { roomCode: string }) => {
       try {
         console.log(`📋 Get game request from ${socket.username} for room ${data.roomCode}`);
-        const game = await gameManager.getGameByRoomCode(data.roomCode);
+        // Pass userId so players can see their own secret word
+        const game = await gameManager.getGameByRoomCode(data.roomCode, socket.userId);
         socket.join(data.roomCode); // Ensure they're in the room
         console.log(`📤 Sending game state (status: ${game.status}) to ${socket.username}`);
 
@@ -795,6 +796,9 @@ export function setupSocketHandlers(io: Server) {
           console.log(`🎮 Game over in room ${data.roomCode}`);
           io.to(data.roomCode).emit('gameOver', result.finalResults);
           stopTurnTimer(data.roomCode);
+        } else if (!result.isCorrect) {
+          // Wrong word guess ends the turn - restart timer for next player
+          startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
         }
       } catch (error: any) {
         console.error(`❌ Error submitting word guess:`, error.message);

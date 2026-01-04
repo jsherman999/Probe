@@ -101,7 +101,7 @@ export class GameManager {
     return this.sanitizeGame(game);
   }
 
-  async getGameByRoomCode(roomCode: string): Promise<any> {
+  async getGameByRoomCode(roomCode: string, forUserId?: string): Promise<any> {
     const game = await prisma.game.findUnique({
       where: { roomCode },
       include: {
@@ -117,7 +117,7 @@ export class GameManager {
       throw new Error('Game not found');
     }
 
-    return this.sanitizeGame(game);
+    return this.sanitizeGame(game, forUserId);
   }
 
   async joinGame(roomCode: string, userId: string): Promise<any> {
@@ -135,7 +135,7 @@ export class GameManager {
     // Check if user already in game - if so, just return current state
     const existingPlayer = game.players.find(p => p.userId === userId);
     if (existingPlayer) {
-      return this.getGameByRoomCode(roomCode);
+      return this.getGameByRoomCode(roomCode, userId);
     }
 
     if (game.status !== 'WAITING' && game.status !== 'WORD_SELECTION') {
@@ -608,7 +608,7 @@ export class GameManager {
         await prisma.gamePlayer.update({
           where: { id: guessingPlayer.id },
           data: {
-            totalScore: Math.max(0, guessingPlayer.totalScore - 50), // Don't go below 0
+            totalScore: guessingPlayer.totalScore - 50, // Allow negative scores
           },
         });
       }
@@ -1086,9 +1086,33 @@ export class GameManager {
     await prisma.gamePlayer.update({
       where: { id: guessingPlayer.id },
       data: {
-        totalScore: Math.max(0, guessingPlayer.totalScore + pointsChange),
+        totalScore: guessingPlayer.totalScore + pointsChange, // Allow negative scores
       },
     });
+
+    // If wrong guess, advance to next player's turn
+    if (!isCorrect) {
+      const currentIndex = game.players.findIndex(p => p.userId === guessingPlayerId);
+      let nextIndex = (currentIndex + 1) % game.players.length;
+
+      // Skip eliminated players
+      const activePlayers = game.players.filter(p => !p.isEliminated);
+      if (activePlayers.length > 1) {
+        while (game.players[nextIndex].isEliminated) {
+          nextIndex = (nextIndex + 1) % game.players.length;
+        }
+      }
+
+      const nextPlayer = game.players[nextIndex];
+
+      await prisma.game.update({
+        where: { id: game.id },
+        data: {
+          currentTurnPlayerId: nextPlayer.userId,
+          currentTurnStartedAt: new Date(),
+        },
+      });
+    }
 
     // Record the word guess as a turn
     await prisma.gameTurn.create({
@@ -1574,7 +1598,7 @@ export class GameManager {
     console.log(`🗑️ Game history ${roomCode} removed from ${filepath}`);
   }
 
-  private sanitizeGame(game: any): any {
+  private sanitizeGame(game: any, forUserId?: string): any {
     return {
       id: game.id,
       roomCode: game.roomCode,
@@ -1589,6 +1613,9 @@ export class GameManager {
         const word = p.paddedWord || p.secretWord;
         const wordLength = word?.length || 0;
 
+        // Include the player's own secret word (without blanks) if this is their data
+        const isOwnPlayer = forUserId && p.userId === forUserId;
+
         return {
           id: p.id,
           userId: p.userId,
@@ -1598,6 +1625,8 @@ export class GameManager {
           hasSelectedWord: p.secretWord !== null,
           frontPadding: p.frontPadding || 0,
           backPadding: p.backPadding || 0,
+          // Include own secret word (the actual word without blanks)
+          mySecretWord: isOwnPlayer ? p.secretWord : undefined,
           revealedPositions: word
             ? JSON.parse(p.revealedPositions as any).map((revealed: boolean, i: number) => {
                 if (!revealed) return null;
