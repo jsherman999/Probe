@@ -119,6 +119,138 @@ For running directly on macOS without containers:
    - Copy `frontend/dist` to web server root
    - Configure reverse proxy to backend
 
+## Production Deployment (launchd - macOS)
+
+For automatic startup and restart on macOS using launchd:
+
+### 1. Build the frontend
+
+```bash
+cd frontend
+npx vite build
+cd ..
+```
+
+### 2. Create launchd plist files
+
+Create `~/Library/LaunchAgents/com.probe.backend.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.probe.backend</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/npx</string>
+        <string>tsx</string>
+        <string>src/server.ts</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/path/to/Probe/backend</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>NODE_ENV</key>
+        <string>production</string>
+        <key>DATABASE_URL</key>
+        <string>postgresql://user:password@localhost:5432/probe_game</string>
+        <key>PORT</key>
+        <string>3000</string>
+        <key>JWT_SECRET</key>
+        <string>your_jwt_secret</string>
+        <key>REFRESH_TOKEN_SECRET</key>
+        <string>your_refresh_secret</string>
+        <key>ALLOWED_ORIGINS</key>
+        <string>http://localhost:5200,http://YOUR_IP:5200</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/path/to/Probe/logs/backend.log</string>
+    <key>StandardErrorPath</key>
+    <string>/path/to/Probe/logs/backend.error.log</string>
+</dict>
+</plist>
+```
+
+Create `~/Library/LaunchAgents/com.probe.frontend.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.probe.frontend</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/npx</string>
+        <string>vite</string>
+        <string>preview</string>
+        <string>--port</string>
+        <string>5200</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/path/to/Probe/frontend</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>NODE_ENV</key>
+        <string>production</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/path/to/Probe/logs/frontend.log</string>
+    <key>StandardErrorPath</key>
+    <string>/path/to/Probe/logs/frontend.error.log</string>
+</dict>
+</plist>
+```
+
+### 3. Create logs directory
+
+```bash
+mkdir -p /path/to/Probe/logs
+```
+
+### 4. Load the services
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.probe.backend.plist
+launchctl load ~/Library/LaunchAgents/com.probe.frontend.plist
+```
+
+### 5. Manage services
+
+```bash
+# Check status
+launchctl list | grep com.probe
+
+# Stop services
+launchctl unload ~/Library/LaunchAgents/com.probe.backend.plist
+launchctl unload ~/Library/LaunchAgents/com.probe.frontend.plist
+
+# Start services
+launchctl load ~/Library/LaunchAgents/com.probe.backend.plist
+launchctl load ~/Library/LaunchAgents/com.probe.frontend.plist
+
+# View logs
+tail -f /path/to/Probe/logs/backend.log
+tail -f /path/to/Probe/logs/frontend.log
+```
+
+The services will automatically start on login and restart if they crash.
+
 ## Environment Variables
 
 ### Backend (.env)
