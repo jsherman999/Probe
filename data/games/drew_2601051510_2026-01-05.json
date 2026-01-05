@@ -1,0 +1,272 @@
+{
+  "id": "9af7dd13-eb82-47de-b043-4d9e712f23c5",
+  "roomCode": "drew_2601051510",
+  "status": "COMPLETED",
+  "createdAt": "2026-01-05T21:10:49.938Z",
+  "startedAt": "2026-01-05T21:12:09.784Z",
+  "completedAt": "2026-01-05T21:15:58.984Z",
+  "players": [
+    {
+      "userId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "displayName": "drewbytewby",
+      "secretWord": "POISONOUS",
+      "paddedWord": "••POISONOUS•",
+      "frontPadding": 2,
+      "backPadding": 1,
+      "totalScore": 50,
+      "isEliminated": true,
+      "turnOrder": 0
+    },
+    {
+      "userId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "displayName": "Mama",
+      "secretWord": "ZOOLOGY",
+      "paddedWord": "ZOOLOGY",
+      "frontPadding": 0,
+      "backPadding": 0,
+      "totalScore": 165,
+      "isEliminated": false,
+      "turnOrder": 1
+    }
+  ],
+  "turns": [
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "E",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:12:19.846Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "targetPlayerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "guessedLetter": "E",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:12:28.535Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "N",
+      "isCorrect": true,
+      "positionsRevealed": [
+        7
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-05T21:12:35.107Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "O",
+      "isCorrect": true,
+      "positionsRevealed": [
+        6
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-05T21:12:45.037Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "I",
+      "isCorrect": true,
+      "positionsRevealed": [
+        4
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-05T21:12:50.059Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:13:02.853Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "targetPlayerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "guessedLetter": "I",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:13:12.872Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "S",
+      "isCorrect": true,
+      "positionsRevealed": [
+        10
+      ],
+      "pointsScored": 40,
+      "createdAt": "2026-01-05T21:13:31.531Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "L",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:13:57.949Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "targetPlayerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "guessedLetter": "O",
+      "isCorrect": true,
+      "positionsRevealed": [
+        1
+      ],
+      "pointsScored": 50,
+      "createdAt": "2026-01-05T21:14:03.853Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "targetPlayerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "guessedLetter": "A",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:14:15.967Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        11
+      ],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:14:21.205Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "A",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:14:31.428Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "targetPlayerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "guessedLetter": "U",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-05T21:14:45.780Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "O",
+      "isCorrect": true,
+      "positionsRevealed": [
+        8
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-05T21:15:05.946Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "U",
+      "isCorrect": true,
+      "positionsRevealed": [
+        9
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-05T21:15:08.098Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "S",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-05T21:15:44.035Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "P",
+      "isCorrect": true,
+      "positionsRevealed": [
+        2
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-05T21:15:46.903Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "targetPlayerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "guessedLetter": "WORD:POISONOUS",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "pointsScored": 50,
+      "createdAt": "2026-01-05T21:15:58.982Z"
+    }
+  ],
+  "results": [
+    {
+      "playerId": "be450096-3371-4977-97d2-fa8ca1d85cb0",
+      "displayName": "Mama",
+      "finalScore": 165,
+      "placement": 1
+    },
+    {
+      "playerId": "bdf3c14f-e16e-46cc-89ae-a696713a1b3c",
+      "displayName": "drewbytewby",
+      "finalScore": 50,
+      "placement": 2
+    }
+  ],
+  "viewerGuesses": []
+}

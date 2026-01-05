@@ -22,6 +22,8 @@ class SocketService {
   private config: SocketConfig = DEFAULT_CONFIG;
   private eventHandlers = new Map<string, Set<(...args: any[]) => void>>();
   private onAuthError: (() => void) | null = null;
+  private isRefreshingToken = false;
+  private onTokenRefreshed: ((newToken: string) => void) | null = null;
 
   connect(token: string): Socket {
     // If already connected, reuse
@@ -71,15 +73,60 @@ class SocketService {
       }
     });
 
-    this.socket.on('connect_error', (error) => {
+    this.socket.on('connect_error', async (error) => {
       console.error('❌ Connection error:', error.message);
       this.reconnectAttempts++;
 
-      // Check for auth errors and trigger callback
+      // Check for auth errors - try to refresh token first before logging out
       if (error.message.includes('Invalid') || error.message.includes('token') || error.message.includes('Authentication')) {
-        console.error('🔒 Auth error detected, triggering re-login');
-        if (this.onAuthError) {
-          this.onAuthError();
+        console.warn('🔒 Auth error detected, attempting token refresh...');
+
+        // Don't try multiple refreshes simultaneously
+        if (this.isRefreshingToken) {
+          console.log('🔄 Token refresh already in progress, waiting...');
+          return;
+        }
+
+        this.isRefreshingToken = true;
+
+        try {
+          const refreshToken = localStorage.getItem('refreshToken');
+          if (!refreshToken) {
+            console.error('❌ No refresh token available, logging out');
+            if (this.onAuthError) this.onAuthError();
+            return;
+          }
+
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+          const response = await fetch(`${API_URL}/api/auth/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Token refreshed successfully, reconnecting socket...');
+            localStorage.setItem('token', data.token);
+
+            // Notify app of new token
+            if (this.onTokenRefreshed) {
+              this.onTokenRefreshed(data.token);
+            }
+
+            // Reconnect with new token
+            this.reconnectAttempts = 0;
+            this.disconnect();
+            this.connect(data.token);
+          } else {
+            console.error('❌ Token refresh failed, logging out');
+            if (this.onAuthError) this.onAuthError();
+          }
+        } catch (err) {
+          console.error('❌ Token refresh error:', err);
+          if (this.onAuthError) this.onAuthError();
+        } finally {
+          this.isRefreshingToken = false;
         }
         return;
       }
@@ -129,6 +176,10 @@ class SocketService {
 
   setAuthErrorHandler(callback: () => void): void {
     this.onAuthError = callback;
+  }
+
+  setTokenRefreshedHandler(callback: (newToken: string) => void): void {
+    this.onTokenRefreshed = callback;
   }
 
   getSocket(): Socket | null {

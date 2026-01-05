@@ -21,6 +21,12 @@ function App() {
       console.log('🔒 Auth error - logging out');
       dispatch(logout());
     });
+
+    // Handle token refresh from socket service
+    socketService.setTokenRefreshedHandler((newToken: string) => {
+      console.log('🔄 Token refreshed from socket, updating store');
+      dispatch(updateToken(newToken));
+    });
   }, [dispatch]);
 
   // Try to refresh token on app startup if we have a refresh token
