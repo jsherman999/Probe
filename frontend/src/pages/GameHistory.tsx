@@ -288,34 +288,48 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
         <div className="card mb-6">
           <h2 className="text-xl font-bold mb-4">Secret Words</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {game.players.map((player) => (
-              <div key={player.userId} className="bg-primary-bg p-4 rounded-lg">
-                <p className="font-semibold mb-2">{player.displayName}</p>
-                <div className="flex gap-1 flex-wrap">
-                  {(player.paddedWord || player.secretWord).split('').map((char, i) => {
-                    const isBlank = char === '\u2022';
-                    return (
-                      <div
-                        key={i}
-                        className={`w-8 h-8 rounded flex items-center justify-center font-bold ${
-                          isBlank
-                            ? 'bg-gray-600 text-gray-400'
-                            : 'bg-accent text-white'
-                        }`}
-                      >
-                        {char}
-                      </div>
-                    );
-                  })}
+            {game.players.map((player) => {
+              const wordLength = (player.paddedWord || player.secretWord).length;
+              let tileSizeClass = 'w-8 h-8';
+              let textSizeClass = 'text-base';
+
+              if (wordLength >= 10) {
+                tileSizeClass = 'w-6 h-6';
+                textSizeClass = 'text-sm';
+              } else if (wordLength === 9) {
+                tileSizeClass = 'w-7 h-7';
+                textSizeClass = 'text-base';
+              }
+
+              return (
+                <div key={player.userId} className="bg-primary-bg p-4 rounded-lg">
+                  <p className="font-semibold mb-2">{player.displayName}</p>
+                  <div className="flex gap-1 overflow-x-auto pb-2">
+                    {(player.paddedWord || player.secretWord).split('').map((char, i) => {
+                      const isBlank = char === '\u2022';
+                      return (
+                        <div
+                          key={i}
+                          className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} flex-shrink-0 ${
+                            isBlank
+                              ? 'bg-gray-600 text-gray-400'
+                              : 'bg-accent text-white'
+                          }`}
+                        >
+                          {char}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-text-muted text-sm mt-2">
+                    Word: {player.secretWord}
+                    {(player.frontPadding > 0 || player.backPadding > 0) && (
+                      <span> (Padding: {player.frontPadding}/{player.backPadding})</span>
+                    )}
+                  </p>
                 </div>
-                <p className="text-text-muted text-sm mt-2">
-                  Word: {player.secretWord}
-                  {(player.frontPadding > 0 || player.backPadding > 0) && (
-                    <span> (Padding: {player.frontPadding}/{player.backPadding})</span>
-                  )}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
