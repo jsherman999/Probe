@@ -374,7 +374,12 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
                         <span className="text-success">HIT</span>
                       </>
                     ) : (
-                      <span className="text-error">MISS</span>
+                      <>
+                        {turn.pointsScored < 0 && (
+                          <span className="text-error">{turn.pointsScored}</span>
+                        )}
+                        <span className="text-error">MISS</span>
+                      </>
                     )}
                   </div>
                 </div>

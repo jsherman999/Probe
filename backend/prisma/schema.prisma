@@ -33,6 +33,10 @@ model Game {
   roundNumber          Int       @default(1)
   turnTimerSeconds     Int       @default(300) // 5 minutes default, min 10 seconds
   currentTurnStartedAt DateTime?
+  currentTurnCard      String?   // Card type for current turn (normal, additional, expose_left, etc.)
+  turnCardMultiplier   Int       @default(1) // Multiplier for first successful guess (1-5)
+  turnCardUsed         Boolean   @default(false) // Whether the card/multiplier effect has been used this turn
+  pendingExposePlayerId String?  // Player who must expose a letter (for expose cards)
   createdAt            DateTime  @default(now())
   startedAt            DateTime?
   completedAt          DateTime?

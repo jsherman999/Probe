@@ -17,16 +17,21 @@ Probe is a word-guessing game where players:
 
 ### 1.2 Core Game Mechanics
 
-#### Letter Values (Based on frequency/difficulty)
+#### Position-Based Scoring System
+Points are awarded based on letter position (repeating pattern):
 ```
-1 point:  E, A, I, O, N, R, T, L, S, U
-2 points: D, G
-3 points: B, C, M, P
-4 points: F, H, V, W, Y
-5 points: K
-8 points: J, X
-10 points: Q, Z
+Position 1, 4, 7, 10...: 5 points
+Position 2, 5, 8, 11...: 10 points
+Position 3, 6, 9, 12...: 15 points
 ```
+
+#### Word Padding (Blanks)
+Players can add blank padding to disguise their word's position:
+- Front padding: blanks before the word
+- Back padding: blanks after the word
+- Example: "••LION•••" (2 front, 3 back)
+- Blanks score the same as letters (position-based)
+- Blank exposure order: back blanks (rightmost first), then front blanks (leftmost first)
 
 #### Game Flow
 1. **Setup Phase**
@@ -49,6 +54,38 @@ Probe is a word-guessing game where players:
 4. **Winning**
    - Game ends when all words fully revealed
    - Player with highest score wins
+
+#### Turn Card System
+At the start of each new player's turn, a card is drawn with the following probabilities:
+
+| Card Type | Label | Probability | Effect |
+|-----------|-------|-------------|--------|
+| normal | Take your normal turn | 60% | Standard turn |
+| additional | Take an additional turn | 5% | Continue playing after a miss |
+| expose_left | Player on your left exposes a letter | 5% | Adjacent player reveals one of their own letters, active player gets points |
+| expose_right | Player on your right exposes a letter | 5% | Adjacent player reveals one of their own letters, active player gets points |
+| bonus_20 | Add 20 to your score | 5% | Immediate +20 points |
+| double | Double the value of your first guess | 5% | 2x multiplier on first successful guess |
+| triple | Triple the value of your first guess | 5% | 3x multiplier on first successful guess |
+| quadruple | Quadruple the value of your first guess | 5% | 4x multiplier on first successful guess |
+| quintuple | Quintuple the value of your first guess | 5% | 5x multiplier on first successful guess |
+
+**Expose Card Rules:**
+- The affected player (left/right) chooses which of their OWN unrevealed letters to expose
+- They see their actual word when selecting (not hidden)
+- The active player who drew the card receives the position-based points
+- 30-second timeout with auto-selection of rightmost unrevealed position
+
+#### Turn Timer
+- Configurable timer per turn (10 seconds to 30 minutes, default 5 minutes)
+- Host sets timer in lobby with presets or custom time
+- Real-time countdown with color urgency indicators
+- Server-side timeout handling advances turn automatically
+
+#### Observer Mode
+- Non-players can watch games in progress
+- Observers can guess secret words (private until game ends)
+- Observer guesses revealed in game history after completion
 
 ---
 

@@ -93,6 +93,26 @@ export default function Game() {
     playerName: string;
   } | null>(null);
 
+  // Turn card state
+  const [currentTurnCard, setCurrentTurnCard] = useState<{
+    type: string;
+    label: string;
+    multiplier?: number;
+    affectedPlayerId?: string;
+    affectedPlayerName?: string;
+  } | null>(null);
+
+  // Expose selection state
+  const [exposeSelectionPending, setExposeSelectionPending] = useState<{
+    affectedPlayerId: string;
+    affectedPlayerName: string;
+    activePlayerId: string;
+    deadline: number;
+    paddedWord: string;
+    revealedPositions: boolean[];
+  } | null>(null);
+  const [exposeSelectionTimeRemaining, setExposeSelectionTimeRemaining] = useState<number>(0);
+
   // Blank selection countdown timer effect
   useEffect(() => {
     if (!blankSelectionPending) {
@@ -146,6 +166,24 @@ export default function Game() {
 
     return () => clearInterval(interval);
   }, [wordGuessActive]);
+
+  // Expose selection countdown timer effect
+  useEffect(() => {
+    if (!exposeSelectionPending) {
+      setExposeSelectionTimeRemaining(0);
+      return;
+    }
+
+    const updateExposeTimer = () => {
+      const remaining = Math.max(0, Math.floor((exposeSelectionPending.deadline - Date.now()) / 1000));
+      setExposeSelectionTimeRemaining(remaining);
+    };
+
+    updateExposeTimer();
+    const interval = setInterval(updateExposeTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [exposeSelectionPending]);
 
   // Handler to initiate word guess
   const handleInitiateWordGuess = (targetPlayerId: string) => {
@@ -231,6 +269,23 @@ export default function Game() {
 
     // Clear pending state immediately for responsive UI
     setDuplicateSelectionPending(null);
+  };
+
+  // Handler to select expose card position (for affected player choosing their own letter to reveal)
+  const handleExposePositionSelect = (position: number) => {
+    if (!exposeSelectionPending || !roomCode) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('📤 Emitting selectExposePosition:', position);
+    socket.emit('selectExposePosition', {
+      roomCode,
+      position,
+    });
+
+    // Clear pending state immediately for responsive UI
+    setExposeSelectionPending(null);
   };
 
   // Handler to leave game
@@ -329,6 +384,27 @@ export default function Game() {
       // Extract viewer guesses if game is completed
       if (data.viewerGuesses && data.viewerGuesses.length > 0) {
         setViewerGuesses(data.viewerGuesses);
+      }
+      // Set turn card info from game state
+      if (data.currentTurnCard) {
+        const cardLabels: Record<string, string> = {
+          normal: 'Take your normal turn',
+          additional: 'Take an additional turn',
+          expose_left: 'Player on your left exposes a letter',
+          expose_right: 'Player on your right exposes a letter',
+          bonus_20: '+20 bonus points!',
+          double: 'Double your first guess!',
+          triple: 'Triple your first guess!',
+          quadruple: 'Quadruple your first guess!',
+          quintuple: 'Quintuple your first guess!',
+        };
+        setCurrentTurnCard({
+          type: data.currentTurnCard,
+          label: cardLabels[data.currentTurnCard] || data.currentTurnCard,
+          multiplier: data.turnCardMultiplier > 1 ? data.turnCardMultiplier : undefined,
+        });
+      } else {
+        setCurrentTurnCard(null);
       }
     };
 
@@ -545,6 +621,57 @@ export default function Game() {
       );
     };
 
+    // Turn card drawn for a player
+    const onTurnCardDrawn = (data: any) => {
+      console.log('🎴 Turn card drawn:', data.turnCard?.type);
+      setCurrentTurnCard(data.turnCard);
+    };
+
+    // Expose card requires affected player to choose a position
+    const onExposeCardRequired = (data: any) => {
+      console.log('🎴 Expose card required:', data);
+      console.log('🎴 paddedWord:', data.paddedWord);
+      console.log('🎴 revealedPositions:', data.revealedPositions, typeof data.revealedPositions);
+
+      // Parse revealedPositions if it's a JSON string
+      let revealedPos = data.revealedPositions;
+      if (typeof revealedPos === 'string') {
+        try {
+          revealedPos = JSON.parse(revealedPos);
+        } catch {
+          revealedPos = [];
+        }
+      }
+      // Ensure it's an array
+      if (!Array.isArray(revealedPos)) {
+        revealedPos = [];
+      }
+
+      const paddedWord = data.paddedWord || '';
+      console.log('🎴 Parsed - paddedWord:', paddedWord, 'length:', paddedWord.length);
+      console.log('🎴 Parsed - revealedPositions:', revealedPos, 'length:', revealedPos.length);
+
+      setExposeSelectionPending({
+        affectedPlayerId: data.affectedPlayerId,
+        affectedPlayerName: data.affectedPlayerName,
+        activePlayerId: data.activePlayerId,
+        deadline: data.deadline,
+        paddedWord: paddedWord,
+        revealedPositions: revealedPos,
+      });
+    };
+
+    // Expose card resolved (player selected position)
+    const onExposeCardResolved = (data: any) => {
+      console.log('🎴 Expose card resolved:', data);
+      setExposeSelectionPending(null);
+      setExposeSelectionTimeRemaining(0);
+      // Update game state
+      if (data.game) {
+        dispatch(setGame(data.game));
+      }
+    };
+
     const onError = (err: any) => {
       console.error('❌ Socket error:', err);
       setError(err.message || 'An error occurred');
@@ -570,6 +697,9 @@ export default function Game() {
     socket.on('turnTimeout', onTurnTimeout);
     socket.on('turnChanged', onTurnChanged);
     socket.on('viewerGuessResult', onViewerGuessResult);
+    socket.on('turnCardDrawn', onTurnCardDrawn);
+    socket.on('exposeCardRequired', onExposeCardRequired);
+    socket.on('exposeCardResolved', onExposeCardResolved);
     socket.on('error', onError);
 
     // Join room and get current game state when component mounts
@@ -606,6 +736,9 @@ export default function Game() {
       socket.off('turnTimeout', onTurnTimeout);
       socket.off('turnChanged', onTurnChanged);
       socket.off('viewerGuessResult', onViewerGuessResult);
+      socket.off('turnCardDrawn', onTurnCardDrawn);
+      socket.off('exposeCardRequired', onExposeCardRequired);
+      socket.off('exposeCardResolved', onExposeCardResolved);
       socket.off('error', onError);
       socket.off('connect', syncGameState);
     };
@@ -1128,6 +1261,108 @@ export default function Game() {
         </div>
       )}
 
+      {/* Expose selection modal - for players who must reveal one of their own letters */}
+      {exposeSelectionPending && exposeSelectionPending.affectedPlayerId === user?.id && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card w-full max-w-md text-center">
+            <h2 className="text-2xl font-bold mb-2 text-orange-400">🎴 Expose a Letter!</h2>
+            <p className="text-text-secondary mb-4">
+              The active player drew an expose card. You must reveal one of your letters!
+            </p>
+
+            {/* Countdown timer */}
+            <div className={`text-3xl font-mono font-bold mb-4 ${
+              exposeSelectionTimeRemaining <= 10 ? 'text-error animate-pulse' :
+              exposeSelectionTimeRemaining <= 20 ? 'text-warning' : 'text-orange-400'
+            }`}>
+              {exposeSelectionTimeRemaining}s
+            </div>
+            <p className="text-sm text-text-muted mb-4">
+              (Rightmost unrevealed position will be auto-selected on timeout)
+            </p>
+
+            {/* Word display with clickable unrevealed positions - showing actual letters */}
+            {(() => {
+              // Use the padded word from the expose card event data
+              const paddedWord = exposeSelectionPending.paddedWord;
+              const revealedPositions = exposeSelectionPending.revealedPositions;
+              const wordLength = paddedWord.length;
+
+              // Debug info
+              console.log('🎴 Modal rendering - paddedWord:', paddedWord, 'revealedPositions:', revealedPositions);
+
+              // Handle empty data case
+              if (!paddedWord || wordLength === 0) {
+                return (
+                  <div className="text-error mb-4">
+                    Error: Could not load your word. Please wait for auto-selection.
+                  </div>
+                );
+              }
+
+              let tileSizeClass = 'w-10 h-10';
+              let textSizeClass = 'text-lg';
+
+              if (wordLength >= 10) {
+                tileSizeClass = 'w-8 h-8';
+                textSizeClass = 'text-base';
+              } else if (wordLength === 9) {
+                tileSizeClass = 'w-9 h-9';
+                textSizeClass = 'text-lg';
+              }
+
+              // The blank character used in the backend
+              const BLANK_CHAR = '\u2022'; // bullet character
+
+              return (
+                <div className="flex gap-1 justify-center flex-wrap pb-2 mb-4">
+                  {paddedWord.split('').map((char, i) => {
+                    const isUnrevealed = !revealedPositions[i];
+                    const isBlank = char === BLANK_CHAR;
+
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          console.log('🎴 Button clicked:', i, 'isUnrevealed:', isUnrevealed);
+                          if (isUnrevealed) {
+                            handleExposePositionSelect(i);
+                          }
+                        }}
+                        disabled={!isUnrevealed}
+                        className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all flex-shrink-0 ${
+                          isUnrevealed
+                            ? isBlank
+                              ? 'bg-gray-500 text-gray-200 cursor-pointer hover:bg-gray-400 hover:scale-110 ring-2 ring-gray-400'
+                              : 'bg-orange-500 text-black cursor-pointer hover:bg-orange-400 hover:scale-110 ring-2 ring-orange-400 animate-pulse'
+                            : isBlank
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                              : 'bg-accent text-white cursor-not-allowed'
+                        }`}
+                      >
+                        {char}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            <p className="text-sm text-text-muted">
+              Click on an orange position to reveal that letter
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Expose selection banner - for other players to see who must expose */}
+      {exposeSelectionPending && exposeSelectionPending.affectedPlayerId !== user?.id && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-40 bg-orange-600/90 text-white px-6 py-3 rounded-lg shadow-lg">
+          <span className="font-bold">🎴 {exposeSelectionPending.affectedPlayerName}</span>
+          <span className="ml-2">must expose a letter... ({exposeSelectionTimeRemaining}s)</span>
+        </div>
+      )}
+
       {/* Word guess modal */}
       {showWordGuessModal && wordGuessActive && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -1398,6 +1633,24 @@ export default function Game() {
                     <span className="text-red-300 font-mono">
                       {[...player.missedLetters].sort().join(', ')}
                     </span>
+                  </div>
+                )}
+
+                {/* Turn card button - only for active player viewing their own card */}
+                {isActive && isMe && !player.isEliminated && currentTurnCard && (
+                  <div
+                    className={`mt-3 w-full py-2 px-3 font-bold rounded text-center text-sm ${
+                      currentTurnCard.type === 'normal'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-red-600 text-white'
+                    }`}
+                  >
+                    <div>🎴 {currentTurnCard.label}</div>
+                    {currentTurnCard.multiplier && !game.turnCardUsed && (
+                      <div className="text-xs mt-1 opacity-80">
+                        (First hit x{currentTurnCard.multiplier})
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -26,6 +26,7 @@ interface GameState {
   roundNumber: number;
   turnTimerSeconds: number;
   currentTurnStartedAt: string | null;
+  turnCardUsed: boolean;
 }
 
 const initialState: GameState = {
@@ -38,6 +39,7 @@ const initialState: GameState = {
   roundNumber: 1,
   turnTimerSeconds: 300,
   currentTurnStartedAt: null,
+  turnCardUsed: false,
 };
 
 const gameSlice = createSlice({

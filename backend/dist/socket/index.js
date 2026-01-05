@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSocketHandlers = setupSocketHandlers;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const GameManager_1 = require("../game/GameManager");
+const client_1 = require("@prisma/client");
+const prisma = new client_1.PrismaClient();
 const gameManager = new GameManager_1.GameManager();
 // Store active game timers by roomCode
 const gameTimers = new Map();
@@ -18,6 +20,9 @@ const pendingDuplicateSelections = new Map();
 // Store word guess timers and pending data
 const wordGuessTimers = new Map();
 const pendingWordGuesses = new Map();
+// Store expose card selection timers and pending data
+const exposeSelectionTimers = new Map();
+const pendingExposeSelections = new Map();
 // Start or reset timer for a game
 function startTurnTimer(io, roomCode, turnTimerSeconds) {
     // Clear existing timer if any
@@ -457,6 +462,121 @@ function setupSocketHandlers(io) {
                 else if (!result.isCorrect) {
                     // Reset timer for next player's turn
                     startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
+                    // If a turn card was drawn for the next player, emit it
+                    if (result.turnCardInfo) {
+                        console.log(`🎴 Turn card drawn for next player: ${result.turnCardInfo.type}`);
+                        io.to(data.roomCode).emit('turnCardDrawn', {
+                            playerId: result.currentTurnPlayerId,
+                            turnCard: result.turnCardInfo,
+                        });
+                        // If expose card, start expose selection timer
+                        if (result.turnCardInfo.affectedPlayerId) {
+                            const selectionKey = `${data.roomCode}_expose`;
+                            // Fetch raw player data from database (sanitized game doesn't have paddedWord)
+                            const rawAffectedPlayer = await prisma.gamePlayer.findFirst({
+                                where: {
+                                    game: { roomCode: data.roomCode },
+                                    userId: result.turnCardInfo.affectedPlayerId,
+                                },
+                                include: { user: true },
+                            });
+                            const affectedPlayerName = rawAffectedPlayer?.user?.displayName || 'Unknown';
+                            const paddedWord = rawAffectedPlayer?.paddedWord || rawAffectedPlayer?.secretWord || '';
+                            // Parse revealedPositions from JSON string to boolean array
+                            let parsedRevealedPositions = [];
+                            try {
+                                const revPos = rawAffectedPlayer?.revealedPositions;
+                                if (typeof revPos === 'string') {
+                                    parsedRevealedPositions = JSON.parse(revPos);
+                                }
+                                else if (Array.isArray(revPos)) {
+                                    parsedRevealedPositions = revPos;
+                                }
+                            }
+                            catch (e) {
+                                console.error('Failed to parse revealedPositions:', e);
+                            }
+                            console.log('🎴 Expose card - paddedWord:', paddedWord, 'revealedPositions:', parsedRevealedPositions);
+                            pendingExposeSelections.set(selectionKey, {
+                                roomCode: data.roomCode,
+                                affectedPlayerId: result.turnCardInfo.affectedPlayerId,
+                                affectedPlayerName: affectedPlayerName,
+                                activePlayerId: result.currentTurnPlayerId,
+                            });
+                            // Notify all players that expose selection is required
+                            io.to(data.roomCode).emit('exposeCardRequired', {
+                                affectedPlayerId: result.turnCardInfo.affectedPlayerId,
+                                affectedPlayerName: affectedPlayerName,
+                                activePlayerId: result.currentTurnPlayerId,
+                                deadline: Date.now() + 30000, // 30 seconds
+                                // Send padded word so affected player can see their letters
+                                paddedWord: paddedWord,
+                                revealedPositions: parsedRevealedPositions,
+                            });
+                            // Start 30 second timer for auto-selection
+                            const existingTimer = exposeSelectionTimers.get(selectionKey);
+                            if (existingTimer)
+                                clearTimeout(existingTimer);
+                            const timer = setTimeout(async () => {
+                                const pending = pendingExposeSelections.get(selectionKey);
+                                if (!pending)
+                                    return;
+                                console.log(`⏰ Expose selection timeout for ${pending.affectedPlayerName}`);
+                                try {
+                                    // Fetch fresh player data from database for auto-selection
+                                    const freshPlayer = await prisma.gamePlayer.findFirst({
+                                        where: {
+                                            game: { roomCode: pending.roomCode },
+                                            userId: pending.affectedPlayerId,
+                                        },
+                                    });
+                                    if (!freshPlayer)
+                                        return;
+                                    // Parse revealedPositions from JSON string
+                                    let revealedPositions = [];
+                                    try {
+                                        const revPos = freshPlayer.revealedPositions;
+                                        if (typeof revPos === 'string') {
+                                            revealedPositions = JSON.parse(revPos);
+                                        }
+                                    }
+                                    catch (e) {
+                                        console.error('Failed to parse revealedPositions in timeout:', e);
+                                        return;
+                                    }
+                                    let rightmostUnrevealed = -1;
+                                    for (let i = revealedPositions.length - 1; i >= 0; i--) {
+                                        if (!revealedPositions[i]) {
+                                            rightmostUnrevealed = i;
+                                            break;
+                                        }
+                                    }
+                                    if (rightmostUnrevealed >= 0) {
+                                        const autoResult = await gameManager.resolveExposeCard(pending.roomCode, pending.affectedPlayerId, rightmostUnrevealed);
+                                        // Broadcast result
+                                        io.to(pending.roomCode).emit('exposeCardResolved', {
+                                            ...autoResult,
+                                            autoSelected: true,
+                                        });
+                                        if (autoResult.wordCompleted) {
+                                            io.to(pending.roomCode).emit('wordCompleted', { playerId: pending.affectedPlayerId });
+                                        }
+                                        if (autoResult.gameOver) {
+                                            io.to(pending.roomCode).emit('gameOver', autoResult.finalResults);
+                                            stopTurnTimer(pending.roomCode);
+                                        }
+                                    }
+                                }
+                                catch (err) {
+                                    console.error('Error in expose auto-selection:', err);
+                                }
+                                // Cleanup
+                                pendingExposeSelections.delete(selectionKey);
+                                exposeSelectionTimers.delete(selectionKey);
+                            }, 30000);
+                            exposeSelectionTimers.set(selectionKey, timer);
+                        }
+                    }
                     // Emit turn changed event for UI refresh
                     const nextPlayer = result.game.players.find((p) => p.userId === result.currentTurnPlayerId);
                     io.to(data.roomCode).emit('turnChanged', {
@@ -556,6 +676,49 @@ function setupSocketHandlers(io) {
             }
             catch (error) {
                 console.error(`❌ Error selecting duplicate position:`, error.message);
+                socket.emit('error', { message: error.message });
+            }
+        });
+        // Select expose card position (when affected player chooses which of their own letters to reveal)
+        socket.on('selectExposePosition', async (data) => {
+            try {
+                const selectionKey = `${data.roomCode}_expose`;
+                const pending = pendingExposeSelections.get(selectionKey);
+                if (!pending) {
+                    socket.emit('error', { message: 'No pending expose selection' });
+                    return;
+                }
+                if (pending.affectedPlayerId !== socket.userId) {
+                    socket.emit('error', { message: 'Not your expose selection' });
+                    return;
+                }
+                console.log(`🎯 Expose position selected by ${socket.username}: position ${data.position}`);
+                // Clear the timer
+                const timer = exposeSelectionTimers.get(selectionKey);
+                if (timer)
+                    clearTimeout(timer);
+                exposeSelectionTimers.delete(selectionKey);
+                pendingExposeSelections.delete(selectionKey);
+                // Resolve the expose selection
+                const result = await gameManager.resolveExposeCard(pending.roomCode, pending.affectedPlayerId, data.position);
+                // Broadcast result to all players
+                io.to(data.roomCode).emit('exposeCardResolved', {
+                    ...result,
+                    autoSelected: false,
+                    selectedPosition: data.position,
+                });
+                if (result.wordCompleted) {
+                    console.log(`🏆 Word completed for player ${pending.affectedPlayerId}`);
+                    io.to(data.roomCode).emit('wordCompleted', { playerId: pending.affectedPlayerId });
+                }
+                if (result.gameOver) {
+                    console.log(`🎮 Game over in room ${data.roomCode}`);
+                    io.to(data.roomCode).emit('gameOver', result.finalResults);
+                    stopTurnTimer(data.roomCode);
+                }
+            }
+            catch (error) {
+                console.error(`❌ Error selecting expose position:`, error.message);
                 socket.emit('error', { message: error.message });
             }
         });
