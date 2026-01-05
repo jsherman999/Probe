@@ -571,30 +571,22 @@ export class GameManager {
     let pointsScored = 0;
     let blankMissPenalty = false;
 
-    // If BLANK guess with multiple unrevealed blanks, require target player to choose
+    // If BLANK guess with multiple unrevealed blanks, auto-select the rightmost (last) blank
     if (isBlankGuess && positions.length > 1) {
-      return {
-        blankSelectionRequired: true,
-        positions,
-        targetPlayerId,
-        guessingPlayerId: playerId,
-        roomCode,
-        letter,
-      };
+      const rightmostPosition = Math.max(...positions);
+      console.log(`🎲 Multiple blanks at positions ${positions.join(',')} - auto-selecting rightmost: ${rightmostPosition}`);
+      // Filter positions to only the selected one
+      positions.splice(0, positions.length, rightmostPosition);
     }
 
     // If regular letter guess with multiple unrevealed positions (duplicate letters),
-    // require target player to choose which one to reveal
+    // auto-select one randomly
     if (!isBlankGuess && positions.length > 1) {
-      console.log(`🔀 Duplicate letter "${letter}" found at positions ${positions.join(',')} - requiring target to choose`);
-      return {
-        duplicateSelectionRequired: true,
-        positions,
-        targetPlayerId,
-        guessingPlayerId: playerId,
-        roomCode,
-        letter,
-      };
+      const randomIndex = Math.floor(Math.random() * positions.length);
+      const selectedPosition = positions[randomIndex];
+      console.log(`🎲 Duplicate letter "${letter}" found at positions ${positions.join(',')} - auto-selected random: ${selectedPosition}`);
+      // Filter positions to only the selected one
+      positions.splice(0, positions.length, selectedPosition);
     }
 
     // Penalty for guessing BLANK when no blanks are available

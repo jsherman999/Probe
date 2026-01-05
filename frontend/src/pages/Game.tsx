@@ -35,7 +35,7 @@ export default function Game() {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showMyWord, setShowMyWord] = useState(false);
 
   // Blank selection state
@@ -85,6 +85,12 @@ export default function Game() {
     isCorrect: boolean;
     submittedAt: Date;
   }>>([]);
+
+  // Turn change flash state
+  const [turnChangeFlash, setTurnChangeFlash] = useState<{
+    isMyTurn: boolean;
+    playerName: string;
+  } | null>(null);
 
   // Blank selection countdown timer effect
   useEffect(() => {
@@ -387,6 +393,23 @@ export default function Game() {
       setToastMessage(`${data.timedOutPlayerName}'s turn timed out!`);
     };
 
+    const onTurnChanged = (data: any) => {
+      console.log('🔄 Turn changed:', data);
+      dispatch(setGame(data.game));
+
+      // Show turn change flash notification
+      const isMyTurn = data.currentPlayerId === user?.id;
+      setTurnChangeFlash({
+        isMyTurn,
+        playerName: data.currentPlayerName,
+      });
+
+      // Auto-dismiss after 2 seconds
+      setTimeout(() => {
+        setTurnChangeFlash(null);
+      }, 2000);
+    };
+
     const onBlankSelectionRequired = (data: any) => {
       console.log('🎲 Blank selection required:', data);
       // Only set pending if current user is the target
@@ -522,6 +545,7 @@ export default function Game() {
     socket.on('gameEnded', onGameEnded);
     socket.on('playerLeft', onPlayerLeft);
     socket.on('turnTimeout', onTurnTimeout);
+    socket.on('turnChanged', onTurnChanged);
     socket.on('viewerGuessResult', onViewerGuessResult);
     socket.on('error', onError);
 
@@ -557,6 +581,7 @@ export default function Game() {
       socket.off('gameEnded', onGameEnded);
       socket.off('playerLeft', onPlayerLeft);
       socket.off('turnTimeout', onTurnTimeout);
+      socket.off('turnChanged', onTurnChanged);
       socket.off('viewerGuessResult', onViewerGuessResult);
       socket.off('error', onError);
       socket.off('connect', syncGameState);
@@ -900,6 +925,29 @@ export default function Game() {
       {/* Toast notification for timeouts */}
       {toastMessage && (
         <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+      )}
+
+      {/* Turn change flash notification */}
+      {turnChangeFlash && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center pointer-events-none animate-pulse ${
+          turnChangeFlash.isMyTurn
+            ? 'bg-green-500/30'
+            : 'bg-blue-500/20'
+        }`}>
+          <div className={`text-center p-8 rounded-2xl ${
+            turnChangeFlash.isMyTurn
+              ? 'bg-green-600/90 text-white shadow-2xl shadow-green-500/50 scale-110'
+              : 'bg-secondary-bg/95 text-white shadow-xl'
+          }`}>
+            <p className="text-5xl mb-4">{turnChangeFlash.isMyTurn ? '🎯' : '⏳'}</p>
+            <p className="text-3xl font-bold mb-2">
+              {turnChangeFlash.isMyTurn ? "YOUR TURN!" : `${turnChangeFlash.playerName}'s Turn`}
+            </p>
+            {turnChangeFlash.isMyTurn && (
+              <p className="text-lg opacity-90">Make your move!</p>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Blank selection modal */}

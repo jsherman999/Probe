@@ -13,6 +13,7 @@ interface Player {
   totalScore: number;
   isEliminated: boolean;
   turnOrder: number;
+  mySecretWord?: string; // Only set for the current user's own player
 }
 
 interface GameState {
