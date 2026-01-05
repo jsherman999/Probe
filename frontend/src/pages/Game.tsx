@@ -37,6 +37,7 @@ export default function Game() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showMyWord, setShowMyWord] = useState(false);
+  const [pendingGuess, setPendingGuess] = useState<string | null>(null); // Track letter being guessed
 
   // Blank selection state
   const [blankSelectionPending, setBlankSelectionPending] = useState<{
@@ -350,6 +351,7 @@ export default function Game() {
 
     const onLetterGuessed = (result: any) => {
       console.log('🎯 Letter guessed:', result.letter, result.isCorrect ? 'HIT' : 'MISS');
+      setPendingGuess(null); // Clear pending state
       dispatch(setGame(result.game || result));
     };
 
@@ -395,6 +397,7 @@ export default function Game() {
 
     const onTurnChanged = (data: any) => {
       console.log('🔄 Turn changed:', data);
+      setPendingGuess(null); // Clear pending state on turn change
       dispatch(setGame(data.game));
 
       // Show turn change flash notification
@@ -428,6 +431,7 @@ export default function Game() {
     const onBlankSelected = (data: any) => {
       console.log('🎯 Blank selected:', data);
       setBlankSelectionPending(null);
+      setPendingGuess(null); // Clear pending guess state
       setToastMessage(null); // Clear the "waiting for opponent" toast
       dispatch(setGame(data.game || data));
       if (data.autoSelected) {
@@ -454,6 +458,7 @@ export default function Game() {
     const onDuplicateSelected = (data: any) => {
       console.log('🎯 Duplicate selected:', data);
       setDuplicateSelectionPending(null);
+      setPendingGuess(null); // Clear pending guess state
       setToastMessage(null); // Clear the "waiting for opponent" toast
       dispatch(setGame(data.game || data));
       if (data.autoSelected) {
@@ -635,11 +640,22 @@ export default function Game() {
       return;
     }
 
+    // Prevent double-clicks while waiting for response
+    if (pendingGuess) {
+      return;
+    }
+
+    setPendingGuess(letter);
     socketService.emit('guessLetter', {
       roomCode,
       targetPlayerId: selectedTarget,
       letter,
     });
+
+    // Safety timeout - clear pending state after 5 seconds if no response
+    setTimeout(() => {
+      setPendingGuess((current) => (current === letter ? null : current));
+    }, 5000);
   };
 
   // Word selection phase
@@ -1404,24 +1420,42 @@ export default function Game() {
               {selectedTarget ? 'Select a letter to guess' : 'Select a player first'}
             </p>
             <div className="grid grid-cols-9 md:grid-cols-13 gap-2">
-              {alphabet.map((letter) => (
-                <button
-                  key={letter}
-                  onClick={() => handleLetterGuess(letter)}
-                  disabled={!selectedTarget}
-                  className="aspect-square bg-secondary-bg hover:bg-accent text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  {letter}
-                </button>
-              ))}
+              {alphabet.map((letter) => {
+                const isPending = pendingGuess === letter;
+                const isDisabled = !selectedTarget || (pendingGuess !== null && !isPending);
+                return (
+                  <button
+                    key={letter}
+                    onClick={() => handleLetterGuess(letter)}
+                    disabled={isDisabled}
+                    className={`aspect-square font-bold rounded transition-colors ${
+                      isPending
+                        ? 'bg-accent text-white animate-pulse'
+                        : 'bg-secondary-bg hover:bg-accent text-white'
+                    } ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  >
+                    {letter}
+                  </button>
+                );
+              })}
               {/* BLANK button for guessing blanks */}
-              <button
-                onClick={() => handleLetterGuess('BLANK')}
-                disabled={!selectedTarget}
-                className="col-span-2 aspect-[2/1] bg-gray-600 hover:bg-gray-500 text-gray-300 font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-sm"
-              >
-                BLANK
-              </button>
+              {(() => {
+                const isPending = pendingGuess === 'BLANK';
+                const isDisabled = !selectedTarget || (pendingGuess !== null && !isPending);
+                return (
+                  <button
+                    onClick={() => handleLetterGuess('BLANK')}
+                    disabled={isDisabled}
+                    className={`col-span-2 aspect-[2/1] font-bold rounded transition-colors text-sm ${
+                      isPending
+                        ? 'bg-gray-400 text-white animate-pulse'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    } ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  >
+                    BLANK
+                  </button>
+                );
+              })()}
             </div>
           </div>
         )}

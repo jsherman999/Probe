@@ -189,7 +189,7 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
   const { token } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
-    const fetchGame = async () => {
+    const fetchGame = async (retryCount = 0): Promise<void> => {
       try {
         const response = await fetch(`${API_URL}/game/history/game/${roomCode}`, {
           headers: {
@@ -198,6 +198,13 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
         });
 
         if (!response.ok) {
+          // If not found and we have retries left, wait and try again
+          // This handles the race condition when navigating immediately after game ends
+          if (response.status === 404 && retryCount < 3) {
+            console.log(`Game history not ready yet, retrying in ${(retryCount + 1) * 500}ms...`);
+            await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 500));
+            return fetchGame(retryCount + 1);
+          }
           throw new Error('Failed to fetch game details');
         }
 
