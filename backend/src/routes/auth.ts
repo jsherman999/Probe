@@ -44,13 +44,13 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+      { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as jwt.SignOptions['expiresIn'] }
     );
 
     const refreshToken = jwt.sign(
       { userId: user.id },
       process.env.REFRESH_TOKEN_SECRET!,
-      { expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d' }
+      { expiresIn: (process.env.REFRESH_TOKEN_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'] }
     );
 
     res.json({
@@ -93,7 +93,7 @@ router.post('/refresh', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+      { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as jwt.SignOptions['expiresIn'] }
     );
 
     res.json({ token });

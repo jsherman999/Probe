@@ -45,6 +45,15 @@ interface GameDetail {
     finalScore: number;
     placement: number;
   }[];
+  viewerGuesses?: {
+    viewerId: string;
+    viewerName: string;
+    targetPlayerId: string;
+    targetPlayerName: string;
+    guessedWord: string;
+    isCorrect: boolean;
+    submittedAt: string;
+  }[];
 }
 
 function GameHistoryList() {

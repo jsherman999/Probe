@@ -71,6 +71,14 @@ function startTurnTimer(io: Server, roomCode: string, turnTimerSeconds: number) 
       // Start new timer for next player if game still active
       if (result.game.status === 'ACTIVE') {
         startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
+        // Also emit turn changed for UI refresh
+        io.to(roomCode).emit('turnChanged', {
+          previousPlayerId: result.timedOutPlayerId,
+          previousPlayerName: result.timedOutPlayerName,
+          currentPlayerId: result.nextPlayerId,
+          currentPlayerName: result.nextPlayerName,
+          game: result.game,
+        });
       }
     } catch (error: any) {
       console.error(`❌ Error handling timeout for ${roomCode}:`, error.message);
@@ -564,6 +572,15 @@ export function setupSocketHandlers(io: Server) {
         } else if (!result.isCorrect) {
           // Reset timer for next player's turn
           startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
+          // Emit turn changed event for UI refresh
+          const nextPlayer = result.game.players.find((p: any) => p.userId === result.currentTurnPlayerId);
+          io.to(data.roomCode).emit('turnChanged', {
+            previousPlayerId: socket.userId,
+            previousPlayerName: socket.username,
+            currentPlayerId: result.currentTurnPlayerId,
+            currentPlayerName: nextPlayer?.displayName || 'Unknown',
+            game: result.game,
+          });
         }
       } catch (error: any) {
         console.error(`❌ Error guessing letter:`, error.message);
@@ -799,6 +816,15 @@ export function setupSocketHandlers(io: Server) {
         } else if (!result.isCorrect) {
           // Wrong word guess ends the turn - restart timer for next player
           startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
+          // Emit turn changed event for UI refresh
+          const nextPlayer = result.game.players.find((p: any) => p.userId === result.game.currentTurnPlayerId);
+          io.to(data.roomCode).emit('turnChanged', {
+            previousPlayerId: socket.userId,
+            previousPlayerName: socket.username,
+            currentPlayerId: result.game.currentTurnPlayerId,
+            currentPlayerName: nextPlayer?.displayName || 'Unknown',
+            game: result.game,
+          });
         }
       } catch (error: any) {
         console.error(`❌ Error submitting word guess:`, error.message);
