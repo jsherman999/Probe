@@ -1,0 +1,72 @@
+{
+  "id": "9aaf721f-10e1-4b7c-b142-657d488d7941",
+  "roomCode": "jay_2601050906",
+  "status": "COMPLETED",
+  "createdAt": "2026-01-05T15:06:06.088Z",
+  "startedAt": "2026-01-05T15:06:47.992Z",
+  "completedAt": "2026-01-05T15:07:07.579Z",
+  "players": [
+    {
+      "userId": "2d996bd5-9883-41c0-a69f-b76ae5eaf18c",
+      "displayName": "jaysaf",
+      "secretWord": "CONGRESS",
+      "paddedWord": "CONGRESS••••",
+      "frontPadding": 0,
+      "backPadding": 4,
+      "totalScore": 0,
+      "isEliminated": true,
+      "turnOrder": 1
+    },
+    {
+      "userId": "f6cbb078-a149-498f-82f1-6bdebc73e598",
+      "displayName": "jay",
+      "secretWord": "ABSOLUTELY",
+      "paddedWord": "ABSOLUTELY••",
+      "frontPadding": 0,
+      "backPadding": 2,
+      "totalScore": 100,
+      "isEliminated": false,
+      "turnOrder": 0
+    }
+  ],
+  "turns": [
+    {
+      "turnNumber": 1,
+      "playerId": "f6cbb078-a149-498f-82f1-6bdebc73e598",
+      "targetPlayerId": "2d996bd5-9883-41c0-a69f-b76ae5eaf18c",
+      "guessedLetter": "WORD:CONGRESS",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "pointsScored": 100,
+      "createdAt": "2026-01-05T15:07:07.576Z"
+    }
+  ],
+  "results": [
+    {
+      "playerId": "f6cbb078-a149-498f-82f1-6bdebc73e598",
+      "displayName": "jay",
+      "finalScore": 100,
+      "placement": 1
+    },
+    {
+      "playerId": "2d996bd5-9883-41c0-a69f-b76ae5eaf18c",
+      "displayName": "jaysaf",
+      "finalScore": 0,
+      "placement": 2
+    }
+  ],
+  "viewerGuesses": []
+}
