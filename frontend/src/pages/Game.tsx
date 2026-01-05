@@ -352,7 +352,16 @@ export default function Game() {
     const onLetterGuessed = (result: any) => {
       console.log('🎯 Letter guessed:', result.letter, result.isCorrect ? 'HIT' : 'MISS');
       setPendingGuess(null); // Clear pending state
-      dispatch(setGame(result.game || result));
+
+      // Update game state
+      if (result.game) {
+        dispatch(setGame(result.game));
+      }
+
+      // If game ended, also request fresh state to ensure we have all data
+      if (result.gameOver) {
+        socket.emit('getGame', { roomCode });
+      }
     };
 
     const onWordCompleted = (data: any) => {
@@ -363,7 +372,7 @@ export default function Game() {
 
     const onGameOver = (results: any) => {
       console.log('🎮 Game over:', results);
-      // Request fresh game state
+      // Request fresh game state to ensure we have the latest with all scores
       socket.emit('getGame', { roomCode });
     };
 
@@ -490,7 +499,16 @@ export default function Game() {
       setShowWordGuessModal(false);
       setWordGuessInput('');
       setToastMessage(null);
-      dispatch(setGame(data.game || data));
+
+      // Update game state - ensure we get the latest
+      if (data.game) {
+        dispatch(setGame(data.game));
+      }
+
+      // If game ended, also request fresh state to ensure we have all data
+      if (data.gameOver) {
+        socket.emit('getGame', { roomCode });
+      }
 
       // Show result toast
       if (data.isCorrect) {
