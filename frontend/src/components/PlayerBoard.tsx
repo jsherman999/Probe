@@ -1,3 +1,5 @@
+import { getRobotIconUrl } from '../utils/robotIcons';
+
 interface PlayerBoardProps {
   playerName: string;
   score: number;
@@ -7,6 +9,7 @@ interface PlayerBoardProps {
   isEliminated: boolean;
   isCurrentUser: boolean;
   isBot?: boolean;
+  botId?: string;
   botModelName?: string;
   onClick?: () => void;
 }
@@ -20,9 +23,12 @@ export default function PlayerBoard({
   isEliminated,
   isCurrentUser,
   isBot,
+  botId,
   botModelName,
   onClick,
 }: PlayerBoardProps) {
+  // Get robot icon URL for bots
+  const robotIconUrl = isBot && botId ? getRobotIconUrl(botId) : null;
   return (
     <div
       onClick={onClick}
@@ -38,11 +44,9 @@ export default function PlayerBoard({
       <div className="flex justify-between items-center mb-3">
         <div>
           <p className="font-bold text-lg flex items-center gap-2">
-            {isBot && (
-              <span className="text-cyan-400" title="AI Player">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
+            {isBot && robotIconUrl && (
+              <span className="w-6 h-6 flex-shrink-0" title="AI Player">
+                <img src={robotIconUrl} alt="Bot" className="w-full h-full object-contain" />
               </span>
             )}
             {playerName} {isCurrentUser && '(You)'}

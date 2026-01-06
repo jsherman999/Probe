@@ -1,0 +1,20 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Head -->
+  <rect x="25" y="20" width="50" height="45" rx="3" fill="#4A90E2" stroke="#2C3E50" stroke-width="2"/>
+  <!-- Eyes -->
+  <circle cx="38" cy="35" r="6" fill="#FFD700"/>
+  <circle cx="62" cy="35" r="6" fill="#FFD700"/>
+  <!-- Eye pupils -->
+  <circle cx="38" cy="35" r="3" fill="#2C3E50"/>
+  <circle cx="62" cy="35" r="3" fill="#2C3E50"/>
+  <!-- Mouth -->
+  <rect x="40" y="50" width="20" height="3" rx="1" fill="#2C3E50"/>
+  <!-- Antenna -->
+  <line x1="50" y1="20" x2="50" y2="5" stroke="#2C3E50" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="50" cy="3" r="2" fill="#E74C3C"/>
+  <!-- Body -->
+  <rect x="30" y="65" width="40" height="25" rx="2" fill="#7F8C8D" stroke="#2C3E50" stroke-width="2"/>
+  <!-- Arms -->
+  <rect x="15" y="75" width="15" height="8" rx="4" fill="#95A5A6"/>
+  <rect x="70" y="75" width="15" height="8" rx="4" fill="#95A5A6"/>
+</svg>

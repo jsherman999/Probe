@@ -1,0 +1,16 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Head outline -->
+  <rect x="28" y="18" width="44" height="44" rx="2" fill="none" stroke="#2C3E50" stroke-width="2.5"/>
+  <!-- Eyes -->
+  <circle cx="38" cy="32" r="4" fill="none" stroke="#2C3E50" stroke-width="2"/>
+  <circle cx="62" cy="32" r="4" fill="none" stroke="#2C3E50" stroke-width="2"/>
+  <!-- Nose -->
+  <line x1="50" y1="42" x2="50" y2="50" stroke="#2C3E50" stroke-width="2"/>
+  <!-- Body -->
+  <rect x="30" y="65" width="40" height="28" rx="2" fill="none" stroke="#2C3E50" stroke-width="2.5"/>
+  <!-- Center line on body -->
+  <line x1="50" y1="65" x2="50" y2="93" stroke="#2C3E50" stroke-width="2"/>
+  <!-- Arms -->
+  <line x1="30" y1="75" x2="10" y2="75" stroke="#2C3E50" stroke-width="2" stroke-linecap="round"/>
+  <line x1="70" y1="75" x2="90" y2="75" stroke="#2C3E50" stroke-width="2" stroke-linecap="round"/>
+</svg>

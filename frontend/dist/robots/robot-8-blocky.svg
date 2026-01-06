@@ -1,0 +1,20 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Head -->
+  <rect x="26" y="14" width="48" height="48" fill="#FF8C42" stroke="#FF6B1A" stroke-width="2"/>
+  <!-- Left eye block -->
+  <rect x="32" y="22" width="10" height="10" fill="#2C3E50" stroke="#1A1A1A" stroke-width="1"/>
+  <!-- Right eye block -->
+  <rect x="58" y="22" width="10" height="10" fill="#2C3E50" stroke="#1A1A1A" stroke-width="1"/>
+  <!-- Mouth blocks -->
+  <rect x="40" y="40" width="4" height="4" fill="#1A1A1A"/>
+  <rect x="46" y="40" width="4" height="4" fill="#1A1A1A"/>
+  <rect x="52" y="40" width="4" height="4" fill="#1A1A1A"/>
+  <!-- Body -->
+  <rect x="28" y="64" width="44" height="28" fill="#4A90E2" stroke="#2E5C8A" stroke-width="2"/>
+  <!-- Chest plate -->
+  <rect x="35" y="70" width="30" height="16" fill="#2C3E50" stroke="#1A1A1A" stroke-width="1"/>
+  <!-- Left arm -->
+  <rect x="10" y="72" width="18" height="10" fill="#FF8C42" stroke="#FF6B1A" stroke-width="2"/>
+  <!-- Right arm -->
+  <rect x="72" y="72" width="18" height="10" fill="#FF8C42" stroke="#FF6B1A" stroke-width="2"/>
+</svg>

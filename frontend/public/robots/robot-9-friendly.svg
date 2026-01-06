@@ -1,0 +1,21 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Head -->
+  <rect x="25" y="16" width="50" height="50" rx="6" fill="#95E1D3" stroke="#38ADA9" stroke-width="2"/>
+  <!-- Eyes with shine -->
+  <circle cx="38" cy="32" r="7" fill="#FFFFFF"/>
+  <circle cx="62" cy="32" r="7" fill="#FFFFFF"/>
+  <circle cx="39" cy="31" r="3" fill="#2C3E50"/>
+  <circle cx="63" cy="31" r="3" fill="#2C3E50"/>
+  <circle cx="41" cy="29" r="1.5" fill="#FFFFFF"/>
+  <circle cx="65" cy="29" r="1.5" fill="#FFFFFF"/>
+  <!-- Big smile -->
+  <path d="M 40 45 Q 50 55 60 45" stroke="#38ADA9" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- Rosy cheeks -->
+  <circle cx="28" cy="42" r="4" fill="#FFB6C1" opacity="0.6"/>
+  <circle cx="72" cy="42" r="4" fill="#FFB6C1" opacity="0.6"/>
+  <!-- Body -->
+  <rect x="30" y="68" width="40" height="28" rx="4" fill="#F38181" stroke="#C73E1D" stroke-width="2"/>
+  <!-- Arms -->
+  <ellipse cx="15" cy="77" rx="8" ry="12" fill="#95E1D3" stroke="#38ADA9" stroke-width="1.5"/>
+  <ellipse cx="85" cy="77" rx="8" ry="12" fill="#95E1D3" stroke="#38ADA9" stroke-width="1.5"/>
+</svg>

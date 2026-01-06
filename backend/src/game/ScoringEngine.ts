@@ -2,6 +2,9 @@ export class ScoringEngine {
   // Position-based scoring: 5, 10, 15 repeating pattern
   private readonly POSITION_POINTS = [5, 10, 15];
 
+  // Bonus for completing a word (guessing final letter or full word)
+  public readonly WORD_COMPLETION_BONUS = 50;
+
   /**
    * Get points for a specific position (0-indexed)
    * Position 0 = 5 pts, Position 1 = 10 pts, Position 2 = 15 pts

@@ -783,12 +783,22 @@ export class GameManager {
         }
       }
 
+      // Check if this guess completed the word (revealed final letter)
+      const wordCompleted = revealedPositions.every(p => p);
+
+      // Award word completion bonus if applicable
+      if (wordCompleted) {
+        const completionBonus = this.scoringEngine.WORD_COMPLETION_BONUS;
+        pointsScored += completionBonus;
+        console.log(`🏆 WORD COMPLETED! Adding ${completionBonus} point bonus (total: ${pointsScored})`);
+      }
+
       // Update target player's revealed positions and elimination status
       await prisma.gamePlayer.update({
         where: { id: targetPlayer.id },
         data: {
           revealedPositions: JSON.stringify(revealedPositions),
-          isEliminated: revealedPositions.every(p => p),
+          isEliminated: wordCompleted,
         },
       });
 
