@@ -295,12 +295,15 @@ export default function Game() {
     };
   }, [game.status, game.currentTurnStartedAt, game.turnTimerSeconds, updateTimeRemaining]);
 
+  // Helper to get player's unique identifier (userId for humans, botId for bots)
+  const getPlayerId = (player: any) => player.userId || player.botId;
+
   // Auto-select opponent in 2-player games when it's my turn
   useEffect(() => {
     if (game.status === 'ACTIVE' && game.currentTurnPlayerId === user?.id) {
       const otherPlayers = game.players.filter(p => p.userId !== user?.id && !p.isEliminated);
       if (otherPlayers.length === 1) {
-        setSelectedTarget(otherPlayers[0].userId);
+        setSelectedTarget(getPlayerId(otherPlayers[0]));
       }
     }
   }, [game.status, game.currentTurnPlayerId, game.players, user?.id]);
@@ -631,10 +634,20 @@ export default function Game() {
             </p>
             <div className="space-y-2 mb-6">
               {[...game.players].sort((a, b) => a.turnOrder - b.turnOrder).map(p => (
-                <div key={p.userId} className="flex justify-between items-center p-3 bg-primary-bg rounded">
-                  <span>{p.displayName}</span>
+                <div key={getPlayerId(p)} className="flex justify-between items-center p-3 bg-primary-bg rounded">
+                  <span className="flex items-center gap-2">
+                    {p.isBot && (
+                      <span className="text-cyan-400" title="AI Player">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      </span>
+                    )}
+                    {p.displayName}
+                    {p.isBot && <span className="text-xs text-cyan-400">(AI)</span>}
+                  </span>
                   <span className={p.hasSelectedWord ? 'text-success' : 'text-text-muted'}>
-                    {p.hasSelectedWord ? '✓' : '...'}
+                    {p.hasSelectedWord ? '✓' : p.isBot ? '🤖 Selecting...' : '...'}
                   </span>
                 </div>
               ))}
@@ -790,10 +803,10 @@ export default function Game() {
           <div className="space-y-2 mb-6">
             {sortedPlayers.map((player, index) => (
               <div
-                key={player.userId}
+                key={getPlayerId(player)}
                 className={`flex justify-between items-center p-3 rounded ${
                   index === 0 ? 'bg-accent/20 border border-accent' : 'bg-primary-bg'
-                }`}
+                } ${player.isBot ? 'border-l-4 border-l-cyan-500' : ''}`}
               >
                 <div className="flex items-center gap-3">
                   <span
@@ -803,9 +816,17 @@ export default function Game() {
                   >
                     {index + 1}
                   </span>
-                  <span className="font-semibold">
+                  <span className="font-semibold flex items-center gap-2">
+                    {player.isBot && (
+                      <span className="text-cyan-400" title="AI Player">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      </span>
+                    )}
                     {player.displayName}
                     {player.userId === user?.id && ' (You)'}
+                    {player.isBot && <span className="text-xs text-cyan-400">(AI)</span>}
                   </span>
                 </div>
                 <span className="text-xl font-bold">{player.totalScore} pts</span>
@@ -1020,7 +1041,7 @@ export default function Game() {
           <div className="card w-full max-w-md text-center">
             <h2 className="text-2xl font-bold mb-2">🎯 Guess the Word!</h2>
             <p className="text-text-secondary mb-4">
-              Type the word you think {game.players.find(p => p.userId === wordGuessActive.targetPlayerId)?.displayName} has chosen.
+              Type the word you think {game.players.find(p => getPlayerId(p) === wordGuessActive.targetPlayerId)?.displayName} has chosen.
             </p>
 
             {/* Countdown timer */}
@@ -1078,7 +1099,7 @@ export default function Game() {
           <div className="card w-full max-w-md text-center">
             <h2 className="text-xl font-bold mb-2">🎯 Word Guess in Progress</h2>
             <p className="text-text-secondary mb-4">
-              {wordGuessActive.guessingPlayerName} is guessing {game.players.find(p => p.userId === wordGuessActive.targetPlayerId)?.displayName}'s word...
+              {wordGuessActive.guessingPlayerName} is guessing {game.players.find(p => getPlayerId(p) === wordGuessActive.targetPlayerId)?.displayName}'s word...
             </p>
             <div className={`text-3xl font-mono font-bold ${
               wordGuessTimeRemaining <= 10 ? 'text-error animate-pulse' :
@@ -1096,7 +1117,7 @@ export default function Game() {
           <div className="card w-full max-w-md text-center">
             <h2 className="text-2xl font-bold mb-2">👁️ Viewer Guess</h2>
             <p className="text-text-secondary mb-4">
-              Guess {game.players.find(p => p.userId === viewerGuessTarget)?.displayName}'s word
+              Guess {game.players.find(p => getPlayerId(p) === viewerGuessTarget)?.displayName}'s word
             </p>
 
             <input
@@ -1159,10 +1180,25 @@ export default function Game() {
           <div className="text-right">
             <p className="text-sm text-text-muted">Round {game.roundNumber}</p>
             <p className="text-lg font-semibold">
-              {myTurn ? "Your Turn" : "Waiting..."}
+              {myTurn ? "Your Turn" :
+                game.players.find(p => getPlayerId(p) === game.currentTurnPlayerId)?.isBot
+                  ? "🤖 AI Thinking..."
+                  : "Waiting..."}
             </p>
           </div>
         </div>
+
+        {/* Bot turn indicator banner */}
+        {game.status === 'ACTIVE' && game.players.find(p => getPlayerId(p) === game.currentTurnPlayerId)?.isBot && (
+          <div className="bg-cyan-600/20 border border-cyan-500 rounded-lg p-3 mb-4 flex items-center justify-center gap-3">
+            <svg className="w-6 h-6 text-cyan-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <span className="text-cyan-400 font-semibold">
+              {game.players.find(p => getPlayerId(p) === game.currentTurnPlayerId)?.displayName} is thinking...
+            </span>
+          </div>
+        )}
 
         {/* Game controls */}
         {!isObserver && game.status === 'ACTIVE' && (
@@ -1187,25 +1223,47 @@ export default function Game() {
         {/* Player boards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           {[...game.players].sort((a, b) => a.turnOrder - b.turnOrder).map((player) => {
+            const playerId = getPlayerId(player);
             const isMe = player.userId === user?.id;
-            const isTarget = selectedTarget === player.userId;
-            const isActive = game.currentTurnPlayerId === player.userId;
+            const isBot = player.isBot;
+            const isTarget = selectedTarget === playerId;
+            const isActive = game.currentTurnPlayerId === playerId;
 
             return (
               <div
-                key={player.userId}
-                onClick={() => !isMe && !player.isEliminated && myTurn && setSelectedTarget(player.userId)}
+                key={playerId}
+                onClick={() => !isMe && !player.isEliminated && myTurn && setSelectedTarget(playerId)}
                 className={`card cursor-pointer transition-all ${
                   isTarget ? 'ring-4 ring-warning' : ''
                 } ${isActive && !isTarget ? 'ring-2 ring-green-500' : ''} ${
                   player.isEliminated ? 'opacity-50' : ''
-                }`}
+                } ${isBot ? 'border-l-4 border-l-cyan-500' : ''}`}
               >
                 <div className="flex justify-between items-center mb-3">
                   <div>
-                    <p className="font-bold">{player.displayName} {isMe && '(You)'}</p>
+                    <p className="font-bold flex items-center gap-2">
+                      {isBot && (
+                        <span className="text-cyan-400" title="AI Player">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        </span>
+                      )}
+                      {player.displayName} {isMe && '(You)'}
+                      {isBot && (
+                        <span className="px-1.5 py-0.5 text-xs bg-cyan-600/30 text-cyan-400 rounded font-normal">
+                          AI
+                        </span>
+                      )}
+                    </p>
+                    {isBot && player.botModelName && (
+                      <span className="text-xs text-cyan-400/70">{player.botModelName}</span>
+                    )}
                     {player.isEliminated && (
                       <span className="text-xs text-player-eliminated">Eliminated</span>
+                    )}
+                    {isActive && !player.isEliminated && isBot && (
+                      <span className="text-xs text-cyan-400 animate-pulse">AI thinking...</span>
                     )}
                     {/* Show secret word toggle for own player */}
                     {isMe && player.mySecretWord && (
@@ -1275,7 +1333,7 @@ export default function Game() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleInitiateWordGuess(player.userId);
+                      handleInitiateWordGuess(playerId);
                     }}
                     className="mt-3 w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded transition-colors text-sm"
                   >
@@ -1288,7 +1346,7 @@ export default function Game() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setViewerGuessTarget(player.userId);
+                      setViewerGuessTarget(playerId);
                     }}
                     className="mt-3 w-full py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded transition-colors text-sm"
                   >
