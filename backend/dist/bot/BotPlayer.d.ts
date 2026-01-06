@@ -1,9 +1,8 @@
 /**
  * BotPlayer - Represents an individual AI player in the game
  */
-import { OllamaService } from './OllamaService';
 import { WordValidator } from '../game/WordValidator';
-import { BotConfig, BotConfigInput, GameContext, PlayerInfo, WordSelection, TurnAction } from './types';
+import { BotConfig, BotConfigInput, GameContext, PlayerInfo, WordSelection, TurnAction, LLMProvider } from './types';
 export declare class BotPlayer {
     readonly id: string;
     readonly displayName: string;
@@ -11,7 +10,7 @@ export declare class BotPlayer {
     readonly config: BotConfig;
     private strategy;
     private thinkingDelayBase;
-    constructor(configInput: BotConfigInput, ollama: OllamaService, wordValidator: WordValidator);
+    constructor(configInput: BotConfigInput, provider: LLMProvider, wordValidator: WordValidator);
     /**
      * Calculate base thinking delay based on difficulty
      * Harder bots "think" longer (more realistic)

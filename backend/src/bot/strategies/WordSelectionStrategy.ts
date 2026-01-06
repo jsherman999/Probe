@@ -2,20 +2,35 @@
  * WordSelectionStrategy - Handles bot word selection during the word selection phase
  */
 
-import { OllamaService } from '../OllamaService';
+import { LLMProvider } from '../types';
 import { WordValidator } from '../../game/WordValidator';
 import { BotConfig, GameContext, WordSelection } from '../types';
 
-// Fallback words by difficulty if LLM fails
+// Larger fallback word lists by difficulty if LLM fails (randomized selection)
 const FALLBACK_WORDS: Record<string, string[]> = {
-  easy: ['HOUSE', 'PLANT', 'MUSIC', 'BREAD', 'CHAIR', 'WATER', 'LIGHT', 'SMILE'],
-  medium: ['PUZZLE', 'RHYTHM', 'GLIMPSE', 'WHISPER', 'FORTUNE', 'CRYSTAL', 'JOURNEY'],
-  hard: ['SPHINX', 'QUARTZ', 'ZEPHYR', 'JOCKEY', 'FERVID', 'BYGONE', 'VORTEX', 'JINXED'],
+  easy: [
+    'APPLE', 'BEACH', 'CANDY', 'DANCE', 'EAGLE', 'FLAME', 'GRAPE', 'HAPPY',
+    'IVORY', 'JOLLY', 'KNIFE', 'LEMON', 'MANGO', 'NIGHT', 'OCEAN', 'PIANO',
+    'QUEEN', 'ROBOT', 'STORM', 'TIGER', 'UNCLE', 'VOICE', 'WHALE', 'YOUTH',
+    'ZEBRA', 'CLOUD', 'DREAM', 'FROST', 'GLOBE', 'HONEY', 'JEWEL', 'KOALA',
+  ],
+  medium: [
+    'BRONZE', 'CAMERA', 'DRAGON', 'ECLIPSE', 'FALCON', 'GLACIER', 'HORIZON',
+    'IMPULSE', 'JASMINE', 'KINGDOM', 'LANTERN', 'MYSTERY', 'NUCLEUS', 'OPTIMAL',
+    'PHOENIX', 'QUANTUM', 'RAINBOW', 'SERPENT', 'TRIDENT', 'UMBRELLA', 'VINTAGE',
+    'WHISTLE', 'XENON', 'YOGURT', 'ZEALOUS', 'CAPTAIN', 'DESTINY', 'EMERALD',
+  ],
+  hard: [
+    'SPHINX', 'QUARTZ', 'ZEPHYR', 'JOCKEY', 'FJORD', 'GLYPH', 'NYMPH', 'CRYPT',
+    'LYMPH', 'PSYCH', 'SYNTH', 'TRYST', 'WRYLY', 'XYLYL', 'FLYBY', 'PYGMY',
+    'MYTHS', 'HYMNS', 'GYPSY', 'JAZZY', 'FIZZY', 'FUZZY', 'BUZZY', 'DIZZY',
+    'PROXY', 'EPOXY', 'OXIDE', 'PIXEL', 'VIXEN', 'BOXER', 'MIXER', 'FIXER',
+  ],
 };
 
 export class WordSelectionStrategy {
   constructor(
-    private ollama: OllamaService,
+    private llm: LLMProvider,
     private wordValidator: WordValidator
   ) {}
 
@@ -45,6 +60,7 @@ Requirements:
 - Word MUST be between 4 and 12 letters
 - Word MUST be a valid English dictionary word
 - Word should only contain letters A-Z (no hyphens, spaces, or special characters)
+- IMPORTANT: Do NOT use any of the example words mentioned above - pick your own unique word!
 
 Strategic considerations:
 - Words with uncommon letters (J, Q, X, Z, K, V, W) are harder to guess
@@ -52,14 +68,15 @@ Strategic considerations:
 - Words with repeated letters can be tricky for opponents
 - Shorter words give less information but have fewer positions to protect
 
-Return ONLY the word in UPPERCASE letters. No explanation, no punctuation, just the word.`;
+Think of a creative word, then return ONLY that word in UPPERCASE letters.
+No explanation, no punctuation, no quotes - just the single word on one line.`;
 
     let attempts = 0;
     const maxAttempts = 3;
 
     while (attempts < maxAttempts) {
       try {
-        const response = await this.ollama.generate(
+        const response = await this.llm.generate(
           config.modelName,
           prompt,
           config.ollamaOptions,
@@ -107,20 +124,58 @@ Return ONLY the word in UPPERCASE letters. No explanation, no punctuation, just 
   }
 
   /**
-   * Apply padding strategy based on difficulty
+   * Apply padding strategy - all bots randomly add 0-3 blanks to front and back
+   * Total word + padding must not exceed 12 characters
    */
   private applyPaddingStrategy(word: string, config: BotConfig): WordSelection {
-    // For now, no padding - can be enhanced later
-    // Harder difficulties could strategically add padding
-    let frontPadding = 0;
-    let backPadding = 0;
+    const MAX_TOTAL_LENGTH = 12;
+    const availablePadding = MAX_TOTAL_LENGTH - word.length;
 
-    if (config.difficulty === 'hard' && word.length <= 8) {
-      // Hard bots might add some padding to obscure word length
-      const totalPadding = Math.floor(Math.random() * 3); // 0-2 padding
-      frontPadding = Math.floor(Math.random() * (totalPadding + 1));
-      backPadding = totalPadding - frontPadding;
+    // If word is already at max length, no padding
+    if (availablePadding <= 0) {
+      console.log(`[Bot ${config.displayName}] Word "${word}" (${word.length} chars) - no padding available`);
+      return { word, frontPadding: 0, backPadding: 0 };
     }
+
+    // Total padding varies by difficulty
+    let maxFrontPadding: number;
+    let maxBackPadding: number;
+
+    switch (config.difficulty) {
+      case 'easy':
+        // Easy bots: 0-1 blanks each side
+        maxFrontPadding = 1;
+        maxBackPadding = 1;
+        break;
+      case 'hard':
+        // Hard bots: 0-3 blanks each side
+        maxFrontPadding = 3;
+        maxBackPadding = 3;
+        break;
+      default:
+        // Medium bots: 0-2 blanks each side
+        maxFrontPadding = 2;
+        maxBackPadding = 2;
+    }
+
+    // Limit padding to what's available
+    maxFrontPadding = Math.min(maxFrontPadding, availablePadding);
+    maxBackPadding = Math.min(maxBackPadding, availablePadding);
+
+    // Select random padding
+    let frontPadding = Math.floor(Math.random() * (maxFrontPadding + 1));
+    let backPadding = Math.floor(Math.random() * (maxBackPadding + 1));
+
+    // Ensure total doesn't exceed available padding
+    const totalPadding = frontPadding + backPadding;
+    if (totalPadding > availablePadding) {
+      // Scale down proportionally
+      const scale = availablePadding / totalPadding;
+      frontPadding = Math.floor(frontPadding * scale);
+      backPadding = availablePadding - frontPadding;
+    }
+
+    console.log(`[Bot ${config.displayName}] Word "${word}" (${word.length} chars) with padding: front=${frontPadding}, back=${backPadding}, total=${word.length + frontPadding + backPadding}`);
 
     return { word, frontPadding, backPadding };
   }
@@ -132,6 +187,7 @@ Return ONLY the word in UPPERCASE letters. No explanation, no punctuation, just 
     const words = FALLBACK_WORDS[config.difficulty] || FALLBACK_WORDS.medium;
     const word = words[Math.floor(Math.random() * words.length)];
     console.log(`[Bot ${config.displayName}] Using fallback word: ${word}`);
-    return { word, frontPadding: 0, backPadding: 0 };
+    // Apply padding to fallback words too
+    return this.applyPaddingStrategy(word, config);
   }
 }

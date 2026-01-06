@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useOllama } from '../hooks/useOllama';
-import { BotConfig, getBotPresets, BotPreset } from '../services/botApi';
+import { BotConfig, getBotPresets, BotPreset, LLMProvider } from '../services/botApi';
 import Modal from './Modal';
 
 interface BotConfigModalProps {
@@ -14,7 +14,7 @@ interface BotConfigModalProps {
 }
 
 export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModalProps) {
-  const { models, isLoading, error, refresh } = useOllama();
+  const { models, isLoading, error, refresh, provider, setProvider } = useOllama();
 
   const [displayName, setDisplayName] = useState('Bot Player');
   const [selectedModel, setSelectedModel] = useState('');
@@ -61,6 +61,7 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
       displayName: displayName.trim() || 'Bot Player',
       modelName: selectedModel,
       difficulty,
+      provider,
       personality: personality.trim() || undefined,
       ollamaOptions: {
         temperature,
@@ -69,6 +70,11 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
 
     onAdd(config);
     resetForm();
+  };
+
+  const handleProviderChange = (newProvider: LLMProvider) => {
+    setProvider(newProvider);
+    setSelectedModel(''); // Clear model selection when switching providers
   };
 
   const resetForm = () => {
@@ -119,6 +125,42 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
 
         {!isLoading && !error && (
           <>
+            {/* Provider Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                AI Provider
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleProviderChange('ollama')}
+                  className={`flex-1 py-2 px-3 rounded-md border transition-colors ${
+                    provider === 'ollama'
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  🖥️ Local (Ollama)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleProviderChange('openrouter')}
+                  className={`flex-1 py-2 px-3 rounded-md border transition-colors ${
+                    provider === 'openrouter'
+                      ? 'bg-purple-500 text-white border-purple-500'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  ☁️ Cloud (OpenRouter)
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {provider === 'ollama'
+                  ? 'Uses local Ollama server for AI responses'
+                  : 'Uses OpenRouter cloud API (free models only)'}
+              </p>
+            </div>
+
             {/* Presets */}
             {presets.length > 0 && (
               <div>
@@ -174,7 +216,9 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
               </select>
               {models.length === 0 && (
                 <p className="text-sm text-gray-500 mt-1">
-                  No models found. Run <code className="bg-gray-100 px-1">ollama pull llama3.2</code> to download a model.
+                  {provider === 'ollama'
+                    ? <>No models found. Run <code className="bg-gray-100 px-1">ollama pull llama3.2</code> to download a model.</>
+                    : 'No free models available from OpenRouter.'}
                 </p>
               )}
             </div>

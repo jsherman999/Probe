@@ -2,23 +2,29 @@
  * BotManager - Manages bot player lifecycle and coordinates bot actions
  */
 import { OllamaService } from './OllamaService';
+import { OpenRouterService } from './OpenRouterService';
 import { WordValidator } from '../game/WordValidator';
 import { BotPlayer } from './BotPlayer';
-import { BotConfigInput, BotPreset, GameContext, TurnAction, OllamaModel } from './types';
+import { BotConfigInput, BotPreset, GameContext, TurnAction, OllamaModel, LLMProviderType } from './types';
 export declare class BotManager {
     private ollama;
+    private openRouter;
     private bots;
     private gameBots;
     private wordValidator;
-    constructor(ollama?: OllamaService, wordValidator?: WordValidator);
+    constructor(ollama?: OllamaService, openRouter?: OpenRouterService, wordValidator?: WordValidator);
     /**
-     * Check if Ollama is available
+     * Check if a provider is available
+     */
+    isProviderAvailable(provider?: LLMProviderType): Promise<boolean>;
+    /**
+     * Legacy: Check if Ollama is available
      */
     isOllamaAvailable(): Promise<boolean>;
     /**
-     * Get list of available Ollama models
+     * Get list of available models from a provider
      */
-    getAvailableModels(): Promise<OllamaModel[]>;
+    getAvailableModels(provider?: LLMProviderType): Promise<OllamaModel[]>;
     /**
      * Get Ollama version
      */

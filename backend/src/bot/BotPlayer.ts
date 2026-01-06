@@ -3,7 +3,6 @@
  */
 
 import crypto from 'crypto';
-import { OllamaService } from './OllamaService';
 import { WordValidator } from '../game/WordValidator';
 import { BotStrategy } from './strategies';
 import {
@@ -14,6 +13,7 @@ import {
   WordSelection,
   TurnAction,
   BotDifficulty,
+  LLMProvider,
 } from './types';
 
 export class BotPlayer {
@@ -27,7 +27,7 @@ export class BotPlayer {
 
   constructor(
     configInput: BotConfigInput,
-    ollama: OllamaService,
+    provider: LLMProvider,
     wordValidator: WordValidator
   ) {
     // Generate unique bot ID
@@ -47,10 +47,11 @@ export class BotPlayer {
       },
       personality: configInput.personality,
       difficulty: configInput.difficulty || 'medium',
+      provider: configInput.provider || 'ollama',
     };
 
     this.displayName = this.config.displayName;
-    this.strategy = new BotStrategy(ollama, wordValidator);
+    this.strategy = new BotStrategy(provider, wordValidator);
     this.thinkingDelayBase = this.calculateThinkingDelay(this.config.difficulty);
   }
 
@@ -121,12 +122,17 @@ export class BotPlayer {
       const shouldGuessWord = await this.strategy.shouldGuessWord(ctx, target, this.config);
 
       if (shouldGuessWord) {
-        const word = await this.strategy.guessWord(ctx, target, this.config);
-        console.log(`[${this.displayName}] Attempting word guess: ${word}`);
-        return { type: 'wordGuess', targetPlayerId: targetId, word };
+        try {
+          const word = await this.strategy.guessWord(ctx, target, this.config);
+          console.log(`[${this.displayName}] Attempting word guess: ${word}`);
+          return { type: 'wordGuess', targetPlayerId: targetId, word };
+        } catch (wordGuessError: any) {
+          // Word guess failed (no valid word found) - fall back to letter guess
+          console.log(`[${this.displayName}] Word guess failed (${wordGuessError.message}), falling back to letter guess`);
+        }
       }
 
-      // Letter guess
+      // Letter guess (default or fallback)
       const letter = await this.strategy.guessLetter(ctx, target, this.config);
       console.log(`[${this.displayName}] Guessing letter: ${letter}`);
       return { type: 'letterGuess', targetPlayerId: targetId, letter };

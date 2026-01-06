@@ -16,7 +16,7 @@ class BotPlayer {
     config;
     strategy;
     thinkingDelayBase;
-    constructor(configInput, ollama, wordValidator) {
+    constructor(configInput, provider, wordValidator) {
         // Generate unique bot ID
         this.id = `bot_${crypto_1.default.randomUUID()}`;
         // Build full config with defaults
@@ -33,9 +33,10 @@ class BotPlayer {
             },
             personality: configInput.personality,
             difficulty: configInput.difficulty || 'medium',
+            provider: configInput.provider || 'ollama',
         };
         this.displayName = this.config.displayName;
-        this.strategy = new strategies_1.BotStrategy(ollama, wordValidator);
+        this.strategy = new strategies_1.BotStrategy(provider, wordValidator);
         this.thinkingDelayBase = this.calculateThinkingDelay(this.config.difficulty);
     }
     /**
@@ -96,11 +97,17 @@ class BotPlayer {
             // Decide: letter guess or word guess?
             const shouldGuessWord = await this.strategy.shouldGuessWord(ctx, target, this.config);
             if (shouldGuessWord) {
-                const word = await this.strategy.guessWord(ctx, target, this.config);
-                console.log(`[${this.displayName}] Attempting word guess: ${word}`);
-                return { type: 'wordGuess', targetPlayerId: targetId, word };
+                try {
+                    const word = await this.strategy.guessWord(ctx, target, this.config);
+                    console.log(`[${this.displayName}] Attempting word guess: ${word}`);
+                    return { type: 'wordGuess', targetPlayerId: targetId, word };
+                }
+                catch (wordGuessError) {
+                    // Word guess failed (no valid word found) - fall back to letter guess
+                    console.log(`[${this.displayName}] Word guess failed (${wordGuessError.message}), falling back to letter guess`);
+                }
             }
-            // Letter guess
+            // Letter guess (default or fallback)
             const letter = await this.strategy.guessLetter(ctx, target, this.config);
             console.log(`[${this.displayName}] Guessing letter: ${letter}`);
             return { type: 'letterGuess', targetPlayerId: targetId, letter };
@@ -108,12 +115,22 @@ class BotPlayer {
         catch (error) {
             console.error(`[${this.displayName}] Turn error: ${error.message}`);
             // Return a safe fallback action
-            const fallbackTarget = ctx.players.find(p => !p.isEliminated && p.id !== ctx.botPlayerId);
-            return {
-                type: 'letterGuess',
-                targetPlayerId: fallbackTarget?.id || '',
-                letter: 'E',
-            };
+            try {
+                const fallbackTarget = ctx.players.find(p => !p.isEliminated && p.id !== ctx.botPlayerId);
+                if (fallbackTarget) {
+                    console.log(`[${this.displayName}] Using fallback target: ${fallbackTarget.displayName}`);
+                    return {
+                        type: 'letterGuess',
+                        targetPlayerId: fallbackTarget.id,
+                        letter: 'E', // Safe fallback letter
+                    };
+                }
+            }
+            catch (fallbackError) {
+                console.error(`[${this.displayName}] Fallback generation failed:`, fallbackError);
+            }
+            // Last resort: re-throw error to be handled by caller
+            throw error;
         }
     }
     /**

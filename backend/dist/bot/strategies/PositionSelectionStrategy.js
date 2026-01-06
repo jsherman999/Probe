@@ -10,10 +10,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PositionSelectionStrategy = void 0;
 const ScoringEngine_1 = require("../../game/ScoringEngine");
 class PositionSelectionStrategy {
-    ollama;
+    llm;
     scoringEngine;
-    constructor(ollama) {
-        this.ollama = ollama;
+    constructor(llm) {
+        this.llm = llm;
         this.scoringEngine = new ScoringEngine_1.ScoringEngine();
     }
     /**
@@ -125,7 +125,7 @@ Strategic considerations:
 Which position number should you reveal? Consider both scoring and strategic value.
 Return ONLY the position number.`;
         try {
-            const response = await this.ollama.generate(config.modelName, prompt, { ...config.ollamaOptions, temperature: 0.3, num_predict: 10 });
+            const response = await this.llm.generate(config.modelName, prompt, { ...config.ollamaOptions, temperature: 0.3, num_predict: 10 });
             const selectedPos = parseInt(response.trim().match(/\d+/)?.[0] || '', 10);
             if (positions.includes(selectedPos)) {
                 console.log(`[Bot ${config.displayName}] LLM selected position ${selectedPos} for duplicate "${letter}"`);

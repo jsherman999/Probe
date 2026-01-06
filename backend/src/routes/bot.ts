@@ -22,6 +22,7 @@ const BotConfigSchema = z.object({
   displayName: z.string().min(1).max(30).default('Bot Player'),
   modelName: z.string().min(1),
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
+  provider: z.enum(['ollama', 'openrouter']).optional().default('ollama'),
   personality: z.string().max(500).optional(),
   ollamaOptions: z.object({
     temperature: z.number().min(0).max(2).optional(),
@@ -38,6 +39,7 @@ const BotPresetSchema = z.object({
   displayName: z.string().min(1).max(30),
   modelName: z.string().min(1),
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
+  provider: z.enum(['ollama', 'openrouter']).optional().default('ollama'),
   personality: z.string().max(500).optional(),
   ollamaConfig: z.object({
     temperature: z.number().min(0).max(2).optional(),
@@ -77,11 +79,18 @@ router.get('/ollama/status', async (req: Request, res: Response) => {
 
 /**
  * GET /api/bot/ollama/models
- * List all available (downloaded) Ollama models
+ * List all available models from specified provider (default: ollama)
  */
 router.get('/ollama/models', async (req: Request, res: Response) => {
   try {
-    const models = await botManager.getAvailableModels();
+    const provider = (req.query.provider as string) || 'ollama';
+
+    // Validate provider
+    if (provider !== 'ollama' && provider !== 'openrouter') {
+      return res.status(400).json({ error: 'Invalid provider' });
+    }
+
+    const models = await botManager.getAvailableModels(provider as any);
 
     // Format models for frontend
     const formattedModels = models.map(model => ({
@@ -211,6 +220,7 @@ router.post('/presets', async (req: Request, res: Response) => {
         displayName: data.displayName,
         modelName: data.modelName,
         difficulty: data.difficulty,
+        provider: data.provider || 'ollama',
         personality: data.personality,
         ollamaConfig: data.ollamaConfig || {},
       },
@@ -254,6 +264,7 @@ router.put('/presets/:id', async (req: Request, res: Response) => {
         displayName: data.displayName,
         modelName: data.modelName,
         difficulty: data.difficulty,
+        provider: data.provider,
         personality: data.personality,
         ollamaConfig: data.ollamaConfig,
       },
@@ -338,35 +349,58 @@ router.get('/stats', async (req: Request, res: Response) => {
 router.post('/validate', async (req: Request, res: Response) => {
   try {
     const data = BotConfigSchema.parse(req.body);
+    const providerType = data.provider || 'ollama';
 
-    // Check if Ollama is available
-    const ollamaAvailable = await botManager.isOllamaAvailable();
-    if (!ollamaAvailable) {
+    // Check if provider is available
+    const providerAvailable = await botManager.isProviderAvailable(providerType);
+    if (!providerAvailable) {
+      const errorMsg = providerType === 'openrouter'
+        ? 'OpenRouter API is not accessible (check API key)'
+        : 'Ollama server is not available';
+
       return res.status(503).json({
         valid: false,
-        error: 'Ollama server is not available',
+        error: errorMsg,
       });
     }
 
     // Check if model exists
-    const models = await botManager.getAvailableModels();
+    const models = await botManager.getAvailableModels(providerType);
     const modelExists = models.some(m => m.name === data.modelName);
 
     if (!modelExists) {
+      // For OpenRouter, we might not have the full list cached, so we might want to be lenient
+      // or ensure we fetched the latest list. For now, we enforce strict checking.
       return res.status(400).json({
         valid: false,
-        error: `Model "${data.modelName}" is not available. Please download it first.`,
+        error: `Model "${data.modelName}" is not available on ${providerType}.`,
         availableModels: models.map(m => m.name),
       });
     }
 
-    // Try a test generation
-    const ollama = new OllamaService();
-    const testResponse = await ollama.generate(
-      data.modelName,
-      'Say "ready" if you can respond.',
-      { ...data.ollamaOptions, num_predict: 20 }
-    );
+    // Try a test generation using the provider directly (via temporary bot or service)
+    // We'll Create a temporary bot instance to test generation
+    const tempBot = botManager.createBot({
+      ...data,
+      displayName: 'Validation Bot',
+    });
+
+    // We can't access private tempBot.strategy.llm directly easily without changing visibility
+    // Instead, we'll instantiate the service directly for validation
+    let testResponse = '';
+    const prompt = 'Say "ready" if you can respond.';
+    const options = { ...data.ollamaOptions, num_predict: 20 };
+
+    if (providerType === 'openrouter') {
+      const { openRouterService } = await import('../bot/OpenRouterService');
+      testResponse = await openRouterService.generate(data.modelName, prompt, options);
+    } else {
+      const { ollamaService } = await import('../bot/OllamaService');
+      testResponse = await ollamaService.generate(data.modelName, prompt, options);
+    }
+
+    // Clean up the temp bot from manager (it was added to the map)
+    botManager.destroyBot(tempBot.id);
 
     res.json({
       valid: true,

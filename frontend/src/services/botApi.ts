@@ -16,10 +16,13 @@ export interface OllamaModel {
   };
 }
 
+export type LLMProvider = 'ollama' | 'openrouter';
+
 export interface BotConfig {
   displayName: string;
   modelName: string;
   difficulty: 'easy' | 'medium' | 'hard';
+  provider?: LLMProvider;
   personality?: string;
   ollamaOptions?: {
     temperature?: number;
@@ -57,11 +60,25 @@ export async function getOllamaStatus(): Promise<OllamaStatus> {
 }
 
 /**
- * Get list of available Ollama models
+ * Get list of available models from specified provider
  */
-export async function getOllamaModels(): Promise<OllamaModel[]> {
-  const response = await api.get('/bot/ollama/models');
+export async function getOllamaModels(provider: LLMProvider = 'ollama'): Promise<OllamaModel[]> {
+  const response = await api.get('/bot/ollama/models', {
+    params: { provider }
+  });
   return response.data.models;
+}
+
+/**
+ * Check if OpenRouter is available
+ */
+export async function checkOpenRouterStatus(): Promise<boolean> {
+  try {
+    const models = await getOllamaModels('openrouter');
+    return models.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /**

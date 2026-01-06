@@ -9,9 +9,9 @@ const LETTER_FREQUENCY = 'ETAOINSHRDLCUMWFGYPBVKJXQZ';
 // Common patterns to help with guessing
 const VOWELS = new Set(['A', 'E', 'I', 'O', 'U']);
 class LetterGuessStrategy {
-    ollama;
-    constructor(ollama) {
-        this.ollama = ollama;
+    llm;
+    constructor(llm) {
+        this.llm = llm;
     }
     /**
      * Select the best letter to guess for a target player's word
@@ -62,33 +62,47 @@ DO NOT guess any of these already-tried letters: ${[...triedLetters].join(', ') 
 What single letter should I guess next?
 Return ONLY one uppercase letter, nothing else.`;
         try {
-            const response = await this.ollama.generate(config.modelName, prompt, {
+            console.log(`🎯 [LetterGuess ${config.displayName}] Calling LLM for letter guess...`);
+            console.log(`🎯 [LetterGuess ${config.displayName}] Pattern: ${pattern}, tried: ${[...triedLetters].join(',')}`);
+            const response = await this.llm.generate(config.modelName, prompt, {
                 ...config.ollamaOptions,
                 temperature: this.getTemperatureForDifficulty(config.difficulty),
                 num_predict: 10, // Very short response expected
             }, systemPrompt);
+            console.log(`🎯 [LetterGuess ${config.displayName}] Raw LLM response: "${response}"`);
             const letter = this.extractLetter(response, triedLetters);
             if (letter) {
+                console.log(`🎯 [LetterGuess ${config.displayName}] Extracted letter: ${letter} ✓`);
                 console.log(`[Bot ${config.displayName}] Guessing letter: ${letter} for pattern: ${pattern}`);
                 return letter;
             }
+            else {
+                console.log(`🎯 [LetterGuess ${config.displayName}] Failed to extract valid letter from response`);
+            }
         }
         catch (error) {
+            console.error(`🎯 [LetterGuess ${config.displayName}] Letter guess error: ${error.message}`);
             console.error(`[Bot ${config.displayName}] Letter guess error: ${error.message}`);
         }
         // Fallback: use frequency-based selection
+        console.log(`🎯 [LetterGuess ${config.displayName}] Using fallback letter selection`);
         return this.selectFallbackLetter(triedLetters, hasVowels, config);
     }
     /**
      * Select which opponent to target
      */
     async selectTarget(ctx, config) {
+        console.log(`🎯 [TargetSelect ${config.displayName}] Selecting target from ${ctx.players.length} players`);
+        console.log(`🎯 [TargetSelect ${config.displayName}] Bot ID: ${ctx.botPlayerId}`);
         // Get eligible targets (not eliminated, not self)
         const eligibleTargets = ctx.players.filter(p => !p.isEliminated && p.id !== ctx.botPlayerId);
+        console.log(`🎯 [TargetSelect ${config.displayName}] Eligible targets: ${eligibleTargets.map(t => t.displayName).join(', ')}`);
         if (eligibleTargets.length === 0) {
+            console.error(`🎯 [TargetSelect ${config.displayName}] No eligible targets found!`);
             throw new Error('No eligible targets');
         }
         if (eligibleTargets.length === 1) {
+            console.log(`🎯 [TargetSelect ${config.displayName}] Only one target: ${eligibleTargets[0].displayName}`);
             return eligibleTargets[0].id;
         }
         // Strategy varies by difficulty

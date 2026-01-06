@@ -1,7 +1,7 @@
 /**
  * BotStrategy - Unified strategy class combining all bot decision-making
  */
-import { OllamaService } from '../OllamaService';
+import { LLMProvider } from '../types';
 import { WordValidator } from '../../game/WordValidator';
 import { BotConfig, GameContext, PlayerInfo, WordSelection, IBotStrategy } from '../types';
 export declare class BotStrategy implements IBotStrategy {
@@ -9,7 +9,7 @@ export declare class BotStrategy implements IBotStrategy {
     private letterGuessStrategy;
     private wordGuessStrategy;
     private positionSelectionStrategy;
-    constructor(ollama: OllamaService, wordValidator: WordValidator);
+    constructor(llm: LLMProvider, wordValidator: WordValidator);
     /**
      * Select a word for the bot to use
      */

@@ -1161,19 +1161,26 @@ export default function Game() {
             {/* Word display with clickable blanks */}
             {(() => {
               const wordLength = game.players.find(p => p.userId === user?.id)?.revealedPositions.length || 0;
-              let tileSizeClass = 'w-10 h-10';
-              let textSizeClass = 'text-lg';
+              // Dynamic sizing - shrink for longer words
+              let tileSizeClass: string;
+              let textSizeClass: string;
 
-              if (wordLength >= 10) {
+              if (wordLength <= 6) {
+                tileSizeClass = 'w-10 h-10';
+                textSizeClass = 'text-lg';
+              } else if (wordLength <= 8) {
                 tileSizeClass = 'w-8 h-8';
                 textSizeClass = 'text-base';
-              } else if (wordLength === 9) {
-                tileSizeClass = 'w-9 h-9';
-                textSizeClass = 'text-lg';
+              } else if (wordLength <= 10) {
+                tileSizeClass = 'w-7 h-7';
+                textSizeClass = 'text-sm';
+              } else {
+                tileSizeClass = 'w-6 h-6';
+                textSizeClass = 'text-xs';
               }
 
               return (
-                <div className="flex gap-1 justify-center overflow-x-auto pb-2 mb-4">
+                <div className="flex gap-0.5 justify-center flex-wrap pb-2 mb-4">
                   {game.players
                     .find(p => p.userId === user?.id)
                     ?.revealedPositions.map((letter, i) => {
@@ -1185,7 +1192,7 @@ export default function Game() {
                           key={i}
                           onClick={() => isClickableBlank && handleBlankPositionSelect(i)}
                           disabled={!isClickableBlank}
-                          className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all flex-shrink-0 ${
+                          className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all ${
                             isClickableBlank
                               ? 'bg-warning text-black cursor-pointer hover:bg-yellow-400 hover:scale-110 ring-2 ring-warning animate-pulse'
                               : letter
@@ -1233,19 +1240,26 @@ export default function Game() {
             {/* Word display with clickable duplicate positions */}
             {(() => {
               const wordLength = game.players.find(p => p.userId === user?.id)?.revealedPositions.length || 0;
-              let tileSizeClass = 'w-10 h-10';
-              let textSizeClass = 'text-lg';
+              // Dynamic sizing - shrink for longer words
+              let tileSizeClass: string;
+              let textSizeClass: string;
 
-              if (wordLength >= 10) {
+              if (wordLength <= 6) {
+                tileSizeClass = 'w-10 h-10';
+                textSizeClass = 'text-lg';
+              } else if (wordLength <= 8) {
                 tileSizeClass = 'w-8 h-8';
                 textSizeClass = 'text-base';
-              } else if (wordLength === 9) {
-                tileSizeClass = 'w-9 h-9';
-                textSizeClass = 'text-lg';
+              } else if (wordLength <= 10) {
+                tileSizeClass = 'w-7 h-7';
+                textSizeClass = 'text-sm';
+              } else {
+                tileSizeClass = 'w-6 h-6';
+                textSizeClass = 'text-xs';
               }
 
               return (
-                <div className="flex gap-1 justify-center overflow-x-auto pb-2 mb-4">
+                <div className="flex gap-0.5 justify-center flex-wrap pb-2 mb-4">
                   {game.players
                     .find(p => p.userId === user?.id)
                     ?.revealedPositions.map((letter, i) => {
@@ -1257,7 +1271,7 @@ export default function Game() {
                           key={i}
                           onClick={() => isClickableDuplicate && handleDuplicatePositionSelect(i)}
                           disabled={!isClickableDuplicate}
-                          className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all flex-shrink-0 ${
+                          className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all ${
                             isClickableDuplicate
                               ? 'bg-warning text-black cursor-pointer hover:bg-yellow-400 hover:scale-110 ring-2 ring-warning animate-pulse'
                               : letter
@@ -1321,22 +1335,29 @@ export default function Game() {
                 );
               }
 
-              let tileSizeClass = 'w-10 h-10';
-              let textSizeClass = 'text-lg';
+              // Dynamic sizing - shrink for longer words
+              let tileSizeClass: string;
+              let textSizeClass: string;
 
-              if (wordLength >= 10) {
+              if (wordLength <= 6) {
+                tileSizeClass = 'w-10 h-10';
+                textSizeClass = 'text-lg';
+              } else if (wordLength <= 8) {
                 tileSizeClass = 'w-8 h-8';
                 textSizeClass = 'text-base';
-              } else if (wordLength === 9) {
-                tileSizeClass = 'w-9 h-9';
-                textSizeClass = 'text-lg';
+              } else if (wordLength <= 10) {
+                tileSizeClass = 'w-7 h-7';
+                textSizeClass = 'text-sm';
+              } else {
+                tileSizeClass = 'w-6 h-6';
+                textSizeClass = 'text-xs';
               }
 
               // The blank character used in the backend
               const BLANK_CHAR = '\u2022'; // bullet character
 
               return (
-                <div className="flex gap-1 justify-center flex-wrap pb-2 mb-4">
+                <div className="flex gap-0.5 justify-center flex-wrap pb-2 mb-4">
                   {paddedWord.split('').map((char, i) => {
                     const isUnrevealed = !revealedPositions[i];
                     const isBlank = char === BLANK_CHAR;
@@ -1351,7 +1372,7 @@ export default function Game() {
                           }
                         }}
                         disabled={!isUnrevealed}
-                        className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all flex-shrink-0 ${
+                        className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all ${
                           isUnrevealed
                             ? isBlank
                               ? 'bg-gray-500 text-gray-200 cursor-pointer hover:bg-gray-400 hover:scale-110 ring-2 ring-gray-400'
@@ -1529,10 +1550,13 @@ export default function Game() {
           <div className="text-right">
             <p className="text-sm text-text-muted">Round {game.roundNumber}</p>
             <p className="text-lg font-semibold">
-              {myTurn ? "Your Turn" :
-                game.players.find(p => getPlayerId(p) === game.currentTurnPlayerId)?.isBot
-                  ? "🤖 AI Thinking..."
-                  : "Waiting..."}
+              {myTurn ? "Your Turn" : (() => {
+                const currentPlayer = game.players.find(p => getPlayerId(p) === game.currentTurnPlayerId);
+                if (currentPlayer?.isBot) {
+                  return `🤖 ${currentPlayer.displayName}'s Turn`;
+                }
+                return `${currentPlayer?.displayName || 'Player'}'s Turn`;
+              })()}
             </p>
           </div>
         </div>
@@ -1638,22 +1662,33 @@ export default function Game() {
                   </div>
                 )}
 
-                {/* Calculate dynamic sizing based on word length */}
+                {/* Calculate dynamic sizing based on word length - tiles shrink to fit */}
                 {(() => {
                   const wordLength = player.revealedPositions.length;
-                  let tileSizeClass = 'w-10 h-10 md:w-14 md:h-14 lg:w-16 lg:h-16';
-                  let textSizeClass = 'text-xl md:text-2xl lg:text-3xl';
+                  // Calculate tile size dynamically - shrink for longer words
+                  // Base sizes decrease as word length increases to fit on one line
+                  let tileSizeClass: string;
+                  let textSizeClass: string;
 
-                  if (wordLength >= 10) {
-                    tileSizeClass = 'w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12';
-                    textSizeClass = 'text-lg md:text-xl lg:text-2xl';
-                  } else if (wordLength === 9) {
-                    tileSizeClass = 'w-9 h-9 md:w-12 md:h-12 lg:w-14 lg:h-14';
-                    textSizeClass = 'text-lg md:text-2xl lg:text-2xl';
+                  if (wordLength <= 5) {
+                    tileSizeClass = 'w-12 h-12 md:w-14 md:h-14';
+                    textSizeClass = 'text-xl md:text-2xl';
+                  } else if (wordLength <= 7) {
+                    tileSizeClass = 'w-10 h-10 md:w-12 md:h-12';
+                    textSizeClass = 'text-lg md:text-xl';
+                  } else if (wordLength <= 9) {
+                    tileSizeClass = 'w-8 h-8 md:w-10 md:h-10';
+                    textSizeClass = 'text-base md:text-lg';
+                  } else if (wordLength <= 11) {
+                    tileSizeClass = 'w-7 h-7 md:w-8 md:h-8';
+                    textSizeClass = 'text-sm md:text-base';
+                  } else {
+                    tileSizeClass = 'w-6 h-6 md:w-7 md:h-7';
+                    textSizeClass = 'text-xs md:text-sm';
                   }
 
                   return (
-                    <div className="flex gap-1 overflow-x-auto overflow-y-hidden pb-2">
+                    <div className="flex gap-0.5 md:gap-1 justify-start pb-2">
                       {player.revealedPositions.map((letter, i) => {
                         const isBlank = letter === 'BLANK';
                         // Calculate point value: 5, 10, 15 repeating pattern
@@ -1661,7 +1696,7 @@ export default function Game() {
                         const pointValue = pointValues[i % 3];
 
                         return (
-                          <div key={i} className="flex flex-col items-center flex-shrink-0">
+                          <div key={i} className="flex flex-col items-center min-w-0">
                             <div
                               className={`${tileSizeClass} ${textSizeClass} flex items-center justify-center font-bold border-2 rounded transition-all duration-200 ${
                                 letter

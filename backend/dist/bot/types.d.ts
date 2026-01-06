@@ -1,6 +1,17 @@
 /**
  * Type definitions for the LLM Bot Player system
  */
+export type LLMProviderType = 'ollama' | 'openrouter';
+/**
+ * Common interface for LLM providers (Ollama, OpenRouter, etc.)
+ */
+export interface LLMProvider {
+    getProviderName(): string;
+    isAvailable(): Promise<boolean>;
+    listModels(): Promise<OllamaModel[]>;
+    generate(modelName: string, prompt: string, options?: OllamaGenerateOptions, systemPrompt?: string): Promise<string>;
+    chat(modelName: string, messages: OllamaChatMessage[], options?: OllamaGenerateOptions): Promise<string>;
+}
 export interface OllamaModel {
     name: string;
     size: number;
@@ -87,6 +98,7 @@ export interface BotConfig {
     ollamaOptions: OllamaGenerateOptions;
     personality?: string;
     difficulty: BotDifficulty;
+    provider: LLMProviderType;
 }
 export interface BotConfigInput {
     displayName: string;
@@ -94,6 +106,7 @@ export interface BotConfigInput {
     ollamaOptions?: OllamaGenerateOptions;
     personality?: string;
     difficulty?: BotDifficulty;
+    provider?: LLMProviderType;
 }
 export interface PlayerInfo {
     id: string;
@@ -151,6 +164,7 @@ export interface BotPreset {
     ollamaOptions: OllamaGenerateOptions;
     personality?: string;
     difficulty: BotDifficulty;
+    provider: LLMProviderType;
     createdAt: Date;
 }
 export interface OllamaStatusResponse {

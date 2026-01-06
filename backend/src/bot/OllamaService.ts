@@ -5,6 +5,7 @@
  */
 
 import {
+  LLMProvider,
   OllamaModel,
   OllamaModelInfo,
   OllamaGenerateOptions,
@@ -16,13 +17,17 @@ import {
   OllamaPullProgress,
 } from './types';
 
-export class OllamaService {
+export class OllamaService implements LLMProvider {
   private baseUrl: string;
   private defaultTimeout: number;
 
   constructor(baseUrl = 'http://localhost:11434', defaultTimeout = 60000) {
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
     this.defaultTimeout = defaultTimeout;
+  }
+
+  getProviderName(): string {
+    return 'ollama';
   }
 
   /**
@@ -193,6 +198,10 @@ export class OllamaService {
     options?: OllamaGenerateOptions,
     systemPrompt?: string
   ): Promise<string> {
+    console.log(`🔮 [OllamaService] Generating with model: ${modelName}`);
+    console.log(`🔮 [OllamaService] Prompt length: ${prompt.length} chars`);
+    const startTime = Date.now();
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
@@ -208,6 +217,8 @@ export class OllamaService {
         request.system = systemPrompt;
       }
 
+      console.log(`🔮 [OllamaService] Sending request to ${this.baseUrl}/api/generate`);
+
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -217,17 +228,25 @@ export class OllamaService {
 
       clearTimeout(timeoutId);
 
+      const elapsed = Date.now() - startTime;
+      console.log(`🔮 [OllamaService] Response received in ${elapsed}ms, status: ${response.status}`);
+
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`🔮 [OllamaService] Generation failed: ${response.statusText} - ${errorText}`);
         throw new Error(`Generation failed: ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json() as OllamaGenerateResponse;
+      console.log(`🔮 [OllamaService] Response text: "${data.response.substring(0, 100)}${data.response.length > 100 ? '...' : ''}"`);
       return data.response;
     } catch (error: any) {
+      const elapsed = Date.now() - startTime;
       if (error.name === 'AbortError') {
+        console.error(`🔮 [OllamaService] Request TIMEOUT after ${elapsed}ms`);
         throw new Error('Request timeout during generation');
       }
+      console.error(`🔮 [OllamaService] Generation ERROR after ${elapsed}ms: ${error.message}`);
       throw new Error(`Generation failed: ${error.message}`);
     }
   }

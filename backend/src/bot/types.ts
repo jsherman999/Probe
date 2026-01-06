@@ -3,6 +3,32 @@
  */
 
 // ============================================================================
+// LLM Provider Types
+// ============================================================================
+
+export type LLMProviderType = 'ollama' | 'openrouter';
+
+/**
+ * Common interface for LLM providers (Ollama, OpenRouter, etc.)
+ */
+export interface LLMProvider {
+  getProviderName(): string;
+  isAvailable(): Promise<boolean>;
+  listModels(): Promise<OllamaModel[]>;
+  generate(
+    modelName: string,
+    prompt: string,
+    options?: OllamaGenerateOptions,
+    systemPrompt?: string
+  ): Promise<string>;
+  chat(
+    modelName: string,
+    messages: OllamaChatMessage[],
+    options?: OllamaGenerateOptions
+  ): Promise<string>;
+}
+
+// ============================================================================
 // Ollama API Types
 // ============================================================================
 
@@ -107,6 +133,7 @@ export interface BotConfig {
   ollamaOptions: OllamaGenerateOptions;
   personality?: string;     // optional system prompt modifier
   difficulty: BotDifficulty;
+  provider: LLMProviderType;
 }
 
 export interface BotConfigInput {
@@ -115,6 +142,7 @@ export interface BotConfigInput {
   ollamaOptions?: OllamaGenerateOptions;
   personality?: string;
   difficulty?: BotDifficulty;
+  provider?: LLMProviderType;
 }
 
 // ============================================================================
@@ -196,6 +224,7 @@ export interface BotPreset {
   ollamaOptions: OllamaGenerateOptions;
   personality?: string;
   difficulty: BotDifficulty;
+  provider: LLMProviderType;
   createdAt: Date;
 }
 

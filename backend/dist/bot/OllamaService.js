@@ -13,6 +13,9 @@ class OllamaService {
         this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
         this.defaultTimeout = defaultTimeout;
     }
+    getProviderName() {
+        return 'ollama';
+    }
     /**
      * Check if Ollama server is running and accessible
      */
@@ -155,6 +158,9 @@ class OllamaService {
      * @param systemPrompt - Optional system prompt
      */
     async generate(modelName, prompt, options, systemPrompt) {
+        console.log(`🔮 [OllamaService] Generating with model: ${modelName}`);
+        console.log(`🔮 [OllamaService] Prompt length: ${prompt.length} chars`);
+        const startTime = Date.now();
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
@@ -167,6 +173,7 @@ class OllamaService {
             if (systemPrompt) {
                 request.system = systemPrompt;
             }
+            console.log(`🔮 [OllamaService] Sending request to ${this.baseUrl}/api/generate`);
             const response = await fetch(`${this.baseUrl}/api/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -174,17 +181,24 @@ class OllamaService {
                 signal: controller.signal,
             });
             clearTimeout(timeoutId);
+            const elapsed = Date.now() - startTime;
+            console.log(`🔮 [OllamaService] Response received in ${elapsed}ms, status: ${response.status}`);
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error(`🔮 [OllamaService] Generation failed: ${response.statusText} - ${errorText}`);
                 throw new Error(`Generation failed: ${response.statusText} - ${errorText}`);
             }
             const data = await response.json();
+            console.log(`🔮 [OllamaService] Response text: "${data.response.substring(0, 100)}${data.response.length > 100 ? '...' : ''}"`);
             return data.response;
         }
         catch (error) {
+            const elapsed = Date.now() - startTime;
             if (error.name === 'AbortError') {
+                console.error(`🔮 [OllamaService] Request TIMEOUT after ${elapsed}ms`);
                 throw new Error('Request timeout during generation');
             }
+            console.error(`🔮 [OllamaService] Generation ERROR after ${elapsed}ms: ${error.message}`);
             throw new Error(`Generation failed: ${error.message}`);
         }
     }

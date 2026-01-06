@@ -1,11 +1,11 @@
 /**
  * LetterGuessStrategy - Handles bot letter guessing during gameplay
  */
-import { OllamaService } from '../OllamaService';
+import { LLMProvider } from '../types';
 import { BotConfig, GameContext, PlayerInfo } from '../types';
 export declare class LetterGuessStrategy {
-    private ollama;
-    constructor(ollama: OllamaService);
+    private llm;
+    constructor(llm: LLMProvider);
     /**
      * Select the best letter to guess for a target player's word
      */

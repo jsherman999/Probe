@@ -2,18 +2,49 @@
 /**
  * Bot management API routes
  *
- * All routes require localhost access for security.
- * These endpoints allow the host to manage Ollama models and bot configurations.
+ * These endpoints allow any player to manage Ollama models and bot configurations
+ * as long as Ollama is available on the hosting server.
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const zod_1 = require("zod");
-const localOnly_1 = require("../middleware/localOnly");
 const bot_1 = require("../bot");
 const server_1 = require("../server");
 const router = (0, express_1.Router)();
-// Apply localhost restriction to all bot routes
-router.use(localOnly_1.requireLocalhost);
+// Bot routes are now available to all players (no localhost restriction)
 // ============================================================================
 // Validation Schemas
 // ============================================================================
@@ -21,6 +52,7 @@ const BotConfigSchema = zod_1.z.object({
     displayName: zod_1.z.string().min(1).max(30).default('Bot Player'),
     modelName: zod_1.z.string().min(1),
     difficulty: zod_1.z.enum(['easy', 'medium', 'hard']).default('medium'),
+    provider: zod_1.z.enum(['ollama', 'openrouter']).optional().default('ollama'),
     personality: zod_1.z.string().max(500).optional(),
     ollamaOptions: zod_1.z.object({
         temperature: zod_1.z.number().min(0).max(2).optional(),
@@ -36,6 +68,7 @@ const BotPresetSchema = zod_1.z.object({
     displayName: zod_1.z.string().min(1).max(30),
     modelName: zod_1.z.string().min(1),
     difficulty: zod_1.z.enum(['easy', 'medium', 'hard']).default('medium'),
+    provider: zod_1.z.enum(['ollama', 'openrouter']).optional().default('ollama'),
     personality: zod_1.z.string().max(500).optional(),
     ollamaConfig: zod_1.z.object({
         temperature: zod_1.z.number().min(0).max(2).optional(),
@@ -72,11 +105,16 @@ router.get('/ollama/status', async (req, res) => {
 });
 /**
  * GET /api/bot/ollama/models
- * List all available (downloaded) Ollama models
+ * List all available models from specified provider (default: ollama)
  */
 router.get('/ollama/models', async (req, res) => {
     try {
-        const models = await bot_1.botManager.getAvailableModels();
+        const provider = req.query.provider || 'ollama';
+        // Validate provider
+        if (provider !== 'ollama' && provider !== 'openrouter') {
+            return res.status(400).json({ error: 'Invalid provider' });
+        }
+        const models = await bot_1.botManager.getAvailableModels(provider);
         // Format models for frontend
         const formattedModels = models.map(model => ({
             name: model.name,
@@ -194,6 +232,7 @@ router.post('/presets', async (req, res) => {
                 displayName: data.displayName,
                 modelName: data.modelName,
                 difficulty: data.difficulty,
+                provider: data.provider || 'ollama',
                 personality: data.personality,
                 ollamaConfig: data.ollamaConfig || {},
             },
@@ -233,6 +272,7 @@ router.put('/presets/:id', async (req, res) => {
                 displayName: data.displayName,
                 modelName: data.modelName,
                 difficulty: data.difficulty,
+                provider: data.provider,
                 personality: data.personality,
                 ollamaConfig: data.ollamaConfig,
             },
@@ -309,27 +349,51 @@ router.get('/stats', async (req, res) => {
 router.post('/validate', async (req, res) => {
     try {
         const data = BotConfigSchema.parse(req.body);
-        // Check if Ollama is available
-        const ollamaAvailable = await bot_1.botManager.isOllamaAvailable();
-        if (!ollamaAvailable) {
+        const providerType = data.provider || 'ollama';
+        // Check if provider is available
+        const providerAvailable = await bot_1.botManager.isProviderAvailable(providerType);
+        if (!providerAvailable) {
+            const errorMsg = providerType === 'openrouter'
+                ? 'OpenRouter API is not accessible (check API key)'
+                : 'Ollama server is not available';
             return res.status(503).json({
                 valid: false,
-                error: 'Ollama server is not available',
+                error: errorMsg,
             });
         }
         // Check if model exists
-        const models = await bot_1.botManager.getAvailableModels();
+        const models = await bot_1.botManager.getAvailableModels(providerType);
         const modelExists = models.some(m => m.name === data.modelName);
         if (!modelExists) {
+            // For OpenRouter, we might not have the full list cached, so we might want to be lenient
+            // or ensure we fetched the latest list. For now, we enforce strict checking.
             return res.status(400).json({
                 valid: false,
-                error: `Model "${data.modelName}" is not available. Please download it first.`,
+                error: `Model "${data.modelName}" is not available on ${providerType}.`,
                 availableModels: models.map(m => m.name),
             });
         }
-        // Try a test generation
-        const ollama = new bot_1.OllamaService();
-        const testResponse = await ollama.generate(data.modelName, 'Say "ready" if you can respond.', { ...data.ollamaOptions, num_predict: 20 });
+        // Try a test generation using the provider directly (via temporary bot or service)
+        // We'll Create a temporary bot instance to test generation
+        const tempBot = bot_1.botManager.createBot({
+            ...data,
+            displayName: 'Validation Bot',
+        });
+        // We can't access private tempBot.strategy.llm directly easily without changing visibility
+        // Instead, we'll instantiate the service directly for validation
+        let testResponse = '';
+        const prompt = 'Say "ready" if you can respond.';
+        const options = { ...data.ollamaOptions, num_predict: 20 };
+        if (providerType === 'openrouter') {
+            const { openRouterService } = await Promise.resolve().then(() => __importStar(require('../bot/OpenRouterService')));
+            testResponse = await openRouterService.generate(data.modelName, prompt, options);
+        }
+        else {
+            const { ollamaService } = await Promise.resolve().then(() => __importStar(require('../bot/OllamaService')));
+            testResponse = await ollamaService.generate(data.modelName, prompt, options);
+        }
+        // Clean up the temp bot from manager (it was added to the map)
+        bot_1.botManager.destroyBot(tempBot.id);
         res.json({
             valid: true,
             modelName: data.modelName,

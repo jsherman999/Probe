@@ -1,49 +1,65 @@
 /**
- * Hook for interacting with Ollama status and models
+ * Hook for interacting with LLM providers (Ollama and OpenRouter)
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { getOllamaStatus, getOllamaModels, OllamaModel, OllamaStatus } from '../services/botApi';
+import { getOllamaStatus, getOllamaModels, OllamaModel, OllamaStatus, LLMProvider } from '../services/botApi';
 
 interface UseOllamaReturn {
   status: OllamaStatus | null;
   models: OllamaModel[];
   isLoading: boolean;
   error: string | null;
+  provider: LLMProvider;
+  setProvider: (provider: LLMProvider) => void;
   refresh: () => Promise<void>;
 }
 
-export function useOllama(): UseOllamaReturn {
+export function useOllama(initialProvider: LLMProvider = 'ollama'): UseOllamaReturn {
   const [status, setStatus] = useState<OllamaStatus | null>(null);
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [provider, setProvider] = useState<LLMProvider>(initialProvider);
 
   const refresh = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Get Ollama status
-      const ollamaStatus = await getOllamaStatus();
-      setStatus(ollamaStatus);
+      if (provider === 'ollama') {
+        // Get Ollama status
+        const ollamaStatus = await getOllamaStatus();
+        setStatus(ollamaStatus);
 
-      // If available, get models
-      if (ollamaStatus.available) {
-        const modelList = await getOllamaModels();
-        setModels(modelList);
+        // If available, get models
+        if (ollamaStatus.available) {
+          const modelList = await getOllamaModels('ollama');
+          setModels(modelList);
+        } else {
+          setModels([]);
+          setError('Ollama is not available on the server');
+        }
       } else {
-        setModels([]);
-        setError('Ollama is not available on the server');
+        // OpenRouter - just fetch models (availability is implied by API key being set)
+        try {
+          const modelList = await getOllamaModels('openrouter');
+          setModels(modelList);
+          setStatus({ available: true, baseUrl: 'https://openrouter.ai' });
+        } catch {
+          setModels([]);
+          setError('OpenRouter is not available (check API key)');
+          setStatus({ available: false, baseUrl: 'https://openrouter.ai' });
+        }
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to connect to Ollama');
-      setStatus({ available: false, baseUrl: 'http://localhost:11434' });
+      setError(err.response?.data?.message || err.message || 'Failed to connect to provider');
+      setStatus({ available: false, baseUrl: provider === 'ollama' ? 'http://localhost:11434' : 'https://openrouter.ai' });
       setModels([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [provider]);
 
   useEffect(() => {
     refresh();
@@ -54,6 +70,8 @@ export function useOllama(): UseOllamaReturn {
     models,
     isLoading,
     error,
+    provider,
+    setProvider,
     refresh,
   };
 }

@@ -2,7 +2,7 @@
  * LetterGuessStrategy - Handles bot letter guessing during gameplay
  */
 
-import { OllamaService } from '../OllamaService';
+import { LLMProvider } from '../types';
 import { BotConfig, GameContext, PlayerInfo } from '../types';
 
 // English letter frequency (most to least common)
@@ -12,7 +12,7 @@ const LETTER_FREQUENCY = 'ETAOINSHRDLCUMWFGYPBVKJXQZ';
 const VOWELS = new Set(['A', 'E', 'I', 'O', 'U']);
 
 export class LetterGuessStrategy {
-  constructor(private ollama: OllamaService) {}
+  constructor(private llm: LLMProvider) {}
 
   /**
    * Select the best letter to guess for a target player's word
@@ -73,7 +73,10 @@ What single letter should I guess next?
 Return ONLY one uppercase letter, nothing else.`;
 
     try {
-      const response = await this.ollama.generate(
+      console.log(`🎯 [LetterGuess ${config.displayName}] Calling LLM for letter guess...`);
+      console.log(`🎯 [LetterGuess ${config.displayName}] Pattern: ${pattern}, tried: ${[...triedLetters].join(',')}`);
+
+      const response = await this.llm.generate(
         config.modelName,
         prompt,
         {
@@ -84,17 +87,24 @@ Return ONLY one uppercase letter, nothing else.`;
         systemPrompt
       );
 
+      console.log(`🎯 [LetterGuess ${config.displayName}] Raw LLM response: "${response}"`);
+
       const letter = this.extractLetter(response, triedLetters);
 
       if (letter) {
+        console.log(`🎯 [LetterGuess ${config.displayName}] Extracted letter: ${letter} ✓`);
         console.log(`[Bot ${config.displayName}] Guessing letter: ${letter} for pattern: ${pattern}`);
         return letter;
+      } else {
+        console.log(`🎯 [LetterGuess ${config.displayName}] Failed to extract valid letter from response`);
       }
     } catch (error: any) {
+      console.error(`🎯 [LetterGuess ${config.displayName}] Letter guess error: ${error.message}`);
       console.error(`[Bot ${config.displayName}] Letter guess error: ${error.message}`);
     }
 
     // Fallback: use frequency-based selection
+    console.log(`🎯 [LetterGuess ${config.displayName}] Using fallback letter selection`);
     return this.selectFallbackLetter(triedLetters, hasVowels, config);
   }
 
@@ -102,16 +112,23 @@ Return ONLY one uppercase letter, nothing else.`;
    * Select which opponent to target
    */
   async selectTarget(ctx: GameContext, config: BotConfig): Promise<string> {
+    console.log(`🎯 [TargetSelect ${config.displayName}] Selecting target from ${ctx.players.length} players`);
+    console.log(`🎯 [TargetSelect ${config.displayName}] Bot ID: ${ctx.botPlayerId}`);
+
     // Get eligible targets (not eliminated, not self)
     const eligibleTargets = ctx.players.filter(
       p => !p.isEliminated && p.id !== ctx.botPlayerId
     );
 
+    console.log(`🎯 [TargetSelect ${config.displayName}] Eligible targets: ${eligibleTargets.map(t => t.displayName).join(', ')}`);
+
     if (eligibleTargets.length === 0) {
+      console.error(`🎯 [TargetSelect ${config.displayName}] No eligible targets found!`);
       throw new Error('No eligible targets');
     }
 
     if (eligibleTargets.length === 1) {
+      console.log(`🎯 [TargetSelect ${config.displayName}] Only one target: ${eligibleTargets[0].displayName}`);
       return eligibleTargets[0].id;
     }
 
@@ -171,27 +188,69 @@ Return ONLY one uppercase letter, nothing else.`;
 
   /**
    * Extract a valid letter from LLM response
+   * Handles various formats like "  D", "D", "The letter D", "I'll guess D", etc.
    */
   private extractLetter(response: string, triedLetters: Set<string>): string | null {
-    // Get first letter from response
-    const match = response.trim().toUpperCase().match(/[A-Z]/);
-    if (!match) return null;
+    // Normalize: remove all whitespace and convert to uppercase
+    const normalized = response.replace(/\s+/g, '').toUpperCase();
 
-    const letter = match[0];
-
-    // Make sure it's not already tried
-    if (triedLetters.has(letter)) {
-      // Try to find another letter in the response
-      const allLetters = response.toUpperCase().match(/[A-Z]/g) || [];
-      for (const l of allLetters) {
-        if (!triedLetters.has(l)) {
-          return l;
-        }
+    // If it's a single letter after normalization, use it directly
+    if (normalized.length === 1 && /[A-Z]/.test(normalized)) {
+      const letter = normalized;
+      if (!triedLetters.has(letter)) {
+        return letter;
       }
+      console.log(`🎯 [LetterGuess] Single letter "${letter}" already tried`);
       return null;
     }
 
-    return letter;
+    // Get all letters from the original response (preserving order)
+    const allLetters = response.toUpperCase().match(/[A-Z]/g) || [];
+
+    if (allLetters.length === 0) {
+      console.log(`🎯 [LetterGuess] No letters found in response: "${response}"`);
+      return null;
+    }
+
+    // If only one unique letter appears, use it (handles "  D", "D.", "D!", etc.)
+    const uniqueLetters = [...new Set(allLetters)];
+    if (uniqueLetters.length === 1) {
+      const letter = uniqueLetters[0];
+      if (!triedLetters.has(letter)) {
+        return letter;
+      }
+      console.log(`🎯 [LetterGuess] Only letter "${letter}" already tried`);
+      return null;
+    }
+
+    // Multiple letters - try to find the intended guess
+    // Common patterns: "I guess X", "The letter is X", "My guess: X", "X.", just "X"
+
+    // Check for single letter at start or end after trimming
+    const trimmed = response.trim().toUpperCase();
+    if (trimmed.length >= 1) {
+      // Check last character (common: "guess D", "letter: D")
+      const lastChar = trimmed[trimmed.length - 1];
+      if (/[A-Z]/.test(lastChar) && !triedLetters.has(lastChar)) {
+        return lastChar;
+      }
+
+      // Check first character
+      const firstChar = trimmed[0];
+      if (/[A-Z]/.test(firstChar) && !triedLetters.has(firstChar)) {
+        return firstChar;
+      }
+    }
+
+    // Fall back to first untried letter in response
+    for (const letter of allLetters) {
+      if (!triedLetters.has(letter)) {
+        return letter;
+      }
+    }
+
+    console.log(`🎯 [LetterGuess] All letters in response already tried: ${allLetters.join(', ')}`);
+    return null;
   }
 
   /**

@@ -3,11 +3,12 @@
  *
  * Ollama API documentation: https://github.com/ollama/ollama/blob/main/docs/api.md
  */
-import { OllamaModel, OllamaModelInfo, OllamaGenerateOptions, OllamaChatMessage, OllamaPullProgress } from './types';
-export declare class OllamaService {
+import { LLMProvider, OllamaModel, OllamaModelInfo, OllamaGenerateOptions, OllamaChatMessage, OllamaPullProgress } from './types';
+export declare class OllamaService implements LLMProvider {
     private baseUrl;
     private defaultTimeout;
     constructor(baseUrl?: string, defaultTimeout?: number);
+    getProviderName(): string;
     /**
      * Check if Ollama server is running and accessible
      */

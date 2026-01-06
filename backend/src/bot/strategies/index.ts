@@ -2,7 +2,7 @@
  * BotStrategy - Unified strategy class combining all bot decision-making
  */
 
-import { OllamaService } from '../OllamaService';
+import { LLMProvider } from '../types';
 import { WordValidator } from '../../game/WordValidator';
 import {
   BotConfig,
@@ -23,12 +23,13 @@ export class BotStrategy implements IBotStrategy {
   private wordGuessStrategy: WordGuessStrategy;
   private positionSelectionStrategy: PositionSelectionStrategy;
 
-  constructor(ollama: OllamaService, wordValidator: WordValidator) {
-    this.wordSelectionStrategy = new WordSelectionStrategy(ollama, wordValidator);
-    this.letterGuessStrategy = new LetterGuessStrategy(ollama);
-    this.wordGuessStrategy = new WordGuessStrategy(ollama);
-    this.positionSelectionStrategy = new PositionSelectionStrategy(ollama);
+  constructor(llm: LLMProvider, wordValidator: WordValidator) {
+    this.wordSelectionStrategy = new WordSelectionStrategy(llm, wordValidator);
+    this.letterGuessStrategy = new LetterGuessStrategy(llm);
+    this.wordGuessStrategy = new WordGuessStrategy(llm, wordValidator);  // Pass validator for word validation
+    this.positionSelectionStrategy = new PositionSelectionStrategy(llm);
   }
+
 
   /**
    * Select a word for the bot to use

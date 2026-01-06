@@ -1,1 +1,1 @@
-{"version":3,"file":"bot.d.ts","sourceRoot":"","sources":["../../src/routes/bot.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AAQH,QAAA,MAAM,MAAM,4CAAW,CAAC;AA6XxB,eAAe,MAAM,CAAC"}
+{"version":3,"file":"bot.d.ts","sourceRoot":"","sources":["../../src/routes/bot.ts"],"names":[],"mappings":"AAAA;;;;;GAKG;AAOH,QAAA,MAAM,MAAM,4CAAW,CAAC;AA8ZxB,eAAe,MAAM,CAAC"}

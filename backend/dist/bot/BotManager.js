@@ -5,30 +5,45 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.botManager = exports.BotManager = void 0;
 const OllamaService_1 = require("./OllamaService");
+const OpenRouterService_1 = require("./OpenRouterService");
 const WordValidator_1 = require("../game/WordValidator");
 const BotPlayer_1 = require("./BotPlayer");
 class BotManager {
     ollama;
+    openRouter;
     bots = new Map();
     gameBots = new Map();
     wordValidator;
-    constructor(ollama = OllamaService_1.ollamaService, wordValidator) {
+    constructor(ollama = OllamaService_1.ollamaService, openRouter = OpenRouterService_1.openRouterService, wordValidator) {
         this.ollama = ollama;
+        this.openRouter = openRouter;
         this.wordValidator = wordValidator || new WordValidator_1.WordValidator();
     }
     // ============================================================================
-    // Ollama Status & Models
+    // Provider Status & Models
     // ============================================================================
     /**
-     * Check if Ollama is available
+     * Check if a provider is available
+     */
+    async isProviderAvailable(provider = 'ollama') {
+        if (provider === 'openrouter') {
+            return this.openRouter.isAvailable();
+        }
+        return this.ollama.isAvailable();
+    }
+    /**
+     * Legacy: Check if Ollama is available
      */
     async isOllamaAvailable() {
         return this.ollama.isAvailable();
     }
     /**
-     * Get list of available Ollama models
+     * Get list of available models from a provider
      */
-    async getAvailableModels() {
+    async getAvailableModels(provider = 'ollama') {
+        if (provider === 'openrouter') {
+            return this.openRouter.listModels();
+        }
         return this.ollama.listModels();
     }
     /**
@@ -48,9 +63,13 @@ class BotManager {
         if (!configInput.modelName) {
             throw new Error('Model name is required');
         }
-        const bot = new BotPlayer_1.BotPlayer(configInput, this.ollama, this.wordValidator);
+        const providerType = configInput.provider || 'ollama';
+        const provider = providerType === 'openrouter'
+            ? this.openRouter
+            : this.ollama;
+        const bot = new BotPlayer_1.BotPlayer(configInput, provider, this.wordValidator);
         this.bots.set(bot.id, bot);
-        console.log(`[BotManager] Created bot: ${bot.displayName} (${bot.id}) using model: ${configInput.modelName}`);
+        console.log(`[BotManager] Created bot: ${bot.displayName} (${bot.id}) using ${providerType} model: ${configInput.modelName}`);
         return bot;
     }
     /**
@@ -63,6 +82,7 @@ class BotManager {
             ollamaOptions: preset.ollamaOptions,
             personality: preset.personality,
             difficulty: preset.difficulty,
+            provider: preset.provider,
         });
     }
     /**

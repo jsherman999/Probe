@@ -1,13 +1,13 @@
 /**
  * WordSelectionStrategy - Handles bot word selection during the word selection phase
  */
-import { OllamaService } from '../OllamaService';
+import { LLMProvider } from '../types';
 import { WordValidator } from '../../game/WordValidator';
 import { BotConfig, GameContext, WordSelection } from '../types';
 export declare class WordSelectionStrategy {
-    private ollama;
+    private llm;
     private wordValidator;
-    constructor(ollama: OllamaService, wordValidator: WordValidator);
+    constructor(llm: LLMProvider, wordValidator: WordValidator);
     /**
      * Select a word for the bot to use in the game
      */
@@ -17,7 +17,8 @@ export declare class WordSelectionStrategy {
      */
     private extractWord;
     /**
-     * Apply padding strategy based on difficulty
+     * Apply padding strategy - all bots randomly add 0-3 blanks to front and back
+     * Total word + padding must not exceed 12 characters
      */
     private applyPaddingStrategy;
     /**

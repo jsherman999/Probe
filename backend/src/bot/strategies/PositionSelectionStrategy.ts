@@ -6,14 +6,14 @@
  * position to reveal. This strategy makes that decision.
  */
 
-import { OllamaService } from '../OllamaService';
+import { LLMProvider } from '../types';
 import { BotConfig, GameContext } from '../types';
 import { ScoringEngine } from '../../game/ScoringEngine';
 
 export class PositionSelectionStrategy {
   private scoringEngine: ScoringEngine;
 
-  constructor(private ollama: OllamaService) {
+  constructor(private llm: LLMProvider) {
     this.scoringEngine = new ScoringEngine();
   }
 
@@ -153,7 +153,7 @@ Which position number should you reveal? Consider both scoring and strategic val
 Return ONLY the position number.`;
 
     try {
-      const response = await this.ollama.generate(
+      const response = await this.llm.generate(
         config.modelName,
         prompt,
         { ...config.ollamaOptions, temperature: 0.3, num_predict: 10 }

@@ -5,12 +5,12 @@
  * or guesses "BLANK" when there are multiple blanks, the bot must choose which
  * position to reveal. This strategy makes that decision.
  */
-import { OllamaService } from '../OllamaService';
+import { LLMProvider } from '../types';
 import { BotConfig, GameContext } from '../types';
 export declare class PositionSelectionStrategy {
-    private ollama;
+    private llm;
     private scoringEngine;
-    constructor(ollama: OllamaService);
+    constructor(llm: LLMProvider);
     /**
      * Select which blank position to reveal when opponent guesses "BLANK"
      *

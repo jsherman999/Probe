@@ -17,13 +17,16 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BotStrategy = exports.botManager = exports.BotManager = exports.BotPlayer = exports.ollamaService = exports.OllamaService = void 0;
+exports.BotStrategy = exports.botManager = exports.BotManager = exports.BotPlayer = exports.openRouterService = exports.OpenRouterService = exports.ollamaService = exports.OllamaService = void 0;
 // Types
 __exportStar(require("./types"), exports);
 // Services
 var OllamaService_1 = require("./OllamaService");
 Object.defineProperty(exports, "OllamaService", { enumerable: true, get: function () { return OllamaService_1.OllamaService; } });
 Object.defineProperty(exports, "ollamaService", { enumerable: true, get: function () { return OllamaService_1.ollamaService; } });
+var OpenRouterService_1 = require("./OpenRouterService");
+Object.defineProperty(exports, "OpenRouterService", { enumerable: true, get: function () { return OpenRouterService_1.OpenRouterService; } });
+Object.defineProperty(exports, "openRouterService", { enumerable: true, get: function () { return OpenRouterService_1.openRouterService; } });
 var BotPlayer_1 = require("./BotPlayer");
 Object.defineProperty(exports, "BotPlayer", { enumerable: true, get: function () { return BotPlayer_1.BotPlayer; } });
 var BotManager_1 = require("./BotManager");

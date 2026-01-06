@@ -1,71 +1,102 @@
 "use strict";
 /**
  * WordGuessStrategy - Handles bot full word guessing decisions
+ *
+ * This strategy is VERY conservative - bots should primarily guess letters.
+ * Word guessing is only attempted when:
+ * 1. At least 80% of the word is revealed
+ * 2. The bot is highly confident it knows the word
+ * 3. The guessed word is a valid English word (verified against dictionary)
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WordGuessStrategy = void 0;
+const WordValidator_1 = require("../../game/WordValidator");
 class WordGuessStrategy {
-    ollama;
-    constructor(ollama) {
-        this.ollama = ollama;
+    llm;
+    wordValidator;
+    constructor(llm, wordValidator) {
+        this.llm = llm;
+        this.wordValidator = wordValidator || new WordValidator_1.WordValidator();
     }
     /**
      * Decide whether the bot should attempt a full word guess
+     * VERY conservative - default to letter guessing
      */
     async shouldGuessWord(_ctx, targetPlayer, config) {
         // Calculate how much of the word is revealed
         const revealedCount = targetPlayer.revealedPositions.filter(p => p !== null).length;
         const totalLength = targetPlayer.wordLength;
         const revealedPct = revealedCount / totalLength;
-        // Different thresholds by difficulty
-        const thresholds = {
-            easy: 0.9, // Easy bot only guesses when 90%+ revealed
-            medium: 0.7, // Medium bot at 70%+
-            hard: 0.5, // Hard bot might guess at 50%+
-        };
-        const threshold = thresholds[config.difficulty] || thresholds.medium;
-        // Don't guess if not enough revealed
-        if (revealedPct < threshold) {
+        console.log(`🎲 [WordGuess ${config.displayName}] Checking if should guess word: ${(revealedPct * 100).toFixed(0)}% revealed`);
+        // STRICT requirement: At least 80% must be revealed for ANY difficulty
+        if (revealedPct < 0.8) {
+            console.log(`🎲 [WordGuess ${config.displayName}] Not enough revealed (<80%), will guess letter`);
             return false;
         }
-        // For hard bots, use LLM to decide
-        if (config.difficulty === 'hard' && revealedPct >= 0.5) {
-            return this.askLLMIfShouldGuess(targetPlayer, config);
+        // Even at 80%+, only guess if there's just 1-2 letters missing
+        const hiddenCount = totalLength - revealedCount;
+        if (hiddenCount > 2) {
+            console.log(`🎲 [WordGuess ${config.displayName}] Too many hidden letters (${hiddenCount}), will guess letter`);
+            return false;
         }
-        // For easier difficulties, use simpler heuristics
-        // Guess if we have a high confidence pattern
-        if (revealedPct >= 0.8) {
-            return true;
+        // For hard bots only, try to determine if we can guess the word
+        if (config.difficulty === 'hard' && hiddenCount <= 2) {
+            const confident = await this.canConfidentlyGuess(targetPlayer, config);
+            console.log(`🎲 [WordGuess ${config.displayName}] Confidence check: ${confident ? 'YES' : 'NO'}`);
+            return confident;
         }
-        // Random chance based on reveal percentage
-        return Math.random() < revealedPct * 0.3;
+        // Easy/Medium bots: only guess word when just 1 letter remains AND very high reveal %
+        if (hiddenCount === 1 && revealedPct >= 0.85) {
+            console.log(`🎲 [WordGuess ${config.displayName}] Only 1 letter hidden and 85%+ revealed, may guess word`);
+            // Still only 50% chance to guess - prefer letter guessing
+            return Math.random() < 0.5;
+        }
+        // Default: don't guess word, keep guessing letters
+        console.log(`🎲 [WordGuess ${config.displayName}] Defaulting to letter guess`);
+        return false;
     }
     /**
-     * Ask LLM if it's confident enough to guess
+     * Check if we can confidently guess the word (for hard bots)
      */
-    async askLLMIfShouldGuess(targetPlayer, config) {
+    async canConfidentlyGuess(targetPlayer, config) {
         const pattern = targetPlayer.revealedPositions
             .map(pos => pos || '_')
             .join('');
-        const prompt = `You are playing a word guessing game.
-
-The opponent's word pattern is: ${pattern}
-(Underscores are hidden letters)
-
-Missed letters (not in the word): ${targetPlayer.missedLetters.join(', ') || 'none'}
-
-Can you confidently guess what this word is?
-Reply with just "YES" if you're 80%+ confident, or "NO" if not sure.`;
-        try {
-            const response = await this.ollama.generate(config.modelName, prompt, { ...config.ollamaOptions, temperature: 0.3, num_predict: 10 });
-            return response.toUpperCase().includes('YES');
-        }
-        catch {
+        // First, try to think of a valid word that matches
+        const candidateWord = await this.generateWordCandidate(targetPlayer, config);
+        if (!candidateWord) {
             return false;
         }
+        // Validate it's a real English word
+        const isValid = await this.wordValidator.isValidWord(candidateWord);
+        console.log(`🎲 [WordGuess ${config.displayName}] Candidate "${candidateWord}" valid: ${isValid}`);
+        return isValid;
+    }
+    /**
+     * Generate a word candidate (without committing to guessing)
+     */
+    async generateWordCandidate(targetPlayer, config) {
+        const pattern = targetPlayer.revealedPositions
+            .map(pos => pos || '_')
+            .join('');
+        const prompt = `What common English word matches this pattern: ${pattern}
+Letters NOT in the word: ${targetPlayer.missedLetters.join(', ') || 'none'}
+Reply with just ONE word in uppercase, or "UNKNOWN" if unsure.`;
+        try {
+            const response = await this.llm.generate(config.modelName, prompt, { ...config.ollamaOptions, temperature: 0.2, num_predict: 15 });
+            const word = this.extractWord(response, targetPlayer.wordLength);
+            if (word && word !== 'UNKNOWN') {
+                return word;
+            }
+        }
+        catch {
+            // Ignore errors
+        }
+        return null;
     }
     /**
      * Generate a word guess for the target player's word
+     * Only called when shouldGuessWord returned true
      */
     async guessWord(_ctx, targetPlayer, config) {
         const pattern = targetPlayer.revealedPositions
@@ -73,89 +104,85 @@ Reply with just "YES" if you're 80%+ confident, or "NO" if not sure.`;
             .join('');
         const revealedLetters = targetPlayer.revealedPositions
             .filter((p) => p !== null);
-        const systemPrompt = config.personality
-            ? `You are an AI player in a word guessing game. ${config.personality}`
-            : 'You are an AI player in a word guessing game.';
-        const prompt = `You are attempting to guess an opponent's complete word in a word guessing game.
-
-WORD INFORMATION:
-- Pattern: ${pattern}
-  (Letters shown are revealed, underscores are hidden)
+        const systemPrompt = 'You are playing a word guessing game. Give only single-word answers.';
+        const prompt = `Complete this word pattern: ${pattern}
 - Word length: ${targetPlayer.wordLength} letters
-- Revealed letters: ${revealedLetters.join(', ') || 'none'}
-- Letters NOT in the word: ${targetPlayer.missedLetters.join(', ') || 'none'}
+- Revealed: ${revealedLetters.join(', ') || 'none'}
+- NOT in word: ${targetPlayer.missedLetters.join(', ') || 'none'}
 
-Think about what English words match this pattern.
-The hidden positions must be filled with letters that:
-1. Are NOT in the missed letters list
-2. Create a valid English word
-3. Make sense with the revealed pattern
-
-What is the complete word?
-Return ONLY the word in UPPERCASE, nothing else.`;
+What is the COMPLETE English word? Reply with ONLY the word in uppercase.`;
+        console.log(`🎲 [WordGuess ${config.displayName}] Asking LLM for word guess, pattern: ${pattern}`);
         try {
-            const response = await this.ollama.generate(config.modelName, prompt, {
+            const response = await this.llm.generate(config.modelName, prompt, {
                 ...config.ollamaOptions,
-                temperature: 0.3, // Low temperature for more focused guessing
+                temperature: 0.2, // Very low for focused guessing
                 num_predict: 20,
             }, systemPrompt);
+            console.log(`🎲 [WordGuess ${config.displayName}] Raw LLM response: "${response}"`);
             const word = this.extractWord(response, targetPlayer.wordLength);
             if (word) {
-                console.log(`[Bot ${config.displayName}] Guessing word: ${word} for pattern: ${pattern}`);
-                return word;
+                // CRITICAL: Validate the word is a real English word
+                const isValid = await this.wordValidator.isValidWord(word);
+                console.log(`🎲 [WordGuess ${config.displayName}] Extracted word "${word}", valid: ${isValid}`);
+                if (isValid) {
+                    // Also check the word matches the revealed pattern
+                    if (this.matchesPattern(word, targetPlayer.revealedPositions)) {
+                        console.log(`[Bot ${config.displayName}] Guessing valid word: ${word} for pattern: ${pattern}`);
+                        return word;
+                    }
+                    else {
+                        console.log(`🎲 [WordGuess ${config.displayName}] Word "${word}" doesn't match pattern`);
+                    }
+                }
             }
         }
         catch (error) {
             console.error(`[Bot ${config.displayName}] Word guess error: ${error.message}`);
         }
-        // Fallback: construct word from pattern with common letters
-        return this.constructFallbackGuess(targetPlayer);
+        // If we can't get a valid word, throw to force letter guessing instead
+        // This is better than guessing a nonsense word
+        console.log(`🎲 [WordGuess ${config.displayName}] No valid word found, will fall back to letter guess`);
+        throw new Error('No valid word candidate found');
+    }
+    /**
+     * Check if a word matches the revealed pattern
+     */
+    matchesPattern(word, revealedPositions) {
+        if (word.length !== revealedPositions.length) {
+            return false;
+        }
+        for (let i = 0; i < word.length; i++) {
+            const revealed = revealedPositions[i];
+            if (revealed !== null && revealed !== word[i]) {
+                return false;
+            }
+        }
+        return true;
     }
     /**
      * Extract a clean word from LLM response
      */
     extractWord(response, expectedLength) {
+        // Clean the response
         const cleaned = response
             .trim()
             .toUpperCase()
-            .replace(/[^A-Z]/g, '');
-        // Check if the length matches
-        if (cleaned.length === expectedLength) {
-            return cleaned;
-        }
-        // Try to find a word of the right length in the response
-        const words = response.toUpperCase().match(/[A-Z]+/g) || [];
+            .replace(/[^A-Z\s]/g, '');
+        // Try to find a word of exactly the right length
+        const words = cleaned.split(/\s+/).filter(w => w.length > 0);
         for (const word of words) {
             if (word.length === expectedLength) {
                 return word;
             }
         }
-        // If we have a word close to the right length, try it anyway
-        if (cleaned.length >= expectedLength - 1 && cleaned.length <= expectedLength + 1) {
-            return cleaned.slice(0, expectedLength);
+        // If single word response and close to right length, try it
+        if (words.length === 1) {
+            const word = words[0];
+            if (word.length === expectedLength) {
+                return word;
+            }
         }
         return null;
-    }
-    /**
-     * Construct a fallback guess by filling in blanks with common letters
-     */
-    constructFallbackGuess(targetPlayer) {
-        const commonLetters = 'ETAOINSHRDLCU';
-        let fallbackIdx = 0;
-        const guess = targetPlayer.revealedPositions.map(pos => {
-            if (pos !== null) {
-                return pos;
-            }
-            // Fill with common letters not in missed list
-            while (fallbackIdx < commonLetters.length) {
-                const letter = commonLetters[fallbackIdx++];
-                if (!targetPlayer.missedLetters.includes(letter)) {
-                    return letter;
-                }
-            }
-            return 'A'; // Last resort
-        });
-        return guess.join('');
     }
 }
 exports.WordGuessStrategy = WordGuessStrategy;

@@ -48,6 +48,16 @@ router.get('/history/game/:roomCode', authenticate, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Migrate all game history (re-archive games still in database)
+router.post('/history/migrate', authenticate, async (req, res) => {
+    try {
+        const result = await gameManager.migrateAllGameHistory();
+        res.json(result);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 // Get all waiting games (lobby) - MUST be before /:roomCode
 router.get('/lobby/all', authenticate, async (req, res) => {
     try {

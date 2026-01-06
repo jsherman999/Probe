@@ -375,7 +375,7 @@ export class GameManager {
         await prisma.game.update({
           where: { id: game.id },
           data: {
-            currentTurnPlayerId: nextPlayer.userId,
+            currentTurnPlayerId: nextPlayer.userId || nextPlayer.botId,
             currentTurnStartedAt: new Date(),
           },
         });
@@ -771,12 +771,16 @@ export class GameManager {
 
       // Apply turn card multiplier for the first successful hit
       let multiplierApplied = false;
+      console.log(`🎴 Multiplier check: basePoints=${basePoints}, turnCardMultiplier=${game.turnCardMultiplier}, turnCardUsed=${game.turnCardUsed}, turnCard=${game.currentTurnCard}`);
       if (basePoints > 0 && game.turnCardMultiplier > 1 && !game.turnCardUsed) {
         pointsScored = basePoints * game.turnCardMultiplier;
         multiplierApplied = true;
         console.log(`🎴 Multiplier x${game.turnCardMultiplier} applied: ${basePoints} -> ${pointsScored}`);
       } else {
         pointsScored = basePoints;
+        if (basePoints > 0 && game.turnCardMultiplier > 1 && game.turnCardUsed) {
+          console.log(`🎴 Multiplier NOT applied - already used this turn`);
+        }
       }
 
       // Update target player's revealed positions and elimination status
@@ -914,7 +918,7 @@ export class GameManager {
         await prisma.game.update({
           where: { id: game.id },
           data: {
-            currentTurnPlayerId: nextPlayer.userId,
+            currentTurnPlayerId: nextPlayer.userId || nextPlayer.botId,
             currentTurnStartedAt: new Date(),
             currentTurnCard: drawnCard.type,
             turnCardMultiplier: drawnCard.multiplier || 1,
@@ -1605,10 +1609,28 @@ export class GameManager {
       throw new Error('Current player not found');
     }
 
-    // Advance to the next player
-    const currentIndex = game.players.findIndex(p => this.getPlayerId(p) === game.currentTurnPlayerId);
-    const nextIndex = (currentIndex + 1) % game.players.length;
-    const nextPlayer = game.players[nextIndex];
+    // Get active (non-eliminated) players sorted by turn order
+    const activePlayers = game.players
+      .filter(p => !p.isEliminated)
+      .sort((a, b) => a.turnOrder - b.turnOrder);
+
+    // If only one active player remains, game should be over
+    if (activePlayers.length <= 1) {
+      throw new Error('Game should be over - only one active player');
+    }
+
+    // Find current player's position among active players
+    const currentActiveIndex = activePlayers.findIndex(p => this.getPlayerId(p) === game.currentTurnPlayerId);
+
+    // If current player is eliminated (shouldn't happen but handle it), start from first active player
+    let nextActiveIndex: number;
+    if (currentActiveIndex === -1) {
+      nextActiveIndex = 0;
+    } else {
+      nextActiveIndex = (currentActiveIndex + 1) % activePlayers.length;
+    }
+
+    const nextPlayer = activePlayers[nextActiveIndex];
     const nextPlayerId = this.getPlayerId(nextPlayer);
 
     await prisma.game.update({
@@ -1691,6 +1713,13 @@ export class GameManager {
       throw new Error('Game not found');
     }
 
+    // Helper to get player display name by internal ID
+    const getPlayerName = (internalId: string): string => {
+      const player = game.players.find(p => p.id === internalId);
+      if (!player) return 'Unknown';
+      return player.isBot ? (player.botDisplayName || 'Bot') : (player.user?.displayName || 'Unknown');
+    };
+
     // Build archive data
     const archiveData = {
       id: game.id,
@@ -1700,8 +1729,9 @@ export class GameManager {
       startedAt: game.startedAt,
       completedAt: game.completedAt,
       players: game.players.map(p => ({
+        id: p.id,  // Include internal ID for turn lookups
         userId: p.userId,
-        displayName: p.user?.displayName || 'Unknown',
+        displayName: p.isBot ? p.botDisplayName : (p.user?.displayName || 'Unknown'),
         secretWord: p.secretWord,
         paddedWord: p.paddedWord,
         frontPadding: p.frontPadding,
@@ -1709,23 +1739,34 @@ export class GameManager {
         totalScore: p.totalScore,
         isEliminated: p.isEliminated,
         turnOrder: p.turnOrder,
+        isBot: p.isBot,
+        botId: p.botId,
       })),
       turns: game.turns.map(t => ({
         turnNumber: t.turnNumber,
         playerId: t.playerId,
+        playerName: getPlayerName(t.playerId),  // Add resolved name
         targetPlayerId: t.targetPlayerId,
+        targetPlayerName: getPlayerName(t.targetPlayerId),  // Add resolved name
         guessedLetter: t.guessedLetter,
         isCorrect: t.isCorrect,
         positionsRevealed: t.positionsRevealed,
         pointsScored: t.pointsScored,
         createdAt: t.createdAt,
       })),
-      results: game.results.map(r => ({
-        playerId: r.playerId,
-        displayName: r.player?.displayName || 'Unknown',
-        finalScore: r.finalScore,
-        placement: r.placement,
-      })),
+      // Generate results for ALL players (including bots), sorted by score
+      results: game.players
+        .map(p => ({
+          playerId: p.userId || p.botId || p.id,
+          displayName: p.isBot ? (p.botDisplayName || 'Bot') : (p.user?.displayName || 'Unknown'),
+          finalScore: p.totalScore || 0,
+          isBot: p.isBot,
+        }))
+        .sort((a, b) => b.finalScore - a.finalScore)
+        .map((r, index) => ({
+          ...r,
+          placement: index + 1,
+        })),
       viewerGuesses: this.viewerGuesses.get(game.roomCode) || [],
     };
 
@@ -1741,6 +1782,43 @@ export class GameManager {
     await fs.writeFile(filepath, JSON.stringify(archiveData, null, 2));
 
     console.log(`📁 Game archived to ${filepath}`);
+  }
+
+  // Re-archive a game by room code (for migrating old files)
+  async reArchiveGame(roomCode: string): Promise<void> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+    });
+
+    if (!game) {
+      throw new Error('Game not found in database');
+    }
+
+    await this.archiveGame(game.id);
+    console.log(`📁 Re-archived game ${roomCode}`);
+  }
+
+  // Re-archive all completed games that are still in the database
+  async migrateAllGameHistory(): Promise<{ migrated: string[]; failed: string[] }> {
+    const completedGames = await prisma.game.findMany({
+      where: { status: 'COMPLETED' },
+    });
+
+    const migrated: string[] = [];
+    const failed: string[] = [];
+
+    for (const game of completedGames) {
+      try {
+        await this.archiveGame(game.id);
+        migrated.push(game.roomCode);
+        console.log(`✅ Migrated ${game.roomCode}`);
+      } catch (err) {
+        failed.push(game.roomCode);
+        console.error(`❌ Failed to migrate ${game.roomCode}:`, err);
+      }
+    }
+
+    return { migrated, failed };
   }
 
   // Handle viewer (observer) word guess

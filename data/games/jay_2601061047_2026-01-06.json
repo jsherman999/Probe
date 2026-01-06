@@ -1,0 +1,308 @@
+{
+  "id": "69be0993-d7fd-40c0-914d-326aeeeece1d",
+  "roomCode": "jay_2601061047",
+  "status": "COMPLETED",
+  "createdAt": "2026-01-06T16:47:28.975Z",
+  "startedAt": "2026-01-06T16:48:38.908Z",
+  "completedAt": "2026-01-06T16:50:30.801Z",
+  "players": [
+    {
+      "id": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "userId": "36f32b00-e7a1-4ac6-a772-0fd6f1c04a8e",
+      "displayName": "jay",
+      "secretWord": "GASH",
+      "paddedWord": "GASH•",
+      "frontPadding": 0,
+      "backPadding": 1,
+      "totalScore": 20,
+      "isEliminated": false,
+      "turnOrder": 0,
+      "isBot": false,
+      "botId": null
+    },
+    {
+      "id": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "userId": null,
+      "displayName": "orca_mini_local",
+      "secretWord": "CAMERA",
+      "paddedWord": "•CAMERA••",
+      "frontPadding": 1,
+      "backPadding": 2,
+      "totalScore": 15,
+      "isEliminated": false,
+      "turnOrder": 1,
+      "isBot": true,
+      "botId": "bot_8dd015cd-ed44-441e-bf7f-697a77d7add3"
+    },
+    {
+      "id": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "userId": null,
+      "displayName": "nvidia_nemo_openr",
+      "secretWord": "MYSTERY",
+      "paddedWord": "MYSTERY",
+      "frontPadding": 0,
+      "backPadding": 0,
+      "totalScore": 35,
+      "isEliminated": false,
+      "turnOrder": 2,
+      "isBot": true,
+      "botId": "bot_74f6f5e2-1970-4ed4-ad60-ac42fcab67ae"
+    }
+  ],
+  "turns": [
+    {
+      "turnNumber": 1,
+      "playerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "playerName": "jay",
+      "targetPlayerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "targetPlayerName": "nvidia_nemo_openr",
+      "guessedLetter": "E",
+      "isCorrect": true,
+      "positionsRevealed": [
+        4
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T16:48:43.550Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "playerName": "jay",
+      "targetPlayerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "targetPlayerName": "nvidia_nemo_openr",
+      "guessedLetter": "N",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:48:48.565Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "playerName": "orca_mini_local",
+      "targetPlayerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "targetPlayerName": "nvidia_nemo_openr",
+      "guessedLetter": "B",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:48:51.211Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "playerName": "nvidia_nemo_openr",
+      "targetPlayerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "targetPlayerName": "jay",
+      "guessedLetter": "E",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:48:54.720Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "playerName": "jay",
+      "targetPlayerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "targetPlayerName": "orca_mini_local",
+      "guessedLetter": "E",
+      "isCorrect": true,
+      "positionsRevealed": [
+        4
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T16:48:59.507Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "playerName": "jay",
+      "targetPlayerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "targetPlayerName": "orca_mini_local",
+      "guessedLetter": "N",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:49:10.948Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "playerName": "orca_mini_local",
+      "targetPlayerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "targetPlayerName": "jay",
+      "guessedLetter": "B",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:49:14.235Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "playerName": "nvidia_nemo_openr",
+      "targetPlayerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "targetPlayerName": "orca_mini_local",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:49:17.600Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "playerName": "nvidia_nemo_openr",
+      "targetPlayerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "targetPlayerName": "orca_mini_local",
+      "guessedLetter": "A",
+      "isCorrect": true,
+      "positionsRevealed": [
+        6
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T16:49:20.435Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "playerName": "nvidia_nemo_openr",
+      "targetPlayerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "targetPlayerName": "jay",
+      "guessedLetter": "A",
+      "isCorrect": true,
+      "positionsRevealed": [
+        1
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T16:49:23.369Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "playerName": "nvidia_nemo_openr",
+      "targetPlayerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "targetPlayerName": "jay",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:49:26.581Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "playerName": "jay",
+      "targetPlayerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "targetPlayerName": "nvidia_nemo_openr",
+      "guessedLetter": "R",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T16:49:33.544Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "playerName": "jay",
+      "targetPlayerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "targetPlayerName": "nvidia_nemo_openr",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T16:49:37.849Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "playerName": "orca_mini_local",
+      "targetPlayerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "targetPlayerName": "jay",
+      "guessedLetter": "S",
+      "isCorrect": true,
+      "positionsRevealed": [
+        2
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T16:49:40.418Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "playerName": "orca_mini_local",
+      "targetPlayerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "targetPlayerName": "jay",
+      "guessedLetter": "D",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:49:43.241Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "playerName": "nvidia_nemo_openr",
+      "targetPlayerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "targetPlayerName": "orca_mini_local",
+      "guessedLetter": "O",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:49:45.930Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "eb166b87-9849-47bd-a143-c0d2dbc93417",
+      "playerName": "jay",
+      "targetPlayerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "targetPlayerName": "orca_mini_local",
+      "guessedLetter": "R",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T16:50:10.356Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "fb3c0d7e-f0f4-4ac8-820d-71fbe5443faa",
+      "playerName": "nvidia_nemo_openr",
+      "targetPlayerId": "d4a9c2cb-4e47-4f6f-bdf1-6b3a04191fea",
+      "targetPlayerName": "orca_mini_local",
+      "guessedLetter": "I",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T16:50:19.139Z"
+    }
+  ],
+  "results": [
+    {
+      "playerId": "bot_74f6f5e2-1970-4ed4-ad60-ac42fcab67ae",
+      "displayName": "nvidia_nemo_openr",
+      "finalScore": 35,
+      "isBot": true,
+      "placement": 1
+    },
+    {
+      "playerId": "36f32b00-e7a1-4ac6-a772-0fd6f1c04a8e",
+      "displayName": "jay",
+      "finalScore": 20,
+      "isBot": false,
+      "placement": 2
+    },
+    {
+      "playerId": "bot_8dd015cd-ed44-441e-bf7f-697a77d7add3",
+      "displayName": "orca_mini_local",
+      "finalScore": 15,
+      "isBot": true,
+      "placement": 3
+    }
+  ],
+  "viewerGuesses": []
+}

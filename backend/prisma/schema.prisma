@@ -120,8 +120,9 @@ model BotPreset {
   id           String   @id @default(uuid())
   presetName   String   @unique  // User-friendly name for the preset
   displayName  String   // Default display name for bots using this preset
-  modelName    String   // Ollama model (e.g., "llama3.2:3b")
+  modelName    String   // LLM model name (e.g., "llama3.2:3b" for Ollama, "openai/gpt-4" for OpenRouter)
   difficulty   String   @default("medium") // easy, medium, hard
+  provider     String   @default("ollama") // ollama or openrouter
   personality  String?  // Optional personality prompt
   ollamaConfig Json     @default("{}") // OllamaGenerateOptions as JSON
   createdAt    DateTime @default(now())

@@ -13,11 +13,11 @@ class BotStrategy {
     letterGuessStrategy;
     wordGuessStrategy;
     positionSelectionStrategy;
-    constructor(ollama, wordValidator) {
-        this.wordSelectionStrategy = new WordSelectionStrategy_1.WordSelectionStrategy(ollama, wordValidator);
-        this.letterGuessStrategy = new LetterGuessStrategy_1.LetterGuessStrategy(ollama);
-        this.wordGuessStrategy = new WordGuessStrategy_1.WordGuessStrategy(ollama);
-        this.positionSelectionStrategy = new PositionSelectionStrategy_1.PositionSelectionStrategy(ollama);
+    constructor(llm, wordValidator) {
+        this.wordSelectionStrategy = new WordSelectionStrategy_1.WordSelectionStrategy(llm, wordValidator);
+        this.letterGuessStrategy = new LetterGuessStrategy_1.LetterGuessStrategy(llm);
+        this.wordGuessStrategy = new WordGuessStrategy_1.WordGuessStrategy(llm, wordValidator); // Pass validator for word validation
+        this.positionSelectionStrategy = new PositionSelectionStrategy_1.PositionSelectionStrategy(llm);
     }
     /**
      * Select a word for the bot to use

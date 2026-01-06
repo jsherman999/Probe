@@ -7,11 +7,22 @@ interface ViewerGuess {
     isCorrect: boolean;
     submittedAt: Date;
 }
+export interface TurnCardInfo {
+    type: string;
+    label: string;
+    multiplier?: number;
+    affectedPlayerId?: string;
+    affectedPlayerName?: string;
+}
 export declare class GameManager {
     private wordValidator;
     private scoringEngine;
     private viewerGuesses;
     constructor();
+    private drawTurnCard;
+    private getPlayerId;
+    private getPlayerDisplayName;
+    private getAdjacentPlayer;
     private generateRoomCode;
     createGame(userId: string, username: string, turnTimerSeconds?: number): Promise<any>;
     getGameByRoomCode(roomCode: string, forUserId?: string): Promise<any>;
@@ -27,10 +38,16 @@ export declare class GameManager {
     processGuess(roomCode: string, playerId: string, targetPlayerId: string, letter: string): Promise<any>;
     resolveBlankSelection(roomCode: string, guessingPlayerId: string, targetPlayerId: string, selectedPosition: number): Promise<any>;
     resolveDuplicateSelection(roomCode: string, guessingPlayerId: string, targetPlayerId: string, selectedPosition: number, letter: string): Promise<any>;
+    resolveExposeCard(roomCode: string, affectedPlayerId: string, selectedPosition: number): Promise<any>;
     processWordGuess(roomCode: string, guessingPlayerId: string, targetPlayerId: string, guessedWord: string): Promise<any>;
     handleTurnTimeout(roomCode: string): Promise<any>;
     updateTimerSettings(roomCode: string, userId: string, turnTimerSeconds: number): Promise<any>;
     archiveGame(gameId: string): Promise<void>;
+    reArchiveGame(roomCode: string): Promise<void>;
+    migrateAllGameHistory(): Promise<{
+        migrated: string[];
+        failed: string[];
+    }>;
     submitViewerGuess(roomCode: string, viewerId: string, viewerName: string, targetPlayerId: string, guessedWord: string): Promise<{
         isCorrect: boolean;
         targetPlayerName: string;
