@@ -7,20 +7,11 @@ interface ViewerGuess {
     isCorrect: boolean;
     submittedAt: Date;
 }
-export interface TurnCardInfo {
-    type: string;
-    label: string;
-    multiplier?: number;
-    affectedPlayerId?: string;
-    affectedPlayerName?: string;
-}
 export declare class GameManager {
     private wordValidator;
     private scoringEngine;
     private viewerGuesses;
     constructor();
-    private drawTurnCard;
-    private getAdjacentPlayer;
     private generateRoomCode;
     createGame(userId: string, username: string, turnTimerSeconds?: number): Promise<any>;
     getGameByRoomCode(roomCode: string, forUserId?: string): Promise<any>;
@@ -36,7 +27,6 @@ export declare class GameManager {
     processGuess(roomCode: string, playerId: string, targetPlayerId: string, letter: string): Promise<any>;
     resolveBlankSelection(roomCode: string, guessingPlayerId: string, targetPlayerId: string, selectedPosition: number): Promise<any>;
     resolveDuplicateSelection(roomCode: string, guessingPlayerId: string, targetPlayerId: string, selectedPosition: number, letter: string): Promise<any>;
-    resolveExposeCard(roomCode: string, affectedPlayerId: string, selectedPosition: number): Promise<any>;
     processWordGuess(roomCode: string, guessingPlayerId: string, targetPlayerId: string, guessedWord: string): Promise<any>;
     handleTurnTimeout(roomCode: string): Promise<any>;
     updateTimerSettings(roomCode: string, userId: string, turnTimerSeconds: number): Promise<any>;
@@ -59,6 +49,14 @@ export declare class GameManager {
     removeGame(roomCode: string, userId?: string, force?: boolean): Promise<void>;
     removeGameHistory(roomCode: string): Promise<void>;
     private sanitizeGame;
+    /**
+     * Add a bot player to a game
+     */
+    addBotPlayer(roomCode: string, bot: any): Promise<any>;
+    /**
+     * Remove a bot player from a game
+     */
+    removeBotPlayer(roomCode: string, botId: string): Promise<any>;
 }
 export {};
 //# sourceMappingURL=GameManager.d.ts.map

@@ -9,7 +9,7 @@ export declare class ScoringEngine {
     /**
      * Calculate score for revealed positions
      * @param positions Array of position indices that were revealed
-     * @param isBlank Optional function to check if a position is a blank (unused, kept for backwards compatibility)
+     * @param isBlank Optional function to check if a position is a blank (blanks score 0)
      */
     calculateScore(positions: number[], isBlank?: (pos: number) => boolean): number;
     /**

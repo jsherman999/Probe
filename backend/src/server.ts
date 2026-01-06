@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client';
 import { setupSocketHandlers } from './socket';
 import authRoutes from './routes/auth';
 import gameRoutes from './routes/game';
+import botRoutes from './routes/bot';
 
 // Load environment variables
 dotenv.config();
@@ -47,6 +48,7 @@ app.get('/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/game', gameRoutes);
+app.use('/api/bot', botRoutes);
 
 // Socket.io setup
 setupSocketHandlers(io);
