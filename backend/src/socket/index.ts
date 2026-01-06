@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import { GameManager } from '../game/GameManager';
 import { PrismaClient } from '@prisma/client';
 import { botManager, BotConfigInput, GameContext, PlayerInfo } from '../bot';
-import { isSocketFromLocalhost } from '../middleware/localOnly';
 
 const prisma = new PrismaClient();
 
@@ -129,7 +128,7 @@ async function buildBotGameContext(roomCode: string, botPlayerId: string): Promi
   const players: PlayerInfo[] = game.players.map((p: any) => ({
     id: p.botId || p.userId || p.id,
     displayName: p.isBot ? p.botDisplayName : p.user?.displayName || 'Unknown',
-    oduserId: p.userId,
+    userId: p.userId,
     isBot: p.isBot || false,
     wordLength: p.paddedWord?.length || p.secretWord?.length || 0,
     revealedPositions: p.revealedPositions || [],
@@ -322,7 +321,7 @@ async function triggerBotWordSelection(io: Server, roomCode: string, botId: stri
 
     // Notify room that bot is ready (don't reveal the word)
     io.to(roomCode).emit('playerReady', {
-      oduserId: botId,
+      userId: botId,
       username: botManager.getBot(botId)?.displayName || 'Bot',
       isBot: true,
     });
@@ -568,22 +567,15 @@ export function setupSocketHandlers(io: Server) {
     });
 
     // ========================================================================
-    // Bot Management Events (localhost only)
+    // Bot Management Events
     // ========================================================================
 
-    // Add bot to game (host only, localhost only)
+    // Add bot to game (host only)
     socket.on('addBotToGame', async (data: {
       roomCode: string;
       botConfig: BotConfigInput;
     }) => {
       try {
-        // Verify localhost
-        const socketAddress = socket.handshake.address;
-        if (!isSocketFromLocalhost(socketAddress)) {
-          socket.emit('error', { message: 'Bot management requires localhost access' });
-          return;
-        }
-
         console.log(`🤖 Add bot request from ${socket.username} for room ${data.roomCode}`);
 
         // Verify host
@@ -641,19 +633,12 @@ export function setupSocketHandlers(io: Server) {
       }
     });
 
-    // Remove bot from game (host only, localhost only)
+    // Remove bot from game (host only)
     socket.on('removeBotFromGame', async (data: {
       roomCode: string;
       botId: string;
     }) => {
       try {
-        // Verify localhost
-        const socketAddress = socket.handshake.address;
-        if (!isSocketFromLocalhost(socketAddress)) {
-          socket.emit('error', { message: 'Bot management requires localhost access' });
-          return;
-        }
-
         console.log(`🤖 Remove bot request from ${socket.username} for room ${data.roomCode}`);
 
         // Verify host

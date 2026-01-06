@@ -34,7 +34,7 @@ export function useOllama(): UseOllamaReturn {
         setModels(modelList);
       } else {
         setModels([]);
-        setError('Ollama is not available. Make sure it\'s running on localhost:11434');
+        setError('Ollama is not available on the server');
       }
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to connect to Ollama');
@@ -59,36 +59,11 @@ export function useOllama(): UseOllamaReturn {
 }
 
 /**
- * Hook to check if the current connection is from localhost
- * This is determined by checking if the API is accessible
- * (bot endpoints are localhost-only, so if they work, we're on localhost)
+ * Hook to check if bot features are available
+ * Bot management is now available to all players as long as Ollama is running on the server
  */
 export function useLocalhost(): { isLocalhost: boolean; isChecking: boolean } {
-  const [isLocalhost, setIsLocalhost] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
-
-  useEffect(() => {
-    const checkLocalhost = async () => {
-      try {
-        // Try to access a bot endpoint - if it works, we're on localhost
-        await getOllamaStatus();
-        setIsLocalhost(true);
-      } catch (err: any) {
-        // If we get a 403, we're not on localhost
-        // If we get a network error, we might still be on localhost but Ollama is down
-        if (err.response?.status === 403) {
-          setIsLocalhost(false);
-        } else {
-          // Assume localhost if we can reach the server at all
-          setIsLocalhost(true);
-        }
-      } finally {
-        setIsChecking(false);
-      }
-    };
-
-    checkLocalhost();
-  }, []);
-
-  return { isLocalhost, isChecking };
+  // Bot features are now available to everyone, not just localhost
+  // Keep the hook for backward compatibility but always return true
+  return { isLocalhost: true, isChecking: false };
 }

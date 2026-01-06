@@ -1,20 +1,18 @@
 /**
  * Bot management API routes
  *
- * All routes require localhost access for security.
- * These endpoints allow the host to manage Ollama models and bot configurations.
+ * These endpoints allow any player to manage Ollama models and bot configurations
+ * as long as Ollama is available on the hosting server.
  */
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { requireLocalhost } from '../middleware/localOnly';
 import { botManager, OllamaService } from '../bot';
 import { prisma } from '../server';
 
 const router = Router();
 
-// Apply localhost restriction to all bot routes
-router.use(requireLocalhost);
+// Bot routes are now available to all players (no localhost restriction)
 
 // ============================================================================
 // Validation Schemas

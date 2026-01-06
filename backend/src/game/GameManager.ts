@@ -94,13 +94,23 @@ export class GameManager {
     return TURN_CARDS[0];
   }
 
+  // Helper to get effective player ID (userId for humans, botId for bots)
+  private getPlayerId(player: { userId: string | null; botId: string | null }): string {
+    return (player.userId ?? player.botId)!;
+  }
+
+  // Helper to get display name (from user for humans, botDisplayName for bots)
+  private getPlayerDisplayName(player: { user?: { displayName: string } | null; botDisplayName?: string | null }): string {
+    return player.user?.displayName ?? player.botDisplayName ?? 'Unknown';
+  }
+
   // Get adjacent player in turn order
   // direction: 'left' = next player, 'right' = previous player
   private getAdjacentPlayer(
-    players: { userId: string; turnOrder: number; isEliminated: boolean; user: { displayName: string } }[],
+    players: { userId: string | null; botId: string | null; turnOrder: number; isEliminated: boolean; user?: { displayName: string } | null; botDisplayName?: string | null }[],
     currentPlayerId: string,
     direction: 'left' | 'right'
-  ): { userId: string; displayName: string } | null {
+  ): { playerId: string; displayName: string } | null {
     // Filter to only active players and sort by turn order
     const activePlayers = players
       .filter(p => !p.isEliminated)
@@ -108,7 +118,7 @@ export class GameManager {
 
     if (activePlayers.length < 2) return null;
 
-    const currentIndex = activePlayers.findIndex(p => p.userId === currentPlayerId);
+    const currentIndex = activePlayers.findIndex(p => this.getPlayerId(p) === currentPlayerId);
     if (currentIndex === -1) return null;
 
     let targetIndex: number;
@@ -122,8 +132,8 @@ export class GameManager {
 
     const targetPlayer = activePlayers[targetIndex];
     return {
-      userId: targetPlayer.userId,
-      displayName: targetPlayer.user.displayName,
+      playerId: this.getPlayerId(targetPlayer),
+      displayName: this.getPlayerDisplayName(targetPlayer),
     };
   }
 
@@ -321,17 +331,18 @@ export class GameManager {
           },
         });
 
-        // Record results
+        // Record results (only for human players)
         const allPlayers = await prisma.gamePlayer.findMany({
           where: { gameId: game.id },
         });
         const sortedPlayers = [...allPlayers].sort((a, b) => b.totalScore - a.totalScore);
+        const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
         await Promise.all(
-          sortedPlayers.map(async (p, index) =>
+          humanPlayers.map(async (p, index) =>
             prisma.gameResult.create({
               data: {
                 gameId: game.id,
-                playerId: p.userId,
+                playerId: p.userId!,
                 finalScore: p.totalScore,
                 placement: index + 1,
               },
@@ -411,14 +422,15 @@ export class GameManager {
       },
     });
 
-    // Record results based on current scores
+    // Record results based on current scores (only for human players)
     const sortedPlayers = [...game.players].sort((a, b) => b.totalScore - a.totalScore);
+    const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
     await Promise.all(
-      sortedPlayers.map(async (p, index) =>
+      humanPlayers.map(async (p, index) =>
         prisma.gameResult.create({
           data: {
             gameId: game.id,
-            playerId: p.userId,
+            playerId: p.userId!,
             finalScore: p.totalScore,
             placement: index + 1,
           },
@@ -848,10 +860,10 @@ export class GameManager {
           .filter(p => !p.isEliminated)
           .sort((a, b) => a.turnOrder - b.turnOrder);
 
-        const currentIndex = activePlayers.findIndex(p => p.userId === playerId);
+        const currentIndex = activePlayers.findIndex(p => this.getPlayerId(p) === playerId);
         const nextIndex = (currentIndex + 1) % activePlayers.length;
         const nextPlayer = activePlayers[nextIndex];
-        nextTurnPlayerId = nextPlayer.userId;
+        nextTurnPlayerId = this.getPlayerId(nextPlayer);
 
         // Draw a turn card for the next player
         const drawnCard = this.drawTurnCard();
@@ -861,13 +873,13 @@ export class GameManager {
         // Handle expose cards
         if (drawnCard.type === 'expose_left' || drawnCard.type === 'expose_right') {
           const direction = drawnCard.type === 'expose_left' ? 'left' : 'right';
-          const affectedPlayer = this.getAdjacentPlayer(game.players, nextPlayer.userId, direction);
+          const affectedPlayer = this.getAdjacentPlayer(game.players, this.getPlayerId(nextPlayer), direction);
           if (affectedPlayer) {
-            pendingExposePlayerId = affectedPlayer.userId;
+            pendingExposePlayerId = affectedPlayer.playerId;
             turnCardInfo = {
               type: drawnCard.type,
               label: drawnCard.label,
-              affectedPlayerId: affectedPlayer.userId,
+              affectedPlayerId: affectedPlayer.playerId,
               affectedPlayerName: affectedPlayer.displayName,
             };
           } else {
@@ -933,14 +945,15 @@ export class GameManager {
         },
       });
 
-      // Record results
+      // Record results (only for human players - bots don't have User records)
       const sorted = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sorted.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sorted.map((p, index) =>
+        humanPlayers.map((p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -1077,12 +1090,13 @@ export class GameManager {
       });
 
       const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sortedPlayers.map(async (p, index) =>
+        humanPlayers.map(async (p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -1217,12 +1231,13 @@ export class GameManager {
       });
 
       const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sortedPlayers.map(async (p, index) =>
+        humanPlayers.map(async (p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -1351,12 +1366,13 @@ export class GameManager {
       });
 
       const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sortedPlayers.map(async (p, index) =>
+        humanPlayers.map(async (p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -1521,12 +1537,13 @@ export class GameManager {
       });
 
       const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sortedPlayers.map(async (p, index) =>
+        humanPlayers.map(async (p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -1998,7 +2015,7 @@ export class GameManager {
 
         return {
           id: p.id,
-          oduserId: p.userId,
+          userId: p.userId,
           botId: p.botId,
           isBot: p.isBot || false,
           displayName: p.isBot ? p.botDisplayName : (p.user?.displayName || 'Unknown'),

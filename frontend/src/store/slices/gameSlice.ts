@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface Player {
   id: string;
-  userId: string;
+  userId: string | null;
   displayName: string;
   wordLength: number;
   hasSelectedWord: boolean;
@@ -14,6 +14,12 @@ interface Player {
   isEliminated: boolean;
   turnOrder: number;
   mySecretWord?: string; // Only set for the current user's own player
+  // Bot-specific fields
+  isBot?: boolean;
+  botId?: string | null;
+  botDisplayName?: string | null;
+  botModelName?: string | null;
+  botDifficulty?: string | null;
 }
 
 interface GameState {
