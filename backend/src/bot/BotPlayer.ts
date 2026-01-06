@@ -132,15 +132,27 @@ export class BotPlayer {
       return { type: 'letterGuess', targetPlayerId: targetId, letter };
     } catch (error: any) {
       console.error(`[${this.displayName}] Turn error: ${error.message}`);
+
       // Return a safe fallback action
-      const fallbackTarget = ctx.players.find(
-        p => !p.isEliminated && p.id !== ctx.botPlayerId
-      );
-      return {
-        type: 'letterGuess',
-        targetPlayerId: fallbackTarget?.id || '',
-        letter: 'E',
-      };
+      try {
+        const fallbackTarget = ctx.players.find(
+          p => !p.isEliminated && p.id !== ctx.botPlayerId
+        );
+
+        if (fallbackTarget) {
+          console.log(`[${this.displayName}] Using fallback target: ${fallbackTarget.displayName}`);
+          return {
+            type: 'letterGuess',
+            targetPlayerId: fallbackTarget.id,
+            letter: 'E', // Safe fallback letter
+          };
+        }
+      } catch (fallbackError) {
+        console.error(`[${this.displayName}] Fallback generation failed:`, fallbackError);
+      }
+
+      // Last resort: re-throw error to be handled by caller
+      throw error;
     }
   }
 

@@ -68,38 +68,46 @@ function startTurnTimer(io: Server, roomCode: string, turnTimerSeconds: number) 
   console.log(`⏱️ Starting ${turnTimerSeconds}s timer for room ${roomCode}`);
 
   // Set new timer
-  const timer = setTimeout(async () => {
-    try {
-      console.log(`⏰ Timer expired for room ${roomCode}`);
-      const result = await gameManager.handleTurnTimeout(roomCode);
-
-      // Broadcast timeout to all players
-      io.to(roomCode).emit('turnTimeout', {
-        timedOutPlayerId: result.timedOutPlayerId,
-        timedOutPlayerName: result.timedOutPlayerName,
-        nextPlayerId: result.nextPlayerId,
-        nextPlayerName: result.nextPlayerName,
-        game: result.game,
-      });
-
-      // Start new timer for next player if game still active
-      if (result.game.status === 'ACTIVE') {
-        startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
-        // Also emit turn changed for UI refresh
-        io.to(roomCode).emit('turnChanged', {
-          previousPlayerId: result.timedOutPlayerId,
-          previousPlayerName: result.timedOutPlayerName,
-          currentPlayerId: result.nextPlayerId,
-          currentPlayerName: result.nextPlayerName,
-          game: result.game,
-        });
-      }
-    } catch (error: any) {
-      console.error(`❌ Error handling timeout for ${roomCode}:`, error.message);
-    }
+  const timer = setTimeout(() => {
+    console.log(`⏰ Timer expired for room ${roomCode}`);
+    executeTurnTimeout(io, roomCode);
   }, turnTimerSeconds * 1000);
 
   gameTimers.set(roomCode, timer);
+}
+
+// Execute turn timeout logic (advances to next player)
+async function executeTurnTimeout(io: Server, roomCode: string) {
+  try {
+    const result = await gameManager.handleTurnTimeout(roomCode);
+
+    // Broadcast timeout to all players
+    io.to(roomCode).emit('turnTimeout', {
+      timedOutPlayerId: result.timedOutPlayerId,
+      timedOutPlayerName: result.timedOutPlayerName,
+      nextPlayerId: result.nextPlayerId,
+      nextPlayerName: result.nextPlayerName,
+      game: result.game,
+    });
+
+    // Start new timer for next player if game still active
+    if (result.game.status === 'ACTIVE') {
+      startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
+      // Also emit turn changed for UI refresh
+      io.to(roomCode).emit('turnChanged', {
+        previousPlayerId: result.timedOutPlayerId,
+        previousPlayerName: result.timedOutPlayerName,
+        currentPlayerId: result.nextPlayerId,
+        currentPlayerName: result.nextPlayerName,
+        game: result.game,
+      });
+
+      // Check if next player is a bot
+      checkAndTriggerBotTurn(io, roomCode, result.game);
+    }
+  } catch (error: any) {
+    console.error(`❌ Error handling timeout for ${roomCode}:`, error.message);
+  }
 }
 
 // Stop timer for a game (when completed or abandoned)
@@ -254,6 +262,8 @@ async function triggerBotTurn(io: Server, roomCode: string, botId: string) {
     }
   } catch (error: any) {
     console.error(`❌ Bot turn error for ${botId}:`, error.message);
+    // Force a turn timeout so the game continues
+    await executeTurnTimeout(io, roomCode);
   }
 }
 
