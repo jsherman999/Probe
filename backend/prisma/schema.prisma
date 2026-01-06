@@ -48,7 +48,9 @@ model Game {
 model GamePlayer {
   id                String   @id @default(uuid())
   gameId            String
-  userId            String
+  userId            String?  // Nullable for bot players
+  botId             String?  // Bot identifier (for bot players)
+  isBot             Boolean  @default(false)
   turnOrder         Int
   secretWord        String?
   secretWordHash    String?
@@ -61,10 +63,17 @@ model GamePlayer {
   isEliminated      Boolean  @default(false)
   joinedAt          DateTime @default(now())
 
+  // Bot-specific fields (stored as JSON for flexibility)
+  botDisplayName    String?  // Bot's display name
+  botModelName      String?  // Ollama model used
+  botDifficulty     String?  // easy, medium, hard
+  botConfig         Json?    // Full bot configuration (ollamaOptions, personality, etc.)
+
   game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
 
   @@unique([gameId, userId])
+  @@unique([gameId, botId])
   @@map("game_players")
 }
 
@@ -99,4 +108,19 @@ model GameResult {
   player User @relation(fields: [playerId], references: [id])
 
   @@map("game_results")
+}
+
+// Bot preset configurations (saved bot templates)
+model BotPreset {
+  id           String   @id @default(uuid())
+  presetName   String   @unique  // User-friendly name for the preset
+  displayName  String   // Default display name for bots using this preset
+  modelName    String   // Ollama model (e.g., "llama3.2:3b")
+  difficulty   String   @default("medium") // easy, medium, hard
+  personality  String?  // Optional personality prompt
+  ollamaConfig Json     @default("{}") // OllamaGenerateOptions as JSON
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("bot_presets")
 }
