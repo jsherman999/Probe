@@ -107,7 +107,7 @@ export class GameManager {
   // Get adjacent player in turn order
   // direction: 'left' = next player, 'right' = previous player
   private getAdjacentPlayer(
-    players: { userId: string | null; botId: string | null; turnOrder: number; isEliminated: boolean; user?: { displayName: string } | null; botDisplayName?: string | null }[],
+    players: any[],
     currentPlayerId: string,
     direction: 'left' | 'right'
   ): { playerId: string; displayName: string } | null {
@@ -748,12 +748,11 @@ export class GameManager {
       pointsScored = -50;
 
       // Deduct points from the guessing player
-      const guessingPlayer = game.players.find(p => p.userId === playerId);
-      if (guessingPlayer) {
+      if (currentPlayer) {
         await prisma.gamePlayer.update({
-          where: { id: guessingPlayer.id },
+          where: { id: currentPlayer.id },
           data: {
-            totalScore: guessingPlayer.totalScore - 50, // Allow negative scores
+            totalScore: currentPlayer.totalScore - 50, // Allow negative scores
           },
         });
       }
@@ -791,13 +790,12 @@ export class GameManager {
 
       // Award points to the GUESSING player (not the target)
       if (pointsScored > 0) {
-        const guessingPlayer = game.players.find(p => p.userId === playerId);
-        if (guessingPlayer) {
-          console.log(`💰 Awarding ${pointsScored} points to GUESSING player ${playerId} (was ${guessingPlayer.totalScore}, now ${guessingPlayer.totalScore + pointsScored})`);
+        if (currentPlayer) {
+          console.log(`💰 Awarding ${pointsScored} points to GUESSING player ${playerId} (was ${currentPlayer.totalScore}, now ${currentPlayer.totalScore + pointsScored})`);
           await prisma.gamePlayer.update({
-            where: { id: guessingPlayer.id },
+            where: { id: currentPlayer.id },
             data: {
-              totalScore: guessingPlayer.totalScore + pointsScored,
+              totalScore: currentPlayer.totalScore + pointsScored,
             },
           });
         }
@@ -816,8 +814,8 @@ export class GameManager {
     await prisma.gameTurn.create({
       data: {
         gameId: game.id,
-        playerId,
-        targetPlayerId,
+        playerId: currentPlayer.id,
+        targetPlayerId: targetPlayer.id,
         guessedLetter: letter,
         isCorrect,
         positionsRevealed: positions,
@@ -1050,7 +1048,7 @@ export class GameManager {
 
     // Award points to the GUESSING player
     if (pointsScored > 0) {
-      const guessingPlayer = game.players.find(p => p.userId === guessingPlayerId);
+      const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
       if (guessingPlayer) {
         await prisma.gamePlayer.update({
           where: { id: guessingPlayer.id },
@@ -1062,18 +1060,21 @@ export class GameManager {
     }
 
     // Record turn
-    await prisma.gameTurn.create({
-      data: {
-        gameId: game.id,
-        playerId: guessingPlayerId,
-        targetPlayerId,
-        guessedLetter: 'BLANK',
-        isCorrect: true,
-        positionsRevealed: [selectedPosition],
-        pointsScored,
-        turnNumber: game.roundNumber,
-      },
-    });
+    const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
+    if (guessingPlayer) {
+      await prisma.gameTurn.create({
+        data: {
+          gameId: game.id,
+          playerId: guessingPlayer.id,
+          targetPlayerId: targetPlayer.id,
+          guessedLetter: 'BLANK',
+          isCorrect: true,
+          positionsRevealed: [selectedPosition],
+          pointsScored,
+          turnNumber: game.roundNumber,
+        },
+      });
+    }
 
     // Check for game over - fetch fresh player data after update
     const updatedPlayers = await prisma.gamePlayer.findMany({
@@ -1191,7 +1192,7 @@ export class GameManager {
 
     // Award points to the GUESSING player
     if (pointsScored > 0) {
-      const guessingPlayer = game.players.find(p => p.userId === guessingPlayerId);
+      const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
       if (guessingPlayer) {
         await prisma.gamePlayer.update({
           where: { id: guessingPlayer.id },
@@ -1203,18 +1204,21 @@ export class GameManager {
     }
 
     // Record turn
-    await prisma.gameTurn.create({
-      data: {
-        gameId: game.id,
-        playerId: guessingPlayerId,
-        targetPlayerId,
-        guessedLetter: letter,
-        isCorrect: true,
-        positionsRevealed: [selectedPosition],
-        pointsScored,
-        turnNumber: game.roundNumber,
-      },
-    });
+    const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
+    if (guessingPlayer) {
+      await prisma.gameTurn.create({
+        data: {
+          gameId: game.id,
+          playerId: guessingPlayer.id,
+          targetPlayerId: targetPlayer.id,
+          guessedLetter: letter,
+          isCorrect: true,
+          positionsRevealed: [selectedPosition],
+          pointsScored,
+          turnNumber: game.roundNumber,
+        },
+      });
+    }
 
     // Check for game over
     const updatedPlayers = await prisma.gamePlayer.findMany({
@@ -1298,13 +1302,14 @@ export class GameManager {
       throw new Error('Not your expose selection');
     }
 
-    const affectedPlayer = game.players.find(p => p.userId === affectedPlayerId);
+    const affectedPlayer = game.players.find(p => this.getPlayerId(p) === affectedPlayerId);
     if (!affectedPlayer) {
       throw new Error('Player not found');
     }
 
     // Find the active player who drew the card (they get the points)
-    const activePlayer = game.players.find(p => p.userId === game.currentTurnPlayerId);
+    // Note: currentTurnPlayerId might be a bot
+    const activePlayer = game.players.find(p => this.getPlayerId(p) === game.currentTurnPlayerId);
 
     const word = affectedPlayer.paddedWord || affectedPlayer.secretWord!;
     const revealedPositions = JSON.parse(affectedPlayer.revealedPositions as any) as boolean[];
@@ -1432,12 +1437,12 @@ export class GameManager {
       throw new Error('Game not active');
     }
 
-    const targetPlayer = game.players.find(p => p.userId === targetPlayerId);
+    const targetPlayer = game.players.find(p => this.getPlayerId(p) === targetPlayerId);
     if (!targetPlayer || targetPlayer.isEliminated) {
       throw new Error('Invalid target player');
     }
 
-    const guessingPlayer = game.players.find(p => p.userId === guessingPlayerId);
+    const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
     if (!guessingPlayer) {
       throw new Error('Guessing player not found');
     }
@@ -1482,7 +1487,7 @@ export class GameManager {
 
     // If wrong guess, advance to next player's turn
     if (!isCorrect) {
-      const currentIndex = game.players.findIndex(p => p.userId === guessingPlayerId);
+      const currentIndex = game.players.findIndex(p => this.getPlayerId(p) === guessingPlayerId);
       let nextIndex = (currentIndex + 1) % game.players.length;
 
       // Skip eliminated players
@@ -1494,11 +1499,12 @@ export class GameManager {
       }
 
       const nextPlayer = game.players[nextIndex];
+      const nextPlayerId = this.getPlayerId(nextPlayer);
 
       await prisma.game.update({
         where: { id: game.id },
         data: {
-          currentTurnPlayerId: nextPlayer.userId,
+          currentTurnPlayerId: nextPlayerId,
           currentTurnStartedAt: new Date(),
         },
       });
@@ -1508,8 +1514,8 @@ export class GameManager {
     await prisma.gameTurn.create({
       data: {
         gameId: game.id,
-        playerId: guessingPlayerId,
-        targetPlayerId,
+        playerId: guessingPlayer.id,
+        targetPlayerId: targetPlayer.id,
         guessedLetter: `WORD:${guessedWord}`,
         isCorrect,
         positionsRevealed: isCorrect ? Array.from({ length: paddedWord.length }, (_, i) => i) : [],
@@ -1594,20 +1600,21 @@ export class GameManager {
     }
 
     // Find the player whose turn timed out
-    const timedOutPlayer = game.players.find(p => p.userId === game.currentTurnPlayerId);
+    const timedOutPlayer = game.players.find(p => this.getPlayerId(p) === game.currentTurnPlayerId);
     if (!timedOutPlayer) {
       throw new Error('Current player not found');
     }
 
     // Advance to the next player
-    const currentIndex = game.players.findIndex(p => p.userId === game.currentTurnPlayerId);
+    const currentIndex = game.players.findIndex(p => this.getPlayerId(p) === game.currentTurnPlayerId);
     const nextIndex = (currentIndex + 1) % game.players.length;
     const nextPlayer = game.players[nextIndex];
+    const nextPlayerId = this.getPlayerId(nextPlayer);
 
     await prisma.game.update({
       where: { id: game.id },
       data: {
-        currentTurnPlayerId: nextPlayer.userId,
+        currentTurnPlayerId: nextPlayerId,
         currentTurnStartedAt: new Date(),
       },
     });
@@ -1615,10 +1622,10 @@ export class GameManager {
     const updatedGame = await this.getGameByRoomCode(roomCode);
 
     return {
-      timedOutPlayerId: timedOutPlayer.userId,
-      timedOutPlayerName: timedOutPlayer.user?.displayName || 'Unknown',
-      nextPlayerId: nextPlayer.userId,
-      nextPlayerName: nextPlayer.user?.displayName || 'Unknown',
+      timedOutPlayerId: this.getPlayerId(timedOutPlayer),
+      timedOutPlayerName: this.getPlayerDisplayName(timedOutPlayer),
+      nextPlayerId: nextPlayerId,
+      nextPlayerName: this.getPlayerDisplayName(nextPlayer),
       game: updatedGame,
     };
   }

@@ -16,8 +16,6 @@ model User {
 
   hostedGames   Game[]        @relation("HostedGames")
   gamePlayers   GamePlayer[]
-  turnsPlayed   GameTurn[]    @relation("PlayerTurns")
-  turnsTargeted GameTurn[]    @relation("TargetedTurns")
   gameResults   GameResult[]
 
   @@map("users")
@@ -76,6 +74,9 @@ model GamePlayer {
   game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [userId], references: [id])
 
+  turnsPlayed   GameTurn[] @relation("PlayerTurns")
+  turnsTargeted GameTurn[] @relation("TargetedTurns")
+
   @@unique([gameId, userId])
   @@unique([gameId, botId])
   @@map("game_players")
@@ -93,9 +94,9 @@ model GameTurn {
   turnNumber        Int
   createdAt         DateTime @default(now())
 
-  game         Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  player       User @relation("PlayerTurns", fields: [playerId], references: [id])
-  targetPlayer User @relation("TargetedTurns", fields: [targetPlayerId], references: [id])
+  game         Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player       GamePlayer @relation("PlayerTurns", fields: [playerId], references: [id])
+  targetPlayer GamePlayer @relation("TargetedTurns", fields: [targetPlayerId], references: [id])
 
   @@map("game_turns")
 }
