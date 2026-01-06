@@ -771,17 +771,22 @@ export class GameManager {
 
       // Apply turn card multiplier for the first successful hit
       let multiplierApplied = false;
-      console.log(`🎴 Multiplier check: basePoints=${basePoints}, turnCardMultiplier=${game.turnCardMultiplier}, turnCardUsed=${game.turnCardUsed}, turnCard=${game.currentTurnCard}`);
+      console.log(`🎴 ==================== MULTIPLIER CHECK ====================`);
+      console.log(`🎴 Base points: ${basePoints}`);
+      console.log(`🎴 Turn card: ${game.currentTurnCard}`);
+      console.log(`🎴 Turn card multiplier: ${game.turnCardMultiplier} (type: ${typeof game.turnCardMultiplier})`);
+      console.log(`🎴 Turn card used: ${game.turnCardUsed} (type: ${typeof game.turnCardUsed})`);
+      console.log(`🎴 Condition check: basePoints > 0 = ${basePoints > 0}, multiplier > 1 = ${game.turnCardMultiplier > 1}, !used = ${!game.turnCardUsed}`);
+
       if (basePoints > 0 && game.turnCardMultiplier > 1 && !game.turnCardUsed) {
         pointsScored = basePoints * game.turnCardMultiplier;
         multiplierApplied = true;
-        console.log(`🎴 Multiplier x${game.turnCardMultiplier} applied: ${basePoints} -> ${pointsScored}`);
+        console.log(`🎴 ✅ Multiplier x${game.turnCardMultiplier} APPLIED: ${basePoints} * ${game.turnCardMultiplier} = ${pointsScored}`);
       } else {
         pointsScored = basePoints;
-        if (basePoints > 0 && game.turnCardMultiplier > 1 && game.turnCardUsed) {
-          console.log(`🎴 Multiplier NOT applied - already used this turn`);
-        }
+        console.log(`🎴 ❌ Multiplier NOT applied. Reason: ${basePoints <= 0 ? 'no points' : game.turnCardMultiplier <= 1 ? 'no multiplier card' : 'already used'}`);
       }
+      console.log(`🎴 ==========================================================`);
 
       // Check if this guess completed the word (revealed final letter)
       const wordCompleted = revealedPositions.every(p => p);
@@ -903,9 +908,10 @@ export class GameManager {
             };
           }
         } else if (drawnCard.type === 'bonus_20') {
-          // Immediately award 20 bonus points
+          // Immediately award 20 bonus points (works for both humans and bots)
           bonusPointsAwarded = 20;
-          const playerToBonus = game.players.find(p => p.userId === nextPlayer.userId);
+          const nextPlayerId = this.getPlayerId(nextPlayer);
+          const playerToBonus = game.players.find(p => this.getPlayerId(p) === nextPlayerId);
           if (playerToBonus) {
             await prisma.gamePlayer.update({
               where: { id: playerToBonus.id },
@@ -913,6 +919,7 @@ export class GameManager {
                 totalScore: playerToBonus.totalScore + 20,
               },
             });
+            console.log(`🎁 BONUS_20 AWARDED: ${this.getPlayerDisplayName(playerToBonus)} received 20 bonus points`);
           }
           turnCardInfo = {
             type: drawnCard.type,

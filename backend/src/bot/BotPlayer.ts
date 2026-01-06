@@ -118,7 +118,7 @@ export class BotPlayer {
 
       console.log(`[${this.displayName}] Targeting: ${target.displayName}`);
 
-      // Decide: letter guess or word guess?
+      // Decide: word guess, blank guess, or letter guess?
       const shouldGuessWord = await this.strategy.shouldGuessWord(ctx, target, this.config);
 
       if (shouldGuessWord) {
@@ -130,6 +130,13 @@ export class BotPlayer {
           // Word guess failed (no valid word found) - fall back to letter guess
           console.log(`[${this.displayName}] Word guess failed (${wordGuessError.message}), falling back to letter guess`);
         }
+      }
+
+      // Check if we should guess BLANK
+      const shouldGuessBlank = this.strategy.shouldGuessBlank(target, this.config);
+      if (shouldGuessBlank) {
+        console.log(`[${this.displayName}] Guessing BLANK`);
+        return { type: 'letterGuess', targetPlayerId: targetId, letter: 'BLANK' };
       }
 
       // Letter guess (default or fallback)

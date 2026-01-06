@@ -297,4 +297,65 @@ Return ONLY one uppercase letter, nothing else.`;
         return 0.7; // Balanced
     }
   }
+
+  /**
+   * Decide whether the bot should guess BLANK instead of a regular letter
+   * Returns true if bot should guess BLANK
+   */
+  shouldGuessBlank(
+    targetPlayer: PlayerInfo,
+    config: BotConfig
+  ): boolean {
+    const revealed = targetPlayer.revealedPositions;
+    const wordLength = targetPlayer.wordLength;
+
+    // Check if any blanks have already been revealed
+    const revealedBlanks = revealed.filter(p => p === 'BLANK').length;
+    const hasKnownBlanks = revealedBlanks > 0;
+
+    // Count unrevealed positions
+    const unrevealedCount = revealed.filter(p => p === null).length;
+
+    // No unrevealed positions - nothing to guess
+    if (unrevealedCount === 0) {
+      return false;
+    }
+
+    // Base probability varies by difficulty
+    let blankChance: number;
+    switch (config.difficulty) {
+      case 'easy':
+        // Easy bots: 10% base chance, higher if blanks known
+        blankChance = hasKnownBlanks ? 0.25 : 0.10;
+        break;
+      case 'hard':
+        // Hard bots: 20% base chance, higher if blanks known
+        blankChance = hasKnownBlanks ? 0.40 : 0.20;
+        break;
+      default:
+        // Medium bots: 15% base chance, higher if blanks known
+        blankChance = hasKnownBlanks ? 0.30 : 0.15;
+    }
+
+    // Increase chance if word is unusually long (likely has padding)
+    // Most words are 4-8 letters, so 9+ is suspicious
+    if (wordLength >= 9) {
+      blankChance += 0.15;
+    }
+
+    // Increase chance if many letters have been missed (exhausted common letters)
+    if (targetPlayer.missedLetters.length >= 8) {
+      blankChance += 0.10;
+    }
+
+    // Roll the dice
+    const roll = Math.random();
+    const shouldGuess = roll < blankChance;
+
+    if (shouldGuess) {
+      console.log(`🎲 [BlankGuess ${config.displayName}] Decided to guess BLANK (roll ${(roll * 100).toFixed(0)}% < ${(blankChance * 100).toFixed(0)}%)`);
+    }
+
+    return shouldGuess;
+  }
 }

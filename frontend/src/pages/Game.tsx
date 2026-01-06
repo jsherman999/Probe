@@ -436,6 +436,28 @@ export default function Game() {
       // Update game state
       if (result.game) {
         dispatch(setGame(result.game));
+
+        // Update turn card state from game (fixes stale card display after turn changes)
+        if (result.game.currentTurnCard) {
+          const cardLabels: Record<string, string> = {
+            normal: 'Take your normal turn',
+            additional: 'Take an additional turn',
+            expose_left: 'Player on your left exposes a letter',
+            expose_right: 'Player on your right exposes a letter',
+            bonus_20: '+20 bonus points!',
+            double: 'Double your first guess!',
+            triple: 'Triple your first guess!',
+            quadruple: 'Quadruple your first guess!',
+            quintuple: 'Quintuple your first guess!',
+          };
+          setCurrentTurnCard({
+            type: result.game.currentTurnCard,
+            label: cardLabels[result.game.currentTurnCard] || result.game.currentTurnCard,
+            multiplier: result.game.turnCardMultiplier > 1 ? result.game.turnCardMultiplier : undefined,
+          });
+        } else {
+          setCurrentTurnCard(null);
+        }
       }
 
       // If game ended, also request fresh state to ensure we have all data

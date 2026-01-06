@@ -57,6 +57,16 @@ export class BotStrategy implements IBotStrategy {
   }
 
   /**
+   * Decide whether to guess BLANK instead of a regular letter
+   */
+  shouldGuessBlank(
+    targetPlayer: PlayerInfo,
+    config: BotConfig
+  ): boolean {
+    return this.letterGuessStrategy.shouldGuessBlank(targetPlayer, config);
+  }
+
+  /**
    * Decide whether to attempt a full word guess
    */
   async shouldGuessWord(
