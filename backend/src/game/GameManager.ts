@@ -806,12 +806,14 @@ export class GameManager {
       }
 
       // Mark turn card as used after first successful hit (for multiplier cards)
-      if (multiplierApplied) {
-        await prisma.game.update({
-          where: { id: game.id },
-          data: { turnCardUsed: true },
-        });
-      }
+      // Also reset currentTurnStartedAt so frontend timer resets for continued turn
+      await prisma.game.update({
+        where: { id: game.id },
+        data: {
+          ...(multiplierApplied ? { turnCardUsed: true } : {}),
+          currentTurnStartedAt: new Date(), // Reset timer for continued turn
+        },
+      });
     }
 
     // Record turn
@@ -913,6 +915,11 @@ export class GameManager {
             label: drawnCard.label,
             multiplier: drawnCard.multiplier,
           };
+        }
+
+        // Log when multiplier card is drawn
+        if (drawnCard.multiplier && drawnCard.multiplier > 1) {
+          console.log(`🎴 MULTIPLIER CARD DRAWN: ${drawnCard.type} (x${drawnCard.multiplier}) for player ${nextPlayer.userId || nextPlayer.botId}`);
         }
 
         await prisma.game.update({
@@ -1741,6 +1748,10 @@ export class GameManager {
         turnOrder: p.turnOrder,
         isBot: p.isBot,
         botId: p.botId,
+        // LLM configuration for bots
+        botModelName: p.botModelName,
+        botDifficulty: p.botDifficulty,
+        botConfig: p.botConfig,
       })),
       turns: game.turns.map(t => ({
         turnNumber: t.turnNumber,
@@ -1930,6 +1941,79 @@ export class GameManager {
     const filepath = path.join(DATA_DIR, matchingFile);
     const content = await fs.readFile(filepath, 'utf-8');
     return JSON.parse(content);
+  }
+
+  // Get aggregated bot stats from all archived games
+  async getBotStats(): Promise<any[]> {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+
+    const files = await fs.readdir(DATA_DIR);
+    const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+    const botStats: any[] = [];
+
+    for (const filename of jsonFiles) {
+      const filepath = path.join(DATA_DIR, filename);
+      const content = await fs.readFile(filepath, 'utf-8');
+      const data = JSON.parse(content);
+
+      // Find bot players in this game
+      const botPlayers = data.players?.filter((p: any) => p.isBot) || [];
+
+      for (const bot of botPlayers) {
+        // Find bot's result (placement and final score)
+        const result = data.results?.find((r: any) =>
+          r.playerId === bot.botId || r.displayName === bot.displayName
+        );
+
+        // Count correct/incorrect guesses from turns
+        const botTurns = data.turns?.filter((t: any) =>
+          t.playerId === bot.botId
+        ) || [];
+        const correctGuesses = botTurns.filter((t: any) => t.isCorrect).length;
+        const incorrectGuesses = botTurns.filter((t: any) => !t.isCorrect).length;
+
+        // Calculate accuracy
+        const totalGuesses = correctGuesses + incorrectGuesses;
+        const accuracy = totalGuesses > 0 ? Math.round((correctGuesses / totalGuesses) * 100) : 0;
+
+        botStats.push({
+          // Game info
+          roomCode: data.roomCode,
+          completedAt: data.completedAt,
+          playerCount: data.players?.length || 0,
+
+          // Bot identity
+          botName: bot.displayName || bot.botDisplayName || 'Unknown Bot',
+          botId: bot.botId,
+
+          // LLM config
+          modelName: bot.botModelName || 'Unknown',
+          difficulty: bot.botDifficulty || 'Unknown',
+          config: bot.botConfig || {},
+
+          // Performance
+          score: result?.finalScore || bot.totalScore || 0,
+          placement: result?.placement || 0,
+          totalPlayers: data.results?.length || data.players?.length || 0,
+
+          // Guessing stats
+          correctGuesses,
+          incorrectGuesses,
+          totalGuesses,
+          accuracy,
+
+          // Word info
+          secretWord: bot.secretWord,
+          wordLength: bot.wordLength || bot.secretWord?.length || 0,
+        });
+      }
+    }
+
+    // Sort by date descending
+    return botStats.sort((a, b) =>
+      new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime()
+    );
   }
 
   // Cleanup stale games (WAITING status older than 30 minutes)

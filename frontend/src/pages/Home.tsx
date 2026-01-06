@@ -365,12 +365,20 @@ export default function Home() {
           )}
         </div>
 
-        <Link
-          to="/history"
-          className="block w-full text-center py-3 text-text-secondary hover:text-accent transition-colors"
-        >
-          View Game History &rarr;
-        </Link>
+        <div className="flex justify-center gap-6">
+          <Link
+            to="/history"
+            className="text-text-secondary hover:text-accent transition-colors"
+          >
+            Game History &rarr;
+          </Link>
+          <Link
+            to="/ai-stats"
+            className="text-text-secondary hover:text-accent transition-colors"
+          >
+            AI Stats &rarr;
+          </Link>
+        </div>
 
         <div className="card">
           <h2 className="text-xl font-bold mb-4">Game Rules</h2>

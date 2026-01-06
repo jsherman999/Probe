@@ -57,21 +57,30 @@ interface AuthSocket extends Socket {
   username?: string;
 }
 
+// Bot turn timer constant (30 seconds for bots, regardless of game setting)
+const BOT_TIMER_SECONDS = 30;
+
 // Start or reset timer for a game
-function startTurnTimer(io: Server, roomCode: string, turnTimerSeconds: number) {
+function startTurnTimer(io: Server, roomCode: string, turnTimerSeconds: number, isBot: boolean = false) {
   // Clear existing timer if any
   const existingTimer = gameTimers.get(roomCode);
   if (existingTimer) {
     clearTimeout(existingTimer);
   }
 
-  // Safety check: ensure timer is at least 10 seconds, default to 300 (5 min) if invalid
-  const safeTimerSeconds = (turnTimerSeconds && turnTimerSeconds > 0) ? turnTimerSeconds : 300;
-  if (!turnTimerSeconds || turnTimerSeconds <= 0) {
-    console.warn(`⚠️ Invalid turnTimerSeconds (${turnTimerSeconds}) for room ${roomCode}, using default ${safeTimerSeconds}s`);
+  // Bots always use 30-second timer, humans use game setting
+  let safeTimerSeconds: number;
+  if (isBot) {
+    safeTimerSeconds = BOT_TIMER_SECONDS;
+    console.log(`🤖 Bot turn - using ${BOT_TIMER_SECONDS}s timer for room ${roomCode}`);
+  } else {
+    // Safety check: ensure timer is at least 10 seconds, default to 300 (5 min) if invalid
+    safeTimerSeconds = (turnTimerSeconds && turnTimerSeconds > 0) ? turnTimerSeconds : 300;
+    if (!turnTimerSeconds || turnTimerSeconds <= 0) {
+      console.warn(`⚠️ Invalid turnTimerSeconds (${turnTimerSeconds}) for room ${roomCode}, using default ${safeTimerSeconds}s`);
+    }
+    console.log(`⏱️ Starting ${safeTimerSeconds}s timer for room ${roomCode}`);
   }
-
-  console.log(`⏱️ Starting ${safeTimerSeconds}s timer for room ${roomCode}`);
 
   // Set new timer
   const timer = setTimeout(() => {
@@ -98,7 +107,13 @@ async function executeTurnTimeout(io: Server, roomCode: string) {
 
     // Start new timer for next player if game still active
     if (result.game.status === 'ACTIVE') {
-      startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
+      // Check if next player is a bot
+      const nextPlayer = result.game.players?.find((p: any) =>
+        p.userId === result.nextPlayerId || p.botId === result.nextPlayerId
+      );
+      const isNextPlayerBot = nextPlayer?.isBot || false;
+      startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isNextPlayerBot);
+
       // Also emit turn changed for UI refresh
       io.to(roomCode).emit('turnChanged', {
         previousPlayerId: result.timedOutPlayerId,
@@ -313,23 +328,28 @@ function handlePostGuessLogic(io: Server, roomCode: string, result: any) {
     botManager.cleanupGame(roomCode);
   } else if (result.isCorrect && result.game) {
     // Correct guess - reset timer for same player's continued turn
-    console.log(`⏱️ Correct guess (bot flow) - resetting timer for continued turn`);
-    startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
+    // Check if current player (who continues) is a bot
+    const currentPlayer = result.game.players?.find((p: any) =>
+      p.userId === result.currentTurnPlayerId || p.botId === result.currentTurnPlayerId
+    );
+    const isCurrentPlayerBot = currentPlayer?.isBot || false;
+    console.log(`⏱️ Correct guess (bot flow) - resetting timer for continued turn (isBot: ${isCurrentPlayerBot})`);
+    startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isCurrentPlayerBot);
     // Same player continues (could be bot)
     checkAndTriggerBotTurn(io, roomCode, result.game);
   } else if (!result.isCorrect) {
     // Turn ended (miss or wrong word guess) - start timer for next player
-    startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
-
-    // Emit turnChanged event so UI updates (critical for bot turns!)
+    // Check if next player is a bot
     const nextPlayer = result.game.players?.find((p: any) =>
       p.userId === result.currentTurnPlayerId ||
       p.botId === result.currentTurnPlayerId ||
       p.id === result.currentTurnPlayerId
     );
-    const nextPlayerName = nextPlayer?.isBot
-      ? nextPlayer?.botDisplayName
-      : nextPlayer?.user?.displayName || nextPlayer?.displayName || 'Unknown';
+    const isNextPlayerBot = nextPlayer?.isBot || false;
+    startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isNextPlayerBot);
+
+    // Use displayName which is pre-resolved in sanitizeGame for both humans and bots
+    const nextPlayerName = nextPlayer?.displayName || 'Unknown';
 
     io.to(roomCode).emit('turnChanged', {
       previousPlayerId: result.guessingPlayerId,
@@ -607,7 +627,12 @@ async function triggerBotWordSelection(io: Server, roomCode: string, botId: stri
     if (game.status === 'ACTIVE') {
       console.log(`🎮 All players ready, starting game in room ${roomCode}`);
       io.to(roomCode).emit('gameStarted', game);
-      startTurnTimer(io, roomCode, game.turnTimerSeconds);
+      // Check if first player is a bot for timer duration
+      const firstPlayer = game.players?.find((p: any) =>
+        p.userId === game.currentTurnPlayerId || p.botId === game.currentTurnPlayerId
+      );
+      const isFirstPlayerBot = firstPlayer?.isBot || false;
+      startTurnTimer(io, roomCode, game.turnTimerSeconds, isFirstPlayerBot);
       // Check if first player is a bot
       checkAndTriggerBotTurn(io, roomCode, game);
       // Handle any pending expose card at game start (affects bots auto-exposing)
@@ -999,8 +1024,12 @@ export function setupSocketHandlers(io: Server) {
           console.log(`🎮 All players ready, starting game in room ${data.roomCode}`);
           io.to(data.roomCode).emit('gameStarted', game);
 
-          // Start the turn timer
-          startTurnTimer(io, data.roomCode, game.turnTimerSeconds);
+          // Start the turn timer - check if first player is a bot
+          const firstPlayer = game.players?.find((p: any) =>
+            p.userId === game.currentTurnPlayerId || p.botId === game.currentTurnPlayerId
+          );
+          const isFirstPlayerBot = firstPlayer?.isBot || false;
+          startTurnTimer(io, data.roomCode, game.turnTimerSeconds, isFirstPlayerBot);
 
           // Check if first player is a bot
           checkAndTriggerBotTurn(io, data.roomCode, game);
@@ -1226,11 +1255,17 @@ export function setupSocketHandlers(io: Server) {
           stopTurnTimer(data.roomCode);
         } else if (result.isCorrect) {
           // Correct guess - reset timer for same player's continued turn
+          // Human correct guess - never a bot (socket.userId is always human)
           console.log(`⏱️ Correct guess - resetting timer for continued turn`);
-          startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
+          startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, false);
         } else {
           // Miss - reset timer for next player's turn
-          startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
+          // Check if next player is a bot
+          const nextPlayer = result.game.players?.find((p: any) =>
+            p.userId === result.currentTurnPlayerId || p.botId === result.currentTurnPlayerId
+          );
+          const isNextPlayerBot = nextPlayer?.isBot || false;
+          startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, isNextPlayerBot);
 
           // If a turn card was drawn for the next player, emit it
           if (result.turnCardInfo) {
@@ -1427,17 +1462,14 @@ export function setupSocketHandlers(io: Server) {
           }
 
           // Emit turn changed event for UI refresh
-          const nextPlayer = result.game.players.find((p: any) =>
-            p.userId === result.currentTurnPlayerId || p.botId === result.currentTurnPlayerId
-          );
-          const nextPlayerName = nextPlayer?.isBot
-            ? nextPlayer?.botDisplayName
-            : nextPlayer?.user?.displayName || nextPlayer?.displayName || 'Unknown';
+          // Note: nextPlayer was already defined above for timer check
+          // Use displayName which is pre-resolved in sanitizeGame for both humans and bots
+          const nextPlayerNameForUI = nextPlayer?.displayName || 'Unknown';
           io.to(data.roomCode).emit('turnChanged', {
             previousPlayerId: socket.userId,
             previousPlayerName: socket.username,
             currentPlayerId: result.currentTurnPlayerId,
-            currentPlayerName: nextPlayerName,
+            currentPlayerName: nextPlayerNameForUI,
             game: result.game,
           });
 
@@ -1731,14 +1763,16 @@ export function setupSocketHandlers(io: Server) {
           stopTurnTimer(data.roomCode);
         } else if (!result.isCorrect) {
           // Wrong word guess ends the turn - restart timer for next player
-          startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
-          // Emit turn changed event for UI refresh
+          // Check if next player is a bot
           const nextPlayer = result.game.players.find((p: any) =>
             p.userId === result.game.currentTurnPlayerId || p.botId === result.game.currentTurnPlayerId
           );
-          const nextPlayerName = nextPlayer?.isBot
-            ? nextPlayer?.botDisplayName
-            : nextPlayer?.user?.displayName || nextPlayer?.displayName || 'Unknown';
+          const isNextPlayerBot = nextPlayer?.isBot || false;
+          startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, isNextPlayerBot);
+
+          // Emit turn changed event for UI refresh
+          // Use displayName which is pre-resolved in sanitizeGame for both humans and bots
+          const nextPlayerName = nextPlayer?.displayName || 'Unknown';
           io.to(data.roomCode).emit('turnChanged', {
             previousPlayerId: socket.userId,
             previousPlayerName: socket.username,
