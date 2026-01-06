@@ -64,7 +64,7 @@ export class OllamaService {
         return null;
       }
 
-      const data = await response.json();
+      const data = await response.json() as { version?: string };
       return data.version || null;
     } catch (error) {
       return null;
@@ -90,7 +90,7 @@ export class OllamaService {
         throw new Error(`Failed to list models: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as { models?: OllamaModel[] };
       return data.models || [];
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -121,7 +121,7 @@ export class OllamaService {
         throw new Error(`Failed to get model info: ${response.statusText}`);
       }
 
-      return await response.json();
+      return await response.json() as OllamaModelInfo;
     } catch (error: any) {
       if (error.name === 'AbortError') {
         throw new Error('Request timeout while getting model info');
@@ -222,7 +222,7 @@ export class OllamaService {
         throw new Error(`Generation failed: ${response.statusText} - ${errorText}`);
       }
 
-      const data: OllamaGenerateResponse = await response.json();
+      const data = await response.json() as OllamaGenerateResponse;
       return data.response;
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -268,7 +268,7 @@ export class OllamaService {
         throw new Error(`Chat failed: ${response.statusText} - ${errorText}`);
       }
 
-      const data: OllamaChatResponse = await response.json();
+      const data = await response.json() as OllamaChatResponse;
       return data.message.content;
     } catch (error: any) {
       if (error.name === 'AbortError') {

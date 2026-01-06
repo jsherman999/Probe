@@ -25,7 +25,7 @@ export class PositionSelectionStrategy {
    */
   async selectBlankPosition(
     positions: number[],
-    ctx: GameContext,
+    _ctx: GameContext,
     config: BotConfig
   ): Promise<number> {
     if (positions.length === 1) {
@@ -171,29 +171,5 @@ Return ONLY the position number.`;
 
     // Fallback to scoring-based selection
     return this.selectByScoring(positions);
-  }
-
-  /**
-   * Get the position that would complete the fewest common patterns
-   * (Advanced heuristic - not using LLM)
-   */
-  private selectLeastRevealingPosition(
-    positions: number[],
-    letter: string,
-    wordLength: number,
-    revealedPositions: (string | null)[]
-  ): number {
-    // Simple heuristic: prefer middle positions over edge positions
-    // Edge positions often reveal more about word structure
-    const middlePosition = Math.floor(wordLength / 2);
-
-    // Sort positions by distance from middle (closer to middle = better)
-    const sorted = [...positions].sort((a, b) => {
-      const distA = Math.abs(a - middlePosition);
-      const distB = Math.abs(b - middlePosition);
-      return distA - distB;
-    });
-
-    return sorted[0];
   }
 }

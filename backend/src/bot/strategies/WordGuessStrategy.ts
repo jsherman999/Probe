@@ -12,7 +12,7 @@ export class WordGuessStrategy {
    * Decide whether the bot should attempt a full word guess
    */
   async shouldGuessWord(
-    ctx: GameContext,
+    _ctx: GameContext,
     targetPlayer: PlayerInfo,
     config: BotConfig
   ): Promise<boolean> {
@@ -88,7 +88,7 @@ Reply with just "YES" if you're 80%+ confident, or "NO" if not sure.`;
    * Generate a word guess for the target player's word
    */
   async guessWord(
-    ctx: GameContext,
+    _ctx: GameContext,
     targetPlayer: PlayerInfo,
     config: BotConfig
   ): Promise<string> {

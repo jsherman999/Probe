@@ -22,7 +22,7 @@ export class WordSelectionStrategy {
   /**
    * Select a word for the bot to use in the game
    */
-  async selectWord(ctx: GameContext, config: BotConfig): Promise<WordSelection> {
+  async selectWord(_ctx: GameContext, config: BotConfig): Promise<WordSelection> {
     const difficultyPrompts = {
       easy: `Choose a common, everyday English word that most people would know.
 Examples of good easy words: HOUSE, APPLE, WATER, CHAIR, BREAD`,

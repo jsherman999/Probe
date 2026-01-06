@@ -18,7 +18,7 @@ import {
 
 export class BotPlayer {
   public readonly id: string;
-  public readonly odisplayName: string;
+  public readonly displayName: string;
   public readonly isBot = true;
   public readonly config: BotConfig;
 
@@ -27,7 +27,7 @@ export class BotPlayer {
 
   constructor(
     configInput: BotConfigInput,
-    private ollama: OllamaService,
+    ollama: OllamaService,
     wordValidator: WordValidator
   ) {
     // Generate unique bot ID
@@ -203,7 +203,7 @@ export class BotPlayer {
     return {
       id: this.id,
       displayName: this.displayName,
-      oduserId: undefined,
+      userId: undefined,
       isBot: true,
       wordLength,
       revealedPositions,

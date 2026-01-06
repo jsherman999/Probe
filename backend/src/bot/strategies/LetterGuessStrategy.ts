@@ -18,7 +18,7 @@ export class LetterGuessStrategy {
    * Select the best letter to guess for a target player's word
    */
   async guessLetter(
-    ctx: GameContext,
+    _ctx: GameContext,
     targetPlayer: PlayerInfo,
     config: BotConfig
   ): Promise<string> {
@@ -41,7 +41,6 @@ export class LetterGuessStrategy {
 
     // Check if we have vowels revealed
     const hasVowels = revealedLetters.some(l => VOWELS.has(l));
-    const triedVowels = [...VOWELS].filter(v => triedLetters.has(v));
     const untriedVowels = [...VOWELS].filter(v => !triedLetters.has(v));
 
     const systemPrompt = config.personality
@@ -140,8 +139,8 @@ Return ONLY one uppercase letter, nothing else.`;
    */
   private selectStrategicTarget(
     eligibleTargets: PlayerInfo[],
-    ctx: GameContext,
-    config: BotConfig
+    _ctx: GameContext,
+    _config: BotConfig
   ): string {
     // Calculate "completion percentage" for each target
     const targetScores = eligibleTargets.map(target => {

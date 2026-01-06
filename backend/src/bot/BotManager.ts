@@ -6,7 +6,6 @@ import { OllamaService, ollamaService } from './OllamaService';
 import { WordValidator } from '../game/WordValidator';
 import { BotPlayer } from './BotPlayer';
 import {
-  BotConfig,
   BotConfigInput,
   BotPreset,
   GameContext,

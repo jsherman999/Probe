@@ -123,9 +123,9 @@ export interface BotConfigInput {
 
 export interface PlayerInfo {
   id: string;
-  odisplayName: string;
-  oduserId?: string;
-  isBoot: boolean;
+  displayName: string;
+  userId?: string;
+  isBot: boolean;
   wordLength: number;
   revealedPositions: (string | null)[];  // letter or null for each position
   missedLetters: string[];
@@ -136,7 +136,7 @@ export interface PlayerInfo {
 
 export interface GameContext {
   roomCode: string;
-  odotPlayerId: string;
+  botPlayerId: string;
   players: PlayerInfo[];
   myWord?: string;
   myPaddedWord?: string;
