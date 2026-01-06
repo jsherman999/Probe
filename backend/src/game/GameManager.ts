@@ -860,13 +860,12 @@ export class GameManager {
         });
       } else {
         // Normal turn transition - find next player
-        const activePlayers = game.players
-          .filter(p => !p.isEliminated)
-          .sort((a, b) => a.turnOrder - b.turnOrder);
+        // Include ALL players in turn rotation (eliminated players can still guess others' letters)
+        const allPlayers = [...game.players].sort((a, b) => a.turnOrder - b.turnOrder);
 
-        const currentIndex = activePlayers.findIndex(p => this.getPlayerId(p) === playerId);
-        const nextIndex = (currentIndex + 1) % activePlayers.length;
-        const nextPlayer = activePlayers[nextIndex];
+        const currentIndex = allPlayers.findIndex(p => this.getPlayerId(p) === playerId);
+        const nextIndex = (currentIndex + 1) % allPlayers.length;
+        const nextPlayer = allPlayers[nextIndex];
         nextTurnPlayerId = this.getPlayerId(nextPlayer);
 
         // Draw a turn card for the next player
@@ -941,8 +940,9 @@ export class GameManager {
       where: { gameId: game.id },
     });
 
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {
@@ -1091,8 +1091,9 @@ export class GameManager {
     const updatedPlayers = await prisma.gamePlayer.findMany({
       where: { gameId: game.id },
     });
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {
@@ -1235,8 +1236,9 @@ export class GameManager {
     const updatedPlayers = await prisma.gamePlayer.findMany({
       where: { gameId: game.id },
     });
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {
@@ -1348,6 +1350,10 @@ export class GameManager {
       },
     });
 
+    // Get the exposed letter for logging
+    const exposedLetter = word[selectedPosition];
+    const affectedPlayerName = this.getPlayerDisplayName(affectedPlayer);
+
     // Award points to the active player who drew the expose card
     if (activePlayer) {
       await prisma.gamePlayer.update({
@@ -1356,7 +1362,11 @@ export class GameManager {
           totalScore: { increment: pointsScored },
         },
       });
-      console.log(`🎴 Expose card: ${activePlayer.user?.displayName} earned ${pointsScored} points from exposed letter`);
+      const activePlayerName = this.getPlayerDisplayName(activePlayer);
+      console.log(`🎴 EXPOSE CARD RESOLVED: ${affectedPlayerName} exposed letter "${exposedLetter}" at position ${selectedPosition}`);
+      console.log(`🎴 ${activePlayerName} earned ${pointsScored} points from the exposed letter`);
+    } else {
+      console.log(`🎴 EXPOSE CARD RESOLVED: ${affectedPlayerName} exposed letter "${exposedLetter}" at position ${selectedPosition}`);
     }
 
     // Clear the pending expose selection
@@ -1371,8 +1381,9 @@ export class GameManager {
     const updatedPlayers = await prisma.gamePlayer.findMany({
       where: { gameId: game.id },
     });
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {
@@ -1540,8 +1551,9 @@ export class GameManager {
       where: { gameId: game.id },
     });
 
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {

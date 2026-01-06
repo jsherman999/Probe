@@ -673,6 +673,12 @@ export default function Game() {
       if (data.game) {
         dispatch(setGame(data.game));
       }
+      // Show toast with exposed letter info
+      if (data.message) {
+        setToastMessage(data.message);
+      } else if (data.revealedLetter && data.exposedByName) {
+        setToastMessage(`${data.exposedByName} exposed the letter "${data.revealedLetter}"`);
+      }
     };
 
     const onError = (err: any) => {

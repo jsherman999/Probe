@@ -464,7 +464,9 @@ async function handlePendingExposeCard(io: Server, roomCode: string, game: any) 
       const randomIndex = Math.floor(Math.random() * unrevealedPositions.length);
       const selectedPosition = unrevealedPositions[randomIndex];
 
-      console.log(`🤖 Bot ${affectedPlayerName} selected position ${selectedPosition} from unrevealed: [${unrevealedPositions.join(', ')}]`);
+      // Get the letter at the selected position for logging
+      const letterToExpose = paddedWord[selectedPosition] || '?';
+      console.log(`🤖 Bot ${affectedPlayerName} selected position ${selectedPosition} (letter "${letterToExpose}") from unrevealed: [${unrevealedPositions.join(', ')}]`);
 
       // Short delay to make it feel natural (1-2 seconds)
       setTimeout(async () => {
@@ -475,11 +477,16 @@ async function handlePendingExposeCard(io: Server, roomCode: string, game: any) 
             selectedPosition
           );
 
-          // Broadcast result
+          // Log the exposed letter clearly
+          console.log(`🎴 EXPOSE: ${affectedPlayerName} exposed letter "${botResult.revealedLetter}" at position ${selectedPosition}`);
+
+          // Broadcast result with exposed letter info
           io.to(roomCode).emit('exposeCardResolved', {
             ...botResult,
             autoSelected: true,
             botSelected: true,
+            exposedByName: affectedPlayerName,
+            message: `${affectedPlayerName} exposed the letter "${botResult.revealedLetter}"`,
           });
 
           if (botResult.wordCompleted) {
@@ -564,10 +571,15 @@ async function handlePendingExposeCard(io: Server, roomCode: string, game: any) 
             rightmostUnrevealed
           );
 
-          // Broadcast result
+          // Log the auto-selected exposed letter
+          console.log(`🎴 EXPOSE (auto): ${pending.affectedPlayerName} exposed letter "${autoResult.revealedLetter}" at position ${rightmostUnrevealed}`);
+
+          // Broadcast result with message
           io.to(pending.roomCode).emit('exposeCardResolved', {
             ...autoResult,
             autoSelected: true,
+            exposedByName: pending.affectedPlayerName,
+            message: `${pending.affectedPlayerName} exposed the letter "${autoResult.revealedLetter}" (timeout)`,
           });
 
           if (autoResult.wordCompleted) {
@@ -1433,10 +1445,15 @@ export function setupSocketHandlers(io: Server) {
                         rightmostUnrevealed
                       );
 
-                      // Broadcast result
+                      // Log the auto-selected exposed letter
+                      console.log(`🎴 EXPOSE (auto): ${pending.affectedPlayerName} exposed letter "${autoResult.revealedLetter}" at position ${rightmostUnrevealed}`);
+
+                      // Broadcast result with message
                       io.to(pending.roomCode).emit('exposeCardResolved', {
                         ...autoResult,
                         autoSelected: true,
+                        exposedByName: pending.affectedPlayerName,
+                        message: `${pending.affectedPlayerName} exposed the letter "${autoResult.revealedLetter}" (timeout)`,
                       });
 
                       if (autoResult.wordCompleted) {
@@ -1624,11 +1641,16 @@ export function setupSocketHandlers(io: Server) {
           data.position
         );
 
-        // Broadcast result to all players
+        // Log the exposed letter
+        console.log(`🎴 EXPOSE: ${pending.affectedPlayerName} exposed letter "${result.revealedLetter}" at position ${data.position}`);
+
+        // Broadcast result to all players with message
         io.to(data.roomCode).emit('exposeCardResolved', {
           ...result,
           autoSelected: false,
           selectedPosition: data.position,
+          exposedByName: pending.affectedPlayerName,
+          message: `${pending.affectedPlayerName} exposed the letter "${result.revealedLetter}"`,
         });
 
         if (result.wordCompleted) {
