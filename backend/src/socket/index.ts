@@ -2,6 +2,8 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { GameManager } from '../game/GameManager';
 import { PrismaClient } from '@prisma/client';
+import { botManager, BotConfigInput, GameContext, PlayerInfo } from '../bot';
+import { isSocketFromLocalhost } from '../middleware/localOnly';
 
 const prisma = new PrismaClient();
 
@@ -108,6 +110,233 @@ function stopTurnTimer(roomCode: string) {
     clearTimeout(timer);
     gameTimers.delete(roomCode);
     console.log(`⏱️ Timer stopped for room ${roomCode}`);
+  }
+}
+
+// ============================================================================
+// Bot Turn Handling
+// ============================================================================
+
+/**
+ * Build game context for bot decision making
+ */
+async function buildBotGameContext(roomCode: string, botPlayerId: string): Promise<GameContext> {
+  const game = await gameManager.getGameByRoomCode(roomCode);
+
+  // Find the bot player to get their word info
+  const botPlayer = game.players.find((p: any) => p.botId === botPlayerId || p.id === botPlayerId);
+
+  const players: PlayerInfo[] = game.players.map((p: any) => ({
+    id: p.botId || p.userId || p.id,
+    displayName: p.isBot ? p.botDisplayName : p.user?.displayName || 'Unknown',
+    oduserId: p.userId,
+    isBot: p.isBot || false,
+    wordLength: p.paddedWord?.length || p.secretWord?.length || 0,
+    revealedPositions: p.revealedPositions || [],
+    missedLetters: p.missedLetters || [],
+    totalScore: p.totalScore || 0,
+    isEliminated: p.isEliminated || false,
+    turnOrder: p.turnOrder || 0,
+  }));
+
+  return {
+    roomCode,
+    botPlayerId,
+    players,
+    myWord: botPlayer?.secretWord,
+    myPaddedWord: botPlayer?.paddedWord,
+    myRevealedPositions: botPlayer?.revealedPositions,
+    currentTurnPlayerId: game.currentTurnPlayerId,
+    roundNumber: game.roundNumber || 1,
+    turnTimerSeconds: game.turnTimerSeconds,
+  };
+}
+
+/**
+ * Trigger a bot to take its turn
+ */
+async function triggerBotTurn(io: Server, roomCode: string, botId: string) {
+  console.log(`🤖 Triggering bot turn for ${botId} in room ${roomCode}`);
+
+  try {
+    const ctx = await buildBotGameContext(roomCode, botId);
+    const action = await botManager.handleBotTurn(botId, ctx);
+
+    if (action.type === 'letterGuess') {
+      // Process the letter guess
+      const result = await gameManager.processGuess(
+        roomCode,
+        botId,
+        action.targetPlayerId,
+        action.letter
+      );
+
+      // Check if duplicate selection is required
+      if (result.duplicateSelectionRequired) {
+        console.log(`🎲 Bot needs to wait for duplicate selection`);
+        // The target player (or bot) needs to select position
+        const targetIsBot = botManager.isBot(action.targetPlayerId);
+        if (targetIsBot) {
+          // Bot target - auto select after delay
+          setTimeout(async () => {
+            const position = await botManager.handleBotDuplicateSelection(
+              action.targetPlayerId,
+              result.positions,
+              result.letter,
+              ctx
+            );
+            // Resolve and broadcast
+            const resolveResult = await gameManager.resolveDuplicateSelection(
+              roomCode,
+              botId,
+              action.targetPlayerId,
+              position,
+              result.letter
+            );
+            io.to(roomCode).emit('duplicateSelected', {
+              ...resolveResult,
+              autoSelected: false,
+              selectedPosition: position,
+            });
+            handlePostGuessLogic(io, roomCode, resolveResult);
+          }, 1000);
+        }
+        return;
+      }
+
+      // Check if blank selection is required
+      if (result.blankSelectionRequired) {
+        console.log(`🎲 Bot needs to wait for blank selection`);
+        const targetIsBot = botManager.isBot(action.targetPlayerId);
+        if (targetIsBot) {
+          setTimeout(async () => {
+            const position = await botManager.handleBotBlankSelection(
+              action.targetPlayerId,
+              result.positions,
+              ctx
+            );
+            const resolveResult = await gameManager.resolveBlankSelection(
+              roomCode,
+              botId,
+              action.targetPlayerId,
+              position
+            );
+            io.to(roomCode).emit('blankSelected', {
+              ...resolveResult,
+              autoSelected: false,
+              selectedPosition: position,
+            });
+            handlePostGuessLogic(io, roomCode, resolveResult);
+          }, 1000);
+        }
+        return;
+      }
+
+      // Broadcast result
+      io.to(roomCode).emit('letterGuessed', result);
+      handlePostGuessLogic(io, roomCode, result);
+
+    } else if (action.type === 'wordGuess') {
+      // Process word guess
+      const result = await gameManager.processWordGuess(
+        roomCode,
+        botId,
+        action.targetPlayerId,
+        action.word
+      );
+
+      io.to(roomCode).emit('wordGuessResult', {
+        ...result,
+        timedOut: false,
+        guessingPlayerName: botManager.getBot(botId)?.displayName || 'Bot',
+      });
+
+      handlePostGuessLogic(io, roomCode, result);
+    }
+  } catch (error: any) {
+    console.error(`❌ Bot turn error for ${botId}:`, error.message);
+  }
+}
+
+/**
+ * Handle post-guess logic (word completion, game over, next turn)
+ */
+function handlePostGuessLogic(io: Server, roomCode: string, result: any) {
+  if (result.wordCompleted) {
+    io.to(roomCode).emit('wordCompleted', { playerId: result.targetPlayerId });
+  }
+
+  if (result.gameOver) {
+    io.to(roomCode).emit('gameOver', result.finalResults);
+    stopTurnTimer(roomCode);
+    botManager.cleanupGame(roomCode);
+  } else if (!result.isCorrect) {
+    // Turn ended (miss or wrong word guess) - start timer for next player
+    startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
+    // Check if next player is a bot
+    checkAndTriggerBotTurn(io, roomCode, result.game);
+  } else if (result.isCorrect && result.game) {
+    // Correct guess - same player continues (could be bot)
+    checkAndTriggerBotTurn(io, roomCode, result.game);
+  }
+}
+
+/**
+ * Check if the current turn player is a bot and trigger their turn
+ */
+function checkAndTriggerBotTurn(io: Server, roomCode: string, game: any) {
+  const currentPlayerId = game.currentTurnPlayerId;
+  if (!currentPlayerId) return;
+
+  // Find the current player
+  const currentPlayer = game.players?.find((p: any) =>
+    p.botId === currentPlayerId || p.userId === currentPlayerId || p.id === currentPlayerId
+  );
+
+  if (currentPlayer?.isBot && currentPlayer.botId) {
+    // It's a bot's turn - trigger after a short delay
+    setTimeout(() => {
+      triggerBotTurn(io, roomCode, currentPlayer.botId);
+    }, 500);
+  }
+}
+
+/**
+ * Trigger bot word selection during word selection phase
+ */
+async function triggerBotWordSelection(io: Server, roomCode: string, botId: string) {
+  console.log(`🤖 Triggering word selection for bot ${botId} in room ${roomCode}`);
+
+  try {
+    const ctx = await buildBotGameContext(roomCode, botId);
+    const selection = await botManager.handleBotWordSelection(botId, ctx);
+
+    // Submit the word selection
+    const game = await gameManager.selectWord(
+      roomCode,
+      botId,
+      selection.word,
+      selection.frontPadding,
+      selection.backPadding
+    );
+
+    // Notify room that bot is ready (don't reveal the word)
+    io.to(roomCode).emit('playerReady', {
+      oduserId: botId,
+      username: botManager.getBot(botId)?.displayName || 'Bot',
+      isBot: true,
+    });
+
+    // Check if all players are ready
+    if (game.status === 'ACTIVE') {
+      console.log(`🎮 All players ready, starting game in room ${roomCode}`);
+      io.to(roomCode).emit('gameStarted', game);
+      startTurnTimer(io, roomCode, game.turnTimerSeconds);
+      // Check if first player is a bot
+      checkAndTriggerBotTurn(io, roomCode, game);
+    }
+  } catch (error: any) {
+    console.error(`❌ Bot word selection error for ${botId}:`, error.message);
   }
 }
 
@@ -338,6 +567,139 @@ export function setupSocketHandlers(io: Server) {
       }
     });
 
+    // ========================================================================
+    // Bot Management Events (localhost only)
+    // ========================================================================
+
+    // Add bot to game (host only, localhost only)
+    socket.on('addBotToGame', async (data: {
+      roomCode: string;
+      botConfig: BotConfigInput;
+    }) => {
+      try {
+        // Verify localhost
+        const socketAddress = socket.handshake.address;
+        if (!isSocketFromLocalhost(socketAddress)) {
+          socket.emit('error', { message: 'Bot management requires localhost access' });
+          return;
+        }
+
+        console.log(`🤖 Add bot request from ${socket.username} for room ${data.roomCode}`);
+
+        // Verify host
+        const game = await gameManager.getGameByRoomCode(data.roomCode);
+        if (game.hostId !== socket.userId) {
+          socket.emit('error', { message: 'Only the host can add bots' });
+          return;
+        }
+
+        // Check game status
+        if (game.status !== 'WAITING' && game.status !== 'WORD_SELECTION') {
+          socket.emit('error', { message: 'Cannot add bots after game has started' });
+          return;
+        }
+
+        // Check player count
+        if (game.players.length >= 4) {
+          socket.emit('error', { message: 'Game is full (max 4 players)' });
+          return;
+        }
+
+        // Create the bot
+        const bot = botManager.createBot(data.botConfig);
+
+        // Add bot to game in database
+        const updatedGame = await gameManager.addBotPlayer(data.roomCode, bot);
+        botManager.addBotToGame(bot.id, data.roomCode);
+
+        console.log(`✅ Bot ${bot.displayName} added to game ${data.roomCode}`);
+
+        // Notify all players in the room
+        io.to(data.roomCode).emit('botJoined', {
+          botId: bot.id,
+          displayName: bot.displayName,
+          modelName: data.botConfig.modelName,
+          difficulty: data.botConfig.difficulty || 'medium',
+          game: updatedGame,
+        });
+
+        // Update lobby
+        io.emit('lobbyGameUpdated', {
+          roomCode: data.roomCode,
+          playerCount: updatedGame.players.length,
+        });
+
+        // If we're in word selection phase, trigger bot word selection
+        if (game.status === 'WORD_SELECTION') {
+          setTimeout(() => {
+            triggerBotWordSelection(io, data.roomCode, bot.id);
+          }, 1000);
+        }
+      } catch (error: any) {
+        console.error(`❌ Error adding bot:`, error.message);
+        socket.emit('error', { message: error.message });
+      }
+    });
+
+    // Remove bot from game (host only, localhost only)
+    socket.on('removeBotFromGame', async (data: {
+      roomCode: string;
+      botId: string;
+    }) => {
+      try {
+        // Verify localhost
+        const socketAddress = socket.handshake.address;
+        if (!isSocketFromLocalhost(socketAddress)) {
+          socket.emit('error', { message: 'Bot management requires localhost access' });
+          return;
+        }
+
+        console.log(`🤖 Remove bot request from ${socket.username} for room ${data.roomCode}`);
+
+        // Verify host
+        const game = await gameManager.getGameByRoomCode(data.roomCode);
+        if (game.hostId !== socket.userId) {
+          socket.emit('error', { message: 'Only the host can remove bots' });
+          return;
+        }
+
+        // Check game status
+        if (game.status !== 'WAITING') {
+          socket.emit('error', { message: 'Cannot remove bots after game has started' });
+          return;
+        }
+
+        // Remove bot
+        const bot = botManager.getBot(data.botId);
+        const botName = bot?.displayName || 'Bot';
+
+        await gameManager.removeBotPlayer(data.roomCode, data.botId);
+        botManager.removeBotFromGame(data.botId, data.roomCode);
+        botManager.destroyBot(data.botId);
+
+        console.log(`✅ Bot ${botName} removed from game ${data.roomCode}`);
+
+        // Get updated game state
+        const updatedGame = await gameManager.getGameByRoomCode(data.roomCode);
+
+        // Notify all players
+        io.to(data.roomCode).emit('botLeft', {
+          botId: data.botId,
+          displayName: botName,
+          game: updatedGame,
+        });
+
+        // Update lobby
+        io.emit('lobbyGameUpdated', {
+          roomCode: data.roomCode,
+          playerCount: updatedGame.players.length,
+        });
+      } catch (error: any) {
+        console.error(`❌ Error removing bot:`, error.message);
+        socket.emit('error', { message: error.message });
+      }
+    });
+
     // Select word
     socket.on('selectWord', async (data: {
       roomCode: string;
@@ -374,6 +736,9 @@ export function setupSocketHandlers(io: Server) {
 
           // Start the turn timer
           startTurnTimer(io, data.roomCode, game.turnTimerSeconds);
+
+          // Check if first player is a bot
+          checkAndTriggerBotTurn(io, data.roomCode, game);
         }
       } catch (error: any) {
         console.error(`❌ Error selecting word:`, error.message);
@@ -391,6 +756,15 @@ export function setupSocketHandlers(io: Server) {
 
         // Remove from lobby since game has started
         io.emit('lobbyGameRemoved', { roomCode: data.roomCode });
+
+        // Trigger word selection for any bots in the game
+        const botIds = botManager.getBotIdsInGame(data.roomCode);
+        botIds.forEach((botId, index) => {
+          // Stagger bot word selections to avoid race conditions
+          setTimeout(() => {
+            triggerBotWordSelection(io, data.roomCode, botId);
+          }, 1000 + (index * 500));
+        });
       } catch (error: any) {
         console.error(`❌ Error starting game:`, error.message);
         socket.emit('error', { message: error.message });

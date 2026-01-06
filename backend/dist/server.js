@@ -15,6 +15,7 @@ const client_1 = require("@prisma/client");
 const socket_1 = require("./socket");
 const auth_1 = __importDefault(require("./routes/auth"));
 const game_1 = __importDefault(require("./routes/game"));
+const bot_1 = __importDefault(require("./routes/bot"));
 // Load environment variables
 dotenv_1.default.config();
 // Initialize Prisma
@@ -47,6 +48,7 @@ app.get('/health', (req, res) => {
 });
 app.use('/api/auth', auth_1.default);
 app.use('/api/game', game_1.default);
+app.use('/api/bot', bot_1.default);
 // Socket.io setup
 (0, socket_1.setupSocketHandlers)(io);
 // Error handling

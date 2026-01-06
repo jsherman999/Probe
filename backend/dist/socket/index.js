@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSocketHandlers = setupSocketHandlers;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const GameManager_1 = require("../game/GameManager");
-const client_1 = require("@prisma/client");
-const prisma = new client_1.PrismaClient();
+const bot_1 = require("../bot");
+const localOnly_1 = require("../middleware/localOnly");
 const gameManager = new GameManager_1.GameManager();
 // Store active game timers by roomCode
 const gameTimers = new Map();
@@ -20,9 +20,6 @@ const pendingDuplicateSelections = new Map();
 // Store word guess timers and pending data
 const wordGuessTimers = new Map();
 const pendingWordGuesses = new Map();
-// Store expose card selection timers and pending data
-const exposeSelectionTimers = new Map();
-const pendingExposeSelections = new Map();
 // Start or reset timer for a game
 function startTurnTimer(io, roomCode, turnTimerSeconds) {
     // Clear existing timer if any
@@ -47,14 +44,6 @@ function startTurnTimer(io, roomCode, turnTimerSeconds) {
             // Start new timer for next player if game still active
             if (result.game.status === 'ACTIVE') {
                 startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
-                // Also emit turn changed for UI refresh
-                io.to(roomCode).emit('turnChanged', {
-                    previousPlayerId: result.timedOutPlayerId,
-                    previousPlayerName: result.timedOutPlayerName,
-                    currentPlayerId: result.nextPlayerId,
-                    currentPlayerName: result.nextPlayerName,
-                    game: result.game,
-                });
             }
         }
         catch (error) {
@@ -70,6 +59,177 @@ function stopTurnTimer(roomCode) {
         clearTimeout(timer);
         gameTimers.delete(roomCode);
         console.log(`⏱️ Timer stopped for room ${roomCode}`);
+    }
+}
+// ============================================================================
+// Bot Turn Handling
+// ============================================================================
+/**
+ * Build game context for bot decision making
+ */
+async function buildBotGameContext(roomCode, botPlayerId) {
+    const game = await gameManager.getGameByRoomCode(roomCode);
+    // Find the bot player to get their word info
+    const botPlayer = game.players.find((p) => p.botId === botPlayerId || p.id === botPlayerId);
+    const players = game.players.map((p) => ({
+        id: p.botId || p.userId || p.id,
+        displayName: p.isBot ? p.botDisplayName : p.user?.displayName || 'Unknown',
+        oduserId: p.userId,
+        isBot: p.isBot || false,
+        wordLength: p.paddedWord?.length || p.secretWord?.length || 0,
+        revealedPositions: p.revealedPositions || [],
+        missedLetters: p.missedLetters || [],
+        totalScore: p.totalScore || 0,
+        isEliminated: p.isEliminated || false,
+        turnOrder: p.turnOrder || 0,
+    }));
+    return {
+        roomCode,
+        botPlayerId,
+        players,
+        myWord: botPlayer?.secretWord,
+        myPaddedWord: botPlayer?.paddedWord,
+        myRevealedPositions: botPlayer?.revealedPositions,
+        currentTurnPlayerId: game.currentTurnPlayerId,
+        roundNumber: game.roundNumber || 1,
+        turnTimerSeconds: game.turnTimerSeconds,
+    };
+}
+/**
+ * Trigger a bot to take its turn
+ */
+async function triggerBotTurn(io, roomCode, botId) {
+    console.log(`🤖 Triggering bot turn for ${botId} in room ${roomCode}`);
+    try {
+        const ctx = await buildBotGameContext(roomCode, botId);
+        const action = await bot_1.botManager.handleBotTurn(botId, ctx);
+        if (action.type === 'letterGuess') {
+            // Process the letter guess
+            const result = await gameManager.processGuess(roomCode, botId, action.targetPlayerId, action.letter);
+            // Check if duplicate selection is required
+            if (result.duplicateSelectionRequired) {
+                console.log(`🎲 Bot needs to wait for duplicate selection`);
+                // The target player (or bot) needs to select position
+                const targetIsBot = bot_1.botManager.isBot(action.targetPlayerId);
+                if (targetIsBot) {
+                    // Bot target - auto select after delay
+                    setTimeout(async () => {
+                        const position = await bot_1.botManager.handleBotDuplicateSelection(action.targetPlayerId, result.positions, result.letter, ctx);
+                        // Resolve and broadcast
+                        const resolveResult = await gameManager.resolveDuplicateSelection(roomCode, botId, action.targetPlayerId, position, result.letter);
+                        io.to(roomCode).emit('duplicateSelected', {
+                            ...resolveResult,
+                            autoSelected: false,
+                            selectedPosition: position,
+                        });
+                        handlePostGuessLogic(io, roomCode, resolveResult);
+                    }, 1000);
+                }
+                return;
+            }
+            // Check if blank selection is required
+            if (result.blankSelectionRequired) {
+                console.log(`🎲 Bot needs to wait for blank selection`);
+                const targetIsBot = bot_1.botManager.isBot(action.targetPlayerId);
+                if (targetIsBot) {
+                    setTimeout(async () => {
+                        const position = await bot_1.botManager.handleBotBlankSelection(action.targetPlayerId, result.positions, ctx);
+                        const resolveResult = await gameManager.resolveBlankSelection(roomCode, botId, action.targetPlayerId, position);
+                        io.to(roomCode).emit('blankSelected', {
+                            ...resolveResult,
+                            autoSelected: false,
+                            selectedPosition: position,
+                        });
+                        handlePostGuessLogic(io, roomCode, resolveResult);
+                    }, 1000);
+                }
+                return;
+            }
+            // Broadcast result
+            io.to(roomCode).emit('letterGuessed', result);
+            handlePostGuessLogic(io, roomCode, result);
+        }
+        else if (action.type === 'wordGuess') {
+            // Process word guess
+            const result = await gameManager.processWordGuess(roomCode, botId, action.targetPlayerId, action.word);
+            io.to(roomCode).emit('wordGuessResult', {
+                ...result,
+                timedOut: false,
+                guessingPlayerName: bot_1.botManager.getBot(botId)?.displayName || 'Bot',
+            });
+            handlePostGuessLogic(io, roomCode, result);
+        }
+    }
+    catch (error) {
+        console.error(`❌ Bot turn error for ${botId}:`, error.message);
+    }
+}
+/**
+ * Handle post-guess logic (word completion, game over, next turn)
+ */
+function handlePostGuessLogic(io, roomCode, result) {
+    if (result.wordCompleted) {
+        io.to(roomCode).emit('wordCompleted', { playerId: result.targetPlayerId });
+    }
+    if (result.gameOver) {
+        io.to(roomCode).emit('gameOver', result.finalResults);
+        stopTurnTimer(roomCode);
+        bot_1.botManager.cleanupGame(roomCode);
+    }
+    else if (!result.isCorrect) {
+        // Turn ended (miss or wrong word guess) - start timer for next player
+        startTurnTimer(io, roomCode, result.game.turnTimerSeconds);
+        // Check if next player is a bot
+        checkAndTriggerBotTurn(io, roomCode, result.game);
+    }
+    else if (result.isCorrect && result.game) {
+        // Correct guess - same player continues (could be bot)
+        checkAndTriggerBotTurn(io, roomCode, result.game);
+    }
+}
+/**
+ * Check if the current turn player is a bot and trigger their turn
+ */
+function checkAndTriggerBotTurn(io, roomCode, game) {
+    const currentPlayerId = game.currentTurnPlayerId;
+    if (!currentPlayerId)
+        return;
+    // Find the current player
+    const currentPlayer = game.players?.find((p) => p.botId === currentPlayerId || p.userId === currentPlayerId || p.id === currentPlayerId);
+    if (currentPlayer?.isBot && currentPlayer.botId) {
+        // It's a bot's turn - trigger after a short delay
+        setTimeout(() => {
+            triggerBotTurn(io, roomCode, currentPlayer.botId);
+        }, 500);
+    }
+}
+/**
+ * Trigger bot word selection during word selection phase
+ */
+async function triggerBotWordSelection(io, roomCode, botId) {
+    console.log(`🤖 Triggering word selection for bot ${botId} in room ${roomCode}`);
+    try {
+        const ctx = await buildBotGameContext(roomCode, botId);
+        const selection = await bot_1.botManager.handleBotWordSelection(botId, ctx);
+        // Submit the word selection
+        const game = await gameManager.selectWord(roomCode, botId, selection.word, selection.frontPadding, selection.backPadding);
+        // Notify room that bot is ready (don't reveal the word)
+        io.to(roomCode).emit('playerReady', {
+            oduserId: botId,
+            username: bot_1.botManager.getBot(botId)?.displayName || 'Bot',
+            isBot: true,
+        });
+        // Check if all players are ready
+        if (game.status === 'ACTIVE') {
+            console.log(`🎮 All players ready, starting game in room ${roomCode}`);
+            io.to(roomCode).emit('gameStarted', game);
+            startTurnTimer(io, roomCode, game.turnTimerSeconds);
+            // Check if first player is a bot
+            checkAndTriggerBotTurn(io, roomCode, game);
+        }
+    }
+    catch (error) {
+        console.error(`❌ Bot word selection error for ${botId}:`, error.message);
     }
 }
 function setupSocketHandlers(io) {
@@ -267,6 +427,113 @@ function setupSocketHandlers(io) {
                 socket.emit('error', { message: error.message });
             }
         });
+        // ========================================================================
+        // Bot Management Events (localhost only)
+        // ========================================================================
+        // Add bot to game (host only, localhost only)
+        socket.on('addBotToGame', async (data) => {
+            try {
+                // Verify localhost
+                const socketAddress = socket.handshake.address;
+                if (!(0, localOnly_1.isSocketFromLocalhost)(socketAddress)) {
+                    socket.emit('error', { message: 'Bot management requires localhost access' });
+                    return;
+                }
+                console.log(`🤖 Add bot request from ${socket.username} for room ${data.roomCode}`);
+                // Verify host
+                const game = await gameManager.getGameByRoomCode(data.roomCode);
+                if (game.hostId !== socket.userId) {
+                    socket.emit('error', { message: 'Only the host can add bots' });
+                    return;
+                }
+                // Check game status
+                if (game.status !== 'WAITING' && game.status !== 'WORD_SELECTION') {
+                    socket.emit('error', { message: 'Cannot add bots after game has started' });
+                    return;
+                }
+                // Check player count
+                if (game.players.length >= 4) {
+                    socket.emit('error', { message: 'Game is full (max 4 players)' });
+                    return;
+                }
+                // Create the bot
+                const bot = bot_1.botManager.createBot(data.botConfig);
+                // Add bot to game in database
+                const updatedGame = await gameManager.addBotPlayer(data.roomCode, bot);
+                bot_1.botManager.addBotToGame(bot.id, data.roomCode);
+                console.log(`✅ Bot ${bot.displayName} added to game ${data.roomCode}`);
+                // Notify all players in the room
+                io.to(data.roomCode).emit('botJoined', {
+                    botId: bot.id,
+                    displayName: bot.displayName,
+                    modelName: data.botConfig.modelName,
+                    difficulty: data.botConfig.difficulty || 'medium',
+                    game: updatedGame,
+                });
+                // Update lobby
+                io.emit('lobbyGameUpdated', {
+                    roomCode: data.roomCode,
+                    playerCount: updatedGame.players.length,
+                });
+                // If we're in word selection phase, trigger bot word selection
+                if (game.status === 'WORD_SELECTION') {
+                    setTimeout(() => {
+                        triggerBotWordSelection(io, data.roomCode, bot.id);
+                    }, 1000);
+                }
+            }
+            catch (error) {
+                console.error(`❌ Error adding bot:`, error.message);
+                socket.emit('error', { message: error.message });
+            }
+        });
+        // Remove bot from game (host only, localhost only)
+        socket.on('removeBotFromGame', async (data) => {
+            try {
+                // Verify localhost
+                const socketAddress = socket.handshake.address;
+                if (!(0, localOnly_1.isSocketFromLocalhost)(socketAddress)) {
+                    socket.emit('error', { message: 'Bot management requires localhost access' });
+                    return;
+                }
+                console.log(`🤖 Remove bot request from ${socket.username} for room ${data.roomCode}`);
+                // Verify host
+                const game = await gameManager.getGameByRoomCode(data.roomCode);
+                if (game.hostId !== socket.userId) {
+                    socket.emit('error', { message: 'Only the host can remove bots' });
+                    return;
+                }
+                // Check game status
+                if (game.status !== 'WAITING') {
+                    socket.emit('error', { message: 'Cannot remove bots after game has started' });
+                    return;
+                }
+                // Remove bot
+                const bot = bot_1.botManager.getBot(data.botId);
+                const botName = bot?.displayName || 'Bot';
+                await gameManager.removeBotPlayer(data.roomCode, data.botId);
+                bot_1.botManager.removeBotFromGame(data.botId, data.roomCode);
+                bot_1.botManager.destroyBot(data.botId);
+                console.log(`✅ Bot ${botName} removed from game ${data.roomCode}`);
+                // Get updated game state
+                const updatedGame = await gameManager.getGameByRoomCode(data.roomCode);
+                // Notify all players
+                io.to(data.roomCode).emit('botLeft', {
+                    botId: data.botId,
+                    displayName: botName,
+                    game: updatedGame,
+                });
+                // Update lobby
+                io.emit('lobbyGameUpdated', {
+                    roomCode: data.roomCode,
+                    playerCount: updatedGame.players.length,
+                });
+            }
+            catch (error) {
+                console.error(`❌ Error removing bot:`, error.message);
+                socket.emit('error', { message: error.message });
+            }
+        });
         // Select word
         socket.on('selectWord', async (data) => {
             try {
@@ -288,6 +555,8 @@ function setupSocketHandlers(io) {
                     io.to(data.roomCode).emit('gameStarted', game);
                     // Start the turn timer
                     startTurnTimer(io, data.roomCode, game.turnTimerSeconds);
+                    // Check if first player is a bot
+                    checkAndTriggerBotTurn(io, data.roomCode, game);
                 }
             }
             catch (error) {
@@ -304,6 +573,14 @@ function setupSocketHandlers(io) {
                 io.to(data.roomCode).emit('wordSelectionPhase', game);
                 // Remove from lobby since game has started
                 io.emit('lobbyGameRemoved', { roomCode: data.roomCode });
+                // Trigger word selection for any bots in the game
+                const botIds = bot_1.botManager.getBotIdsInGame(data.roomCode);
+                botIds.forEach((botId, index) => {
+                    // Stagger bot word selections to avoid race conditions
+                    setTimeout(() => {
+                        triggerBotWordSelection(io, data.roomCode, botId);
+                    }, 1000 + (index * 500));
+                });
             }
             catch (error) {
                 console.error(`❌ Error starting game:`, error.message);
@@ -462,130 +739,6 @@ function setupSocketHandlers(io) {
                 else if (!result.isCorrect) {
                     // Reset timer for next player's turn
                     startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
-                    // If a turn card was drawn for the next player, emit it
-                    if (result.turnCardInfo) {
-                        console.log(`🎴 Turn card drawn for next player: ${result.turnCardInfo.type}`);
-                        io.to(data.roomCode).emit('turnCardDrawn', {
-                            playerId: result.currentTurnPlayerId,
-                            turnCard: result.turnCardInfo,
-                        });
-                        // If expose card, start expose selection timer
-                        if (result.turnCardInfo.affectedPlayerId) {
-                            const selectionKey = `${data.roomCode}_expose`;
-                            // Fetch raw player data from database (sanitized game doesn't have paddedWord)
-                            const rawAffectedPlayer = await prisma.gamePlayer.findFirst({
-                                where: {
-                                    game: { roomCode: data.roomCode },
-                                    userId: result.turnCardInfo.affectedPlayerId,
-                                },
-                                include: { user: true },
-                            });
-                            const affectedPlayerName = rawAffectedPlayer?.user?.displayName || 'Unknown';
-                            const paddedWord = rawAffectedPlayer?.paddedWord || rawAffectedPlayer?.secretWord || '';
-                            // Parse revealedPositions from JSON string to boolean array
-                            let parsedRevealedPositions = [];
-                            try {
-                                const revPos = rawAffectedPlayer?.revealedPositions;
-                                if (typeof revPos === 'string') {
-                                    parsedRevealedPositions = JSON.parse(revPos);
-                                }
-                                else if (Array.isArray(revPos)) {
-                                    parsedRevealedPositions = revPos;
-                                }
-                            }
-                            catch (e) {
-                                console.error('Failed to parse revealedPositions:', e);
-                            }
-                            console.log('🎴 Expose card - paddedWord:', paddedWord, 'revealedPositions:', parsedRevealedPositions);
-                            pendingExposeSelections.set(selectionKey, {
-                                roomCode: data.roomCode,
-                                affectedPlayerId: result.turnCardInfo.affectedPlayerId,
-                                affectedPlayerName: affectedPlayerName,
-                                activePlayerId: result.currentTurnPlayerId,
-                            });
-                            // Notify all players that expose selection is required
-                            io.to(data.roomCode).emit('exposeCardRequired', {
-                                affectedPlayerId: result.turnCardInfo.affectedPlayerId,
-                                affectedPlayerName: affectedPlayerName,
-                                activePlayerId: result.currentTurnPlayerId,
-                                deadline: Date.now() + 30000, // 30 seconds
-                                // Send padded word so affected player can see their letters
-                                paddedWord: paddedWord,
-                                revealedPositions: parsedRevealedPositions,
-                            });
-                            // Start 30 second timer for auto-selection
-                            const existingTimer = exposeSelectionTimers.get(selectionKey);
-                            if (existingTimer)
-                                clearTimeout(existingTimer);
-                            const timer = setTimeout(async () => {
-                                const pending = pendingExposeSelections.get(selectionKey);
-                                if (!pending)
-                                    return;
-                                console.log(`⏰ Expose selection timeout for ${pending.affectedPlayerName}`);
-                                try {
-                                    // Fetch fresh player data from database for auto-selection
-                                    const freshPlayer = await prisma.gamePlayer.findFirst({
-                                        where: {
-                                            game: { roomCode: pending.roomCode },
-                                            userId: pending.affectedPlayerId,
-                                        },
-                                    });
-                                    if (!freshPlayer)
-                                        return;
-                                    // Parse revealedPositions from JSON string
-                                    let revealedPositions = [];
-                                    try {
-                                        const revPos = freshPlayer.revealedPositions;
-                                        if (typeof revPos === 'string') {
-                                            revealedPositions = JSON.parse(revPos);
-                                        }
-                                    }
-                                    catch (e) {
-                                        console.error('Failed to parse revealedPositions in timeout:', e);
-                                        return;
-                                    }
-                                    let rightmostUnrevealed = -1;
-                                    for (let i = revealedPositions.length - 1; i >= 0; i--) {
-                                        if (!revealedPositions[i]) {
-                                            rightmostUnrevealed = i;
-                                            break;
-                                        }
-                                    }
-                                    if (rightmostUnrevealed >= 0) {
-                                        const autoResult = await gameManager.resolveExposeCard(pending.roomCode, pending.affectedPlayerId, rightmostUnrevealed);
-                                        // Broadcast result
-                                        io.to(pending.roomCode).emit('exposeCardResolved', {
-                                            ...autoResult,
-                                            autoSelected: true,
-                                        });
-                                        if (autoResult.wordCompleted) {
-                                            io.to(pending.roomCode).emit('wordCompleted', { playerId: pending.affectedPlayerId });
-                                        }
-                                        if (autoResult.gameOver) {
-                                            io.to(pending.roomCode).emit('gameOver', autoResult.finalResults);
-                                            stopTurnTimer(pending.roomCode);
-                                        }
-                                    }
-                                }
-                                catch (err) {
-                                    console.error('Error in expose auto-selection:', err);
-                                }
-                                // Cleanup
-                                pendingExposeSelections.delete(selectionKey);
-                                exposeSelectionTimers.delete(selectionKey);
-                            }, 30000);
-                            exposeSelectionTimers.set(selectionKey, timer);
-                        }
-                    }
-                    // Emit turn changed event for UI refresh
-                    const nextPlayer = result.game.players.find((p) => p.userId === result.currentTurnPlayerId);
-                    io.to(data.roomCode).emit('turnChanged', {
-                        previousPlayerId: socket.userId,
-                        previousPlayerName: socket.username,
-                        currentPlayerId: result.currentTurnPlayerId,
-                        currentPlayerName: nextPlayer?.displayName || 'Unknown',
-                        game: result.game,
-                    });
                 }
             }
             catch (error) {
@@ -676,49 +829,6 @@ function setupSocketHandlers(io) {
             }
             catch (error) {
                 console.error(`❌ Error selecting duplicate position:`, error.message);
-                socket.emit('error', { message: error.message });
-            }
-        });
-        // Select expose card position (when affected player chooses which of their own letters to reveal)
-        socket.on('selectExposePosition', async (data) => {
-            try {
-                const selectionKey = `${data.roomCode}_expose`;
-                const pending = pendingExposeSelections.get(selectionKey);
-                if (!pending) {
-                    socket.emit('error', { message: 'No pending expose selection' });
-                    return;
-                }
-                if (pending.affectedPlayerId !== socket.userId) {
-                    socket.emit('error', { message: 'Not your expose selection' });
-                    return;
-                }
-                console.log(`🎯 Expose position selected by ${socket.username}: position ${data.position}`);
-                // Clear the timer
-                const timer = exposeSelectionTimers.get(selectionKey);
-                if (timer)
-                    clearTimeout(timer);
-                exposeSelectionTimers.delete(selectionKey);
-                pendingExposeSelections.delete(selectionKey);
-                // Resolve the expose selection
-                const result = await gameManager.resolveExposeCard(pending.roomCode, pending.affectedPlayerId, data.position);
-                // Broadcast result to all players
-                io.to(data.roomCode).emit('exposeCardResolved', {
-                    ...result,
-                    autoSelected: false,
-                    selectedPosition: data.position,
-                });
-                if (result.wordCompleted) {
-                    console.log(`🏆 Word completed for player ${pending.affectedPlayerId}`);
-                    io.to(data.roomCode).emit('wordCompleted', { playerId: pending.affectedPlayerId });
-                }
-                if (result.gameOver) {
-                    console.log(`🎮 Game over in room ${data.roomCode}`);
-                    io.to(data.roomCode).emit('gameOver', result.finalResults);
-                    stopTurnTimer(data.roomCode);
-                }
-            }
-            catch (error) {
-                console.error(`❌ Error selecting expose position:`, error.message);
                 socket.emit('error', { message: error.message });
             }
         });
@@ -814,15 +924,6 @@ function setupSocketHandlers(io) {
                 else if (!result.isCorrect) {
                     // Wrong word guess ends the turn - restart timer for next player
                     startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds);
-                    // Emit turn changed event for UI refresh
-                    const nextPlayer = result.game.players.find((p) => p.userId === result.game.currentTurnPlayerId);
-                    io.to(data.roomCode).emit('turnChanged', {
-                        previousPlayerId: socket.userId,
-                        previousPlayerName: socket.username,
-                        currentPlayerId: result.game.currentTurnPlayerId,
-                        currentPlayerName: nextPlayer?.displayName || 'Unknown',
-                        game: result.game,
-                    });
                 }
             }
             catch (error) {

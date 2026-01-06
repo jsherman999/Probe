@@ -523,7 +523,8 @@ export class GameManager {
       throw new Error('Not in word selection phase');
     }
 
-    const player = game.players.find(p => p.userId === userId);
+    // Find player by userId or botId (userId parameter may be a botId)
+    const player = game.players.find(p => p.userId === userId || p.botId === userId);
     if (!player) {
       throw new Error('Not in this game');
     }
@@ -561,16 +562,18 @@ export class GameManager {
       const initialCard = this.drawTurnCard();
       let pendingExposePlayerId: string | null = null;
 
-      // Handle expose cards for initial player
-      const firstPlayer = updatedPlayers[0];
+      // Handle expose cards for initial player - first player could be human or bot
+      const sortedPlayers = [...updatedPlayers].sort((a, b) => a.turnOrder - b.turnOrder);
+      const firstPlayer = sortedPlayers[0];
+      const firstPlayerId = firstPlayer.userId || firstPlayer.botId;
+
       if (initialCard.type === 'expose_left' || initialCard.type === 'expose_right') {
-        const sortedPlayers = [...updatedPlayers].sort((a, b) => a.turnOrder - b.turnOrder);
         const direction = initialCard.type === 'expose_left' ? 'left' : 'right';
         const firstIndex = 0;
         const targetIndex = direction === 'left'
           ? (firstIndex + 1) % sortedPlayers.length
           : (firstIndex - 1 + sortedPlayers.length) % sortedPlayers.length;
-        pendingExposePlayerId = sortedPlayers[targetIndex].userId;
+        pendingExposePlayerId = sortedPlayers[targetIndex].userId || sortedPlayers[targetIndex].botId;
       }
 
       // Handle bonus_20 for initial player
@@ -589,7 +592,7 @@ export class GameManager {
         data: {
           status: 'ACTIVE',
           startedAt: new Date(),
-          currentTurnPlayerId: firstPlayer.userId,
+          currentTurnPlayerId: firstPlayerId,
           currentTurnStartedAt: new Date(),
           currentTurnCard: initialCard.type,
           turnCardMultiplier: initialCard.multiplier || 1,
@@ -649,11 +652,19 @@ export class GameManager {
       throw new Error('Game not active');
     }
 
-    if (game.currentTurnPlayerId !== playerId) {
+    // playerId could be userId or botId
+    const currentPlayer = game.players.find(p => p.userId === playerId || p.botId === playerId);
+    if (!currentPlayer) {
+      throw new Error('Player not in game');
+    }
+
+    const currentPlayerId = currentPlayer.userId || currentPlayer.botId;
+    if (game.currentTurnPlayerId !== currentPlayerId) {
       throw new Error('Not your turn');
     }
 
-    const targetPlayer = game.players.find(p => p.userId === targetPlayerId);
+    // targetPlayerId could be userId or botId
+    const targetPlayer = game.players.find(p => p.userId === targetPlayerId || p.botId === targetPlayerId);
     if (!targetPlayer || targetPlayer.isEliminated) {
       throw new Error('Invalid target player');
     }
@@ -1982,12 +1993,17 @@ export class GameManager {
         const wordLength = word?.length || 0;
 
         // Include the player's own secret word (without blanks) if this is their data
-        const isOwnPlayer = forUserId && p.userId === forUserId;
+        // For bots, forUserId might be the botId
+        const isOwnPlayer = forUserId && (p.userId === forUserId || p.botId === forUserId);
 
         return {
           id: p.id,
-          userId: p.userId,
-          displayName: p.user?.displayName || 'Unknown',
+          oduserId: p.userId,
+          botId: p.botId,
+          isBot: p.isBot || false,
+          displayName: p.isBot ? p.botDisplayName : (p.user?.displayName || 'Unknown'),
+          botModelName: p.botModelName,
+          botDifficulty: p.botDifficulty,
           turnOrder: p.turnOrder,
           wordLength: wordLength,
           hasSelectedWord: p.secretWord !== null,
@@ -2008,5 +2024,106 @@ export class GameManager {
         };
       }),
     };
+  }
+
+  // ============================================================================
+  // Bot Player Methods
+  // ============================================================================
+
+  /**
+   * Add a bot player to a game
+   */
+  async addBotPlayer(roomCode: string, bot: any): Promise<any> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: { players: true },
+    });
+
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    if (game.status !== 'WAITING' && game.status !== 'WORD_SELECTION') {
+      throw new Error('Cannot add bot after game has started');
+    }
+
+    if (game.players.length >= game.maxPlayers) {
+      throw new Error('Game is full');
+    }
+
+    // Check if bot already in game
+    const existingBot = game.players.find(p => p.botId === bot.id);
+    if (existingBot) {
+      return this.getGameByRoomCode(roomCode);
+    }
+
+    const updatedGame = await prisma.game.update({
+      where: { id: game.id },
+      data: {
+        players: {
+          create: {
+            botId: bot.id,
+            isBot: true,
+            botDisplayName: bot.displayName || bot.config?.displayName || 'Bot',
+            botModelName: bot.config?.modelName,
+            botDifficulty: bot.config?.difficulty || 'medium',
+            botConfig: bot.config || {},
+            turnOrder: game.players.length,
+          },
+        },
+      },
+      include: {
+        players: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    return this.sanitizeGame(updatedGame);
+  }
+
+  /**
+   * Remove a bot player from a game
+   */
+  async removeBotPlayer(roomCode: string, botId: string): Promise<any> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: { players: true },
+    });
+
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    if (game.status !== 'WAITING') {
+      throw new Error('Cannot remove bot after game has started');
+    }
+
+    const botPlayer = game.players.find(p => p.botId === botId);
+    if (!botPlayer) {
+      throw new Error('Bot not in this game');
+    }
+
+    await prisma.gamePlayer.delete({
+      where: { id: botPlayer.id },
+    });
+
+    // Re-order remaining players
+    const remainingPlayers = game.players
+      .filter(p => p.botId !== botId)
+      .sort((a, b) => a.turnOrder - b.turnOrder);
+
+    await Promise.all(
+      remainingPlayers.map((p, index) =>
+        prisma.gamePlayer.update({
+          where: { id: p.id },
+          data: { turnOrder: index },
+        })
+      )
+    );
+
+    return this.getGameByRoomCode(roomCode);
   }
 }
