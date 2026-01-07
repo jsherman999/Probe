@@ -309,6 +309,12 @@ Return ONLY one uppercase letter, nothing else.`;
     const revealed = targetPlayer.revealedPositions;
     const wordLength = targetPlayer.wordLength;
 
+    // NEVER guess BLANK if it was already missed on this player
+    // (means this player has no blanks in their word)
+    if (targetPlayer.missedLetters.includes('BLANK')) {
+      return false;
+    }
+
     // Check if any blanks have already been revealed
     const revealedBlanks = revealed.filter(p => p === 'BLANK').length;
     const hasKnownBlanks = revealedBlanks > 0;
@@ -319,6 +325,14 @@ Return ONLY one uppercase letter, nothing else.`;
     // No unrevealed positions - nothing to guess
     if (unrevealedCount === 0) {
       return false;
+    }
+
+    // If blanks are known, check if all blanks are already revealed
+    // (no point guessing BLANK if all blanks are already shown)
+    if (hasKnownBlanks) {
+      // Count how many unrevealed positions could still be blanks
+      // We can't know for sure, but if all revealed are blanks and word is short, maybe done
+      // For now, just allow guessing if there are unrevealed positions
     }
 
     // Base probability varies by difficulty

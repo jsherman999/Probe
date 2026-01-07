@@ -1,11 +1,11 @@
 /**
  * WordGuessStrategy - Handles bot full word guessing decisions
  *
- * This strategy is VERY conservative - bots should primarily guess letters.
- * Word guessing is only attempted when:
- * 1. At least 80% of the word is revealed
- * 2. The bot is highly confident it knows the word
- * 3. The guessed word is a valid English word (verified against dictionary)
+ * This strategy is now more aggressive - bots will attempt word guesses when:
+ * 1. At least 50% of the word is revealed (for hard bots)
+ * 2. At least 60% revealed for medium bots
+ * 3. At least 70% revealed for easy bots
+ * 4. The guessed word must be a valid English word
  */
 
 import { LLMProvider } from '../types';
@@ -24,7 +24,7 @@ export class WordGuessStrategy {
 
   /**
    * Decide whether the bot should attempt a full word guess
-   * VERY conservative - default to letter guessing
+   * More aggressive than before - bots will try guessing earlier
    */
   async shouldGuessWord(
     _ctx: GameContext,
@@ -35,64 +35,71 @@ export class WordGuessStrategy {
     const revealedCount = targetPlayer.revealedPositions.filter(p => p !== null).length;
     const totalLength = targetPlayer.wordLength;
     const revealedPct = revealedCount / totalLength;
-
-    console.log(`🎲 [WordGuess ${config.displayName}] Checking if should guess word: ${(revealedPct * 100).toFixed(0)}% revealed`);
-
-    // STRICT requirement: At least 80% must be revealed for ANY difficulty
-    if (revealedPct < 0.8) {
-      console.log(`🎲 [WordGuess ${config.displayName}] Not enough revealed (<80%), will guess letter`);
-      return false;
-    }
-
-    // Even at 80%+, only guess if there's just 1-2 letters missing
     const hiddenCount = totalLength - revealedCount;
-    if (hiddenCount > 2) {
-      console.log(`🎲 [WordGuess ${config.displayName}] Too many hidden letters (${hiddenCount}), will guess letter`);
+
+    console.log(`🎲 [WordGuess ${config.displayName}] Checking word guess: ${revealedCount}/${totalLength} revealed (${(revealedPct * 100).toFixed(0)}%), ${hiddenCount} hidden`);
+
+    // No point guessing if word is complete or only blanks remain
+    if (hiddenCount === 0) {
+      console.log(`🎲 [WordGuess ${config.displayName}] Word already complete, no guess needed`);
       return false;
     }
 
-    // For hard bots only, try to determine if we can guess the word
-    if (config.difficulty === 'hard' && hiddenCount <= 2) {
-      const confident = await this.canConfidentlyGuess(targetPlayer, config);
-      console.log(`🎲 [WordGuess ${config.displayName}] Confidence check: ${confident ? 'YES' : 'NO'}`);
-      return confident;
+    // Threshold varies by difficulty
+    let minRevealedPct: number;
+    let wordGuessChance: number;
+
+    switch (config.difficulty) {
+      case 'hard':
+        // Hard bots: try guessing at 50% revealed, high chance
+        minRevealedPct = 0.50;
+        wordGuessChance = 0.7;
+        break;
+      case 'medium':
+        // Medium bots: try at 60% revealed, moderate chance
+        minRevealedPct = 0.60;
+        wordGuessChance = 0.5;
+        break;
+      case 'easy':
+      default:
+        // Easy bots: try at 70% revealed, lower chance
+        minRevealedPct = 0.70;
+        wordGuessChance = 0.3;
+        break;
     }
 
-    // Easy/Medium bots: only guess word when just 1 letter remains AND very high reveal %
-    if (hiddenCount === 1 && revealedPct >= 0.85) {
-      console.log(`🎲 [WordGuess ${config.displayName}] Only 1 letter hidden and 85%+ revealed, may guess word`);
-      // Still only 50% chance to guess - prefer letter guessing
-      return Math.random() < 0.5;
+    // Not enough revealed yet
+    if (revealedPct < minRevealedPct) {
+      console.log(`🎲 [WordGuess ${config.displayName}] Not enough revealed (${(revealedPct * 100).toFixed(0)}% < ${(minRevealedPct * 100).toFixed(0)}%), will guess letter`);
+      return false;
     }
 
-    // Default: don't guess word, keep guessing letters
-    console.log(`🎲 [WordGuess ${config.displayName}] Defaulting to letter guess`);
+    // With very few letters remaining (1-2), always try word guess for all difficulties
+    if (hiddenCount <= 2) {
+      console.log(`🎲 [WordGuess ${config.displayName}] Only ${hiddenCount} hidden - will attempt word guess`);
+      return true;
+    }
+
+    // Roll the dice based on difficulty
+    const roll = Math.random();
+    if (roll < wordGuessChance) {
+      // Check if we can actually form a valid word candidate
+      const candidate = await this.generateWordCandidate(targetPlayer, config);
+      if (candidate) {
+        const isValid = await this.wordValidator.isValidWord(candidate);
+        if (isValid) {
+          console.log(`🎲 [WordGuess ${config.displayName}] Found valid candidate "${candidate}", will attempt word guess`);
+          return true;
+        }
+        console.log(`🎲 [WordGuess ${config.displayName}] Candidate "${candidate}" invalid, will guess letter`);
+      } else {
+        console.log(`🎲 [WordGuess ${config.displayName}] No candidate found, will guess letter`);
+      }
+    } else {
+      console.log(`🎲 [WordGuess ${config.displayName}] Random roll ${(roll * 100).toFixed(0)}% > ${(wordGuessChance * 100).toFixed(0)}%, will guess letter`);
+    }
+
     return false;
-  }
-
-  /**
-   * Check if we can confidently guess the word (for hard bots)
-   */
-  private async canConfidentlyGuess(
-    targetPlayer: PlayerInfo,
-    config: BotConfig
-  ): Promise<boolean> {
-    const pattern = targetPlayer.revealedPositions
-      .map(pos => pos || '_')
-      .join('');
-
-    // First, try to think of a valid word that matches
-    const candidateWord = await this.generateWordCandidate(targetPlayer, config);
-
-    if (!candidateWord) {
-      return false;
-    }
-
-    // Validate it's a real English word
-    const isValid = await this.wordValidator.isValidWord(candidateWord);
-    console.log(`🎲 [WordGuess ${config.displayName}] Candidate "${candidateWord}" valid: ${isValid}`);
-
-    return isValid;
   }
 
   /**
@@ -106,21 +113,25 @@ export class WordGuessStrategy {
       .map(pos => pos || '_')
       .join('');
 
-    const prompt = `What common English word matches this pattern: ${pattern}
+    const prompt = `What English word matches this pattern: ${pattern}
 Letters NOT in the word: ${targetPlayer.missedLetters.join(', ') || 'none'}
-Reply with just ONE word in uppercase, or "UNKNOWN" if unsure.`;
+The word is ${targetPlayer.wordLength} letters long.
+Reply with just ONE word in uppercase, or "UNKNOWN" if you can't determine it.`;
 
     try {
       const response = await this.llm.generate(
         config.modelName,
         prompt,
-        { ...config.ollamaOptions, temperature: 0.2, num_predict: 15 }
+        { ...config.ollamaOptions, temperature: 0.3, num_predict: 20 }
       );
 
       const word = this.extractWord(response, targetPlayer.wordLength);
 
       if (word && word !== 'UNKNOWN') {
-        return word;
+        // Also verify it matches the revealed pattern
+        if (this.matchesPattern(word, targetPlayer.revealedPositions)) {
+          return word;
+        }
       }
     } catch {
       // Ignore errors
@@ -149,10 +160,11 @@ Reply with just ONE word in uppercase, or "UNKNOWN" if unsure.`;
 
     const prompt = `Complete this word pattern: ${pattern}
 - Word length: ${targetPlayer.wordLength} letters
-- Revealed: ${revealedLetters.join(', ') || 'none'}
-- NOT in word: ${targetPlayer.missedLetters.join(', ') || 'none'}
+- Revealed letters: ${revealedLetters.join(', ') || 'none'}
+- Letters NOT in word: ${targetPlayer.missedLetters.join(', ') || 'none'}
 
-What is the COMPLETE English word? Reply with ONLY the word in uppercase.`;
+Think about what common English word this could be. What is the COMPLETE word?
+Reply with ONLY the word in uppercase letters.`;
 
     console.log(`🎲 [WordGuess ${config.displayName}] Asking LLM for word guess, pattern: ${pattern}`);
 
@@ -162,8 +174,8 @@ What is the COMPLETE English word? Reply with ONLY the word in uppercase.`;
         prompt,
         {
           ...config.ollamaOptions,
-          temperature: 0.2, // Very low for focused guessing
-          num_predict: 20,
+          temperature: 0.3,
+          num_predict: 25,
         },
         systemPrompt
       );
@@ -173,14 +185,14 @@ What is the COMPLETE English word? Reply with ONLY the word in uppercase.`;
       const word = this.extractWord(response, targetPlayer.wordLength);
 
       if (word) {
-        // CRITICAL: Validate the word is a real English word
+        // Validate the word is a real English word
         const isValid = await this.wordValidator.isValidWord(word);
         console.log(`🎲 [WordGuess ${config.displayName}] Extracted word "${word}", valid: ${isValid}`);
 
         if (isValid) {
           // Also check the word matches the revealed pattern
           if (this.matchesPattern(word, targetPlayer.revealedPositions)) {
-            console.log(`[Bot ${config.displayName}] Guessing valid word: ${word} for pattern: ${pattern}`);
+            console.log(`[Bot ${config.displayName}] Guessing word: ${word} for pattern: ${pattern}`);
             return word;
           } else {
             console.log(`🎲 [WordGuess ${config.displayName}] Word "${word}" doesn't match pattern`);
@@ -192,7 +204,6 @@ What is the COMPLETE English word? Reply with ONLY the word in uppercase.`;
     }
 
     // If we can't get a valid word, throw to force letter guessing instead
-    // This is better than guessing a nonsense word
     console.log(`🎲 [WordGuess ${config.displayName}] No valid word found, will fall back to letter guess`);
     throw new Error('No valid word candidate found');
   }
@@ -207,7 +218,7 @@ What is the COMPLETE English word? Reply with ONLY the word in uppercase.`;
 
     for (let i = 0; i < word.length; i++) {
       const revealed = revealedPositions[i];
-      if (revealed !== null && revealed !== word[i]) {
+      if (revealed !== null && revealed.toUpperCase() !== word[i].toUpperCase()) {
         return false;
       }
     }
@@ -234,12 +245,9 @@ What is the COMPLETE English word? Reply with ONLY the word in uppercase.`;
       }
     }
 
-    // If single word response and close to right length, try it
-    if (words.length === 1) {
-      const word = words[0];
-      if (word.length === expectedLength) {
-        return word;
-      }
+    // If single word response close to right length, check it
+    if (words.length === 1 && words[0].length === expectedLength) {
+      return words[0];
     }
 
     return null;

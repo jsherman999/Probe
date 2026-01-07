@@ -1,0 +1,947 @@
+{
+  "id": "c623a760-dea5-4efa-bea2-ae5e9bd8acb4",
+  "roomCode": "jay_2601061726",
+  "status": "COMPLETED",
+  "createdAt": "2026-01-06T23:26:13.534Z",
+  "startedAt": "2026-01-06T23:37:43.592Z",
+  "completedAt": "2026-01-06T23:48:32.257Z",
+  "players": [
+    {
+      "id": "df623551-7498-46ce-b2f7-4c096e017321",
+      "userId": "fd67d227-76d3-46ab-ae83-21baab0241fa",
+      "displayName": "Jay",
+      "secretWord": "CHRONIC",
+      "paddedWord": "•CHRONIC••",
+      "frontPadding": 1,
+      "backPadding": 2,
+      "totalScore": 120,
+      "isEliminated": true,
+      "turnOrder": 0,
+      "isBot": false,
+      "botId": null,
+      "botModelName": null,
+      "botDifficulty": null,
+      "botConfig": null
+    },
+    {
+      "id": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "userId": "4c090c36-bd89-4a3d-a75d-1c180d062713",
+      "displayName": "Mama",
+      "secretWord": "QUERY",
+      "paddedWord": "•••QUERY••",
+      "frontPadding": 3,
+      "backPadding": 2,
+      "totalScore": 130,
+      "isEliminated": true,
+      "turnOrder": 3,
+      "isBot": false,
+      "botId": null,
+      "botModelName": null,
+      "botDifficulty": null,
+      "botConfig": null
+    },
+    {
+      "id": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "userId": null,
+      "displayName": "Bot bottie",
+      "secretWord": "WRAITH",
+      "paddedWord": "•••WRAITH••",
+      "frontPadding": 3,
+      "backPadding": 2,
+      "totalScore": 100,
+      "isEliminated": true,
+      "turnOrder": 1,
+      "isBot": true,
+      "botId": "bot_57fd91ac-4373-4fdf-ac90-770e78db72cb",
+      "botModelName": "gpt-oss:latest",
+      "botDifficulty": "hard",
+      "botConfig": {
+        "id": "bot_57fd91ac-4373-4fdf-ac90-770e78db72cb",
+        "provider": "ollama",
+        "modelName": "gpt-oss:latest",
+        "difficulty": "hard",
+        "displayName": "Bot bottie",
+        "ollamaOptions": {
+          "top_k": 40,
+          "top_p": 0.9,
+          "num_predict": 100,
+          "temperature": 0.7
+        }
+      }
+    },
+    {
+      "id": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "userId": null,
+      "displayName": "Mr mcbot",
+      "secretWord": "TWELFTH",
+      "paddedWord": "•••TWELFTH",
+      "frontPadding": 3,
+      "backPadding": 0,
+      "totalScore": 85,
+      "isEliminated": false,
+      "turnOrder": 2,
+      "isBot": true,
+      "botId": "bot_b2915e07-80d2-41b1-8f2a-d0518d24902a",
+      "botModelName": "orca-mini:latest",
+      "botDifficulty": "hard",
+      "botConfig": {
+        "id": "bot_b2915e07-80d2-41b1-8f2a-d0518d24902a",
+        "provider": "ollama",
+        "modelName": "orca-mini:latest",
+        "difficulty": "hard",
+        "displayName": "Mr mcbot",
+        "ollamaOptions": {
+          "top_k": 40,
+          "top_p": 0.9,
+          "num_predict": 100,
+          "temperature": 0.7
+        }
+      }
+    }
+  ],
+  "turns": [
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "E",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T23:38:37.506Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "I",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:38:42.297Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "E",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:38:47.271Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "B",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:38:53.083Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "E",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:39:12.615Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "N",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:39:55.405Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        9
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T23:39:59.333Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "A",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:40:06.216Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "N",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 75,
+      "createdAt": "2026-01-06T23:40:11.541Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:40:15.345Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "I",
+      "isCorrect": true,
+      "positionsRevealed": [
+        6
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T23:40:23.154Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "I",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:40:41.076Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "targetPlayerName": "Mr mcbot",
+      "guessedLetter": "N",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:40:46.298Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "O",
+      "isCorrect": true,
+      "positionsRevealed": [
+        4
+      ],
+      "pointsScored": 20,
+      "createdAt": "2026-01-06T23:40:51.875Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "S",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:40:57.058Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "D",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:41:02.343Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "R",
+      "isCorrect": true,
+      "positionsRevealed": [
+        3
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T23:41:15.387Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "P",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:41:42.481Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "A",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:41:51.254Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "H",
+      "isCorrect": true,
+      "positionsRevealed": [
+        2
+      ],
+      "pointsScored": 60,
+      "createdAt": "2026-01-06T23:41:56.292Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "L",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:42:01.109Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        8
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T23:42:04.475Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "G",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:42:08.874Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "targetPlayerName": "Jay",
+      "guessedLetter": "WORD:CHRONIC",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "pointsScored": 50,
+      "createdAt": "2026-01-06T23:42:12.026Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "I",
+      "isCorrect": true,
+      "positionsRevealed": [
+        6
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T23:42:34.183Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "N",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:42:48.872Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "targetPlayerName": "Mr mcbot",
+      "guessedLetter": "E",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T23:42:54.715Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "targetPlayerName": "Mr mcbot",
+      "guessedLetter": "R",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:42:58.294Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:43:04.000Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "S",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:43:08.734Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "O",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:43:15.499Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        10
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T23:43:27.773Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        9
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T23:43:29.327Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "A",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T23:43:34.345Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "N",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:43:39.967Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "O",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:43:45.643Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        9
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T23:43:49.654Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        8
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T23:43:53.046Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "B",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:43:56.911Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "M",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:44:15.195Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "U",
+      "isCorrect": true,
+      "positionsRevealed": [
+        4
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T23:44:29.640Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "G",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:44:39.158Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "H",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:44:46.255Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        1
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T23:44:51.067Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        2
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T23:44:55.536Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T23:45:00.186Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "D",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:45:04.183Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "T",
+      "isCorrect": true,
+      "positionsRevealed": [
+        7
+      ],
+      "pointsScored": 40,
+      "createdAt": "2026-01-06T23:45:09.365Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "W",
+      "isCorrect": true,
+      "positionsRevealed": [
+        3
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T23:45:45.211Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "A",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:45:58.005Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "WORD:DUALS",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T23:46:13.064Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T23:46:38.254Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "H",
+      "isCorrect": true,
+      "positionsRevealed": [
+        8
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T23:46:54.947Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "targetPlayerName": "Bot bottie",
+      "guessedLetter": "WORD:WRAITH",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "pointsScored": 50,
+      "createdAt": "2026-01-06T23:46:59.656Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "targetPlayerName": "Mr mcbot",
+      "guessedLetter": "I",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:47:14.470Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "L",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:47:29.961Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "R",
+      "isCorrect": true,
+      "positionsRevealed": [
+        6
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T23:47:35.591Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "6a0cd360-47ee-478b-a3a9-a09f44464f63",
+      "playerName": "Bot bottie",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "C",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:47:40.592Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "playerName": "Mr mcbot",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "P",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:47:44.922Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "playerName": "Mama",
+      "targetPlayerId": "50cf978a-482a-4e08-a8cb-78cc110e1dbc",
+      "targetPlayerName": "Mr mcbot",
+      "guessedLetter": "A",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T23:47:54.844Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "df623551-7498-46ce-b2f7-4c096e017321",
+      "playerName": "Jay",
+      "targetPlayerId": "151f57a9-5ee1-4307-9d80-96b149657413",
+      "targetPlayerName": "Mama",
+      "guessedLetter": "WORD:QUERY",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "pointsScored": 50,
+      "createdAt": "2026-01-06T23:48:18.157Z"
+    }
+  ],
+  "results": [
+    {
+      "playerId": "4c090c36-bd89-4a3d-a75d-1c180d062713",
+      "displayName": "Mama",
+      "finalScore": 130,
+      "isBot": false,
+      "placement": 1
+    },
+    {
+      "playerId": "fd67d227-76d3-46ab-ae83-21baab0241fa",
+      "displayName": "Jay",
+      "finalScore": 120,
+      "isBot": false,
+      "placement": 2
+    },
+    {
+      "playerId": "bot_57fd91ac-4373-4fdf-ac90-770e78db72cb",
+      "displayName": "Bot bottie",
+      "finalScore": 100,
+      "isBot": true,
+      "placement": 3
+    },
+    {
+      "playerId": "bot_b2915e07-80d2-41b1-8f2a-d0518d24902a",
+      "displayName": "Mr mcbot",
+      "finalScore": 85,
+      "isBot": true,
+      "placement": 4
+    }
+  ],
+  "viewerGuesses": []
+}
