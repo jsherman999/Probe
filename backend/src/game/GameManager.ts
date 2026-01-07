@@ -1499,8 +1499,24 @@ export class GameManager {
 
     let pointsChange = 0;
     if (isCorrect) {
-      // Correct guess: +100 if 5+ unrevealed, +50 otherwise
-      pointsChange = unrevealedCount >= 5 ? 100 : 50;
+      // Base bonus: +100 if 5+ unrevealed, +50 otherwise
+      const baseBonus = unrevealedCount >= 5 ? 100 : 50;
+
+      // Calculate value of all unexposed positions (including blanks)
+      const unrevealedPositions: number[] = [];
+      for (let i = 0; i < paddedWord.length; i++) {
+        if (!revealedPositions[i]) {
+          unrevealedPositions.push(i);
+        }
+      }
+
+      const unrevealedPositionsValue = this.scoringEngine.calculateScore(unrevealedPositions);
+      pointsChange = baseBonus + unrevealedPositionsValue;
+
+      console.log(`🎯 WORD GUESS CORRECT!`);
+      console.log(`   Base bonus: ${baseBonus} points (${unrevealedCount} unrevealed)`);
+      console.log(`   Unrevealed positions (letters + blanks): ${unrevealedPositions.length} = ${unrevealedPositionsValue} points`);
+      console.log(`   Total award: ${pointsChange} points`);
 
       // Reveal all positions and eliminate the target
       const allRevealed = new Array(paddedWord.length).fill(true);
@@ -1514,6 +1530,7 @@ export class GameManager {
     } else {
       // Incorrect guess: -50 points
       pointsChange = -50;
+      console.log(`❌ WORD GUESS INCORRECT: ${guessedWord} != ${actualWord} (-50 points)`);
     }
 
     // Update guessing player's score

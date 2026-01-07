@@ -32,22 +32,22 @@ const GameRules = () => {
             <ul className="space-y-2 text-gray-300">
               <li>• Players take turns guessing letters in opponents' words</li>
               <li>• Choose a letter and select which player to probe</li>
-              <li>• If the letter is in their word, all instances are revealed</li>
-              <li>• Earn points equal to: (letter value) × (number of occurrences)</li>
+              <li>• If the letter is in their word, one instance is revealed</li>
+              <li>• Earn points based on the position of the revealed letter</li>
+              <li>• Can guess the full word for a large bonus</li>
             </ul>
           </Card>
 
           <Card>
             <h3 className="text-lg font-bold text-accent mb-2">⭐ Scoring</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm text-gray-300">
-              <div><strong>1 pt:</strong> E, A, I, O, N, R, T, L, S, U</div>
-              <div><strong>2 pts:</strong> D, G</div>
-              <div><strong>3 pts:</strong> B, C, M, P</div>
-              <div><strong>4 pts:</strong> F, H, V, W, Y</div>
-              <div><strong>5 pts:</strong> K</div>
-              <div><strong>8 pts:</strong> J, X</div>
-              <div><strong>10 pts:</strong> Q, Z</div>
-            </div>
+            <ul className="space-y-2 text-gray-300 text-sm">
+              <li>• <strong>Position-based:</strong> Points are awarded by letter position (5, 10, 15, repeating)</li>
+              <li>• <strong>Position 0, 3, 6...</strong> = 5 points each</li>
+              <li>• <strong>Position 1, 4, 7...</strong> = 10 points each</li>
+              <li>• <strong>Position 2, 5, 8...</strong> = 15 points each</li>
+              <li>• <strong>Word guess bonus:</strong> Base 50-100 pts + value of all unrevealed positions (including blanks)</li>
+              <li>• <strong>Wrong word guess:</strong> -50 points</li>
+            </ul>
           </Card>
 
           <Card>
