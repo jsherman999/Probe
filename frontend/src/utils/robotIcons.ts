@@ -3,8 +3,9 @@
  * Assigns consistent robot icons based on botId hash
  */
 
-// List of available robot icons
+// List of available robot icons (30 total from 3 galleries)
 export const ROBOT_ICONS = [
+  // Original Gallery (1-10)
   { id: 1, name: 'Classic Bot', src: '/robots/robot-1-classic.svg' },
   { id: 2, name: 'Cute Bot', src: '/robots/robot-2-cute.svg' },
   { id: 3, name: 'Geometric Bot', src: '/robots/robot-3-geometric.svg' },
@@ -15,6 +16,28 @@ export const ROBOT_ICONS = [
   { id: 8, name: 'Blocky Bot', src: '/robots/robot-8-blocky.svg' },
   { id: 9, name: 'Friendly Bot', src: '/robots/robot-9-friendly.svg' },
   { id: 10, name: 'Sparkle Bot', src: '/robots/robot-10-sparkle.svg' },
+  // Gallery V2 (11-20)
+  { id: 11, name: 'Cyborg Bot', src: '/robots/robot-11-cyborg.svg' },
+  { id: 12, name: 'Steampunk Bot', src: '/robots/robot-12-steampunk.svg' },
+  { id: 13, name: 'Ninja Bot', src: '/robots/robot-13-ninja.svg' },
+  { id: 14, name: 'Chef Bot', src: '/robots/robot-14-chef.svg' },
+  { id: 15, name: 'Astronaut Bot', src: '/robots/robot-15-astronaut.svg' },
+  { id: 16, name: 'DJ Bot', src: '/robots/robot-16-dj.svg' },
+  { id: 17, name: 'Wizard Bot', src: '/robots/robot-17-wizard.svg' },
+  { id: 18, name: 'Sports Bot', src: '/robots/robot-18-sports.svg' },
+  { id: 19, name: 'Pirate Bot', src: '/robots/robot-19-pirate.svg' },
+  { id: 20, name: 'Garden Bot', src: '/robots/robot-20-garden.svg' },
+  // Gallery V3 (21-30)
+  { id: 21, name: 'Scientist Bot', src: '/robots/robot-21-scientist.svg' },
+  { id: 22, name: 'Artist Bot', src: '/robots/robot-22-artist.svg' },
+  { id: 23, name: 'Detective Bot', src: '/robots/robot-23-detective.svg' },
+  { id: 24, name: 'Musician Bot', src: '/robots/robot-24-musician.svg' },
+  { id: 25, name: 'Superhero Bot', src: '/robots/robot-25-superhero.svg' },
+  { id: 26, name: 'Viking Bot', src: '/robots/robot-26-viking.svg' },
+  { id: 27, name: 'Samurai Bot', src: '/robots/robot-27-samurai.svg' },
+  { id: 28, name: 'Explorer Bot', src: '/robots/robot-28-explorer.svg' },
+  { id: 29, name: 'Doctor Bot', src: '/robots/robot-29-doctor.svg' },
+  { id: 30, name: 'Disco Bot', src: '/robots/robot-30-disco.svg' },
 ];
 
 /**

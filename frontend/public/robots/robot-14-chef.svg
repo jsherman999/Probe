@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Chef Bot - Cooking robot -->
+  <defs>
+    <linearGradient id="chef-white" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f8fafc"/>
+      <stop offset="100%" style="stop-color:#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="chef-body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#64748b"/>
+      <stop offset="100%" style="stop-color:#475569"/>
+    </linearGradient>
+  </defs>
+  <!-- Chef hat puffs -->
+  <circle cx="35" cy="12" r="10" fill="url(#chef-white)"/>
+  <circle cx="50" cy="8" r="12" fill="url(#chef-white)"/>
+  <circle cx="65" cy="12" r="10" fill="url(#chef-white)"/>
+  <circle cx="42" cy="18" r="8" fill="url(#chef-white)"/>
+  <circle cx="58" cy="18" r="8" fill="url(#chef-white)"/>
+  <!-- Hat base -->
+  <rect x="28" y="22" width="44" height="10" fill="url(#chef-white)"/>
+  <!-- Head -->
+  <rect x="25" y="32" width="50" height="38" rx="8" fill="url(#chef-body)"/>
+  <!-- Happy eyes -->
+  <ellipse cx="38" cy="48" rx="8" ry="10" fill="white"/>
+  <ellipse cx="62" cy="48" rx="8" ry="10" fill="white"/>
+  <circle cx="38" cy="50" r="4" fill="#1e293b"/>
+  <circle cx="62" cy="50" r="4" fill="#1e293b"/>
+  <circle cx="37" cy="49" r="1.5" fill="white"/>
+  <circle cx="61" cy="49" r="1.5" fill="white"/>
+  <!-- Rosy cheeks -->
+  <ellipse cx="28" cy="55" rx="5" ry="3" fill="#fca5a5" opacity="0.6"/>
+  <ellipse cx="72" cy="55" rx="5" ry="3" fill="#fca5a5" opacity="0.6"/>
+  <!-- Happy smile -->
+  <path d="M40 60 Q50 68 60 60" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+  <!-- Body/apron -->
+  <rect x="28" y="72" width="44" height="22" rx="5" fill="url(#chef-white)"/>
+  <!-- Apron pocket -->
+  <rect x="38" y="78" width="24" height="12" rx="2" fill="#cbd5e1"/>
+  <!-- Utensils in pocket -->
+  <rect x="42" y="74" width="3" height="12" rx="1" fill="#94a3b8"/>
+  <rect x="48" y="72" width="4" height="14" rx="1" fill="#94a3b8"/>
+  <circle cx="50" cy="72" r="3" fill="#94a3b8"/>
+  <rect x="55" y="74" width="3" height="12" rx="1" fill="#94a3b8"/>
+</svg>

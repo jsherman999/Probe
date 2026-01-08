@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Disco floor reflection -->
+  <rect x="25" y="90" width="50" height="8" rx="2" fill="url(#discoGradient)"/>
+  <defs>
+    <linearGradient id="discoGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ef4444"/>
+      <stop offset="25%" style="stop-color:#eab308"/>
+      <stop offset="50%" style="stop-color:#22c55e"/>
+      <stop offset="75%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#a855f7"/>
+    </linearGradient>
+  </defs>
+  <!-- Body (sparkly suit) -->
+  <rect x="30" y="48" width="40" height="35" rx="5" fill="#7c3aed"/>
+  <!-- Suit sparkles -->
+  <circle cx="40" cy="55" r="1.5" fill="#fbbf24"/>
+  <circle cx="55" cy="60" r="1.5" fill="#fbbf24"/>
+  <circle cx="45" cy="70" r="1.5" fill="#fbbf24"/>
+  <circle cx="60" cy="75" r="1.5" fill="#fbbf24"/>
+  <circle cx="35" cy="65" r="1.5" fill="#fbbf24"/>
+  <!-- Collar -->
+  <path d="M35 48 L50 58 L65 48" fill="none" stroke="white" stroke-width="3"/>
+  <!-- Head -->
+  <rect x="25" y="15" width="50" height="35" rx="8" fill="#a78bfa"/>
+  <!-- Afro -->
+  <ellipse cx="50" cy="18" rx="28" ry="18" fill="#1e1b4b"/>
+  <circle cx="30" cy="15" r="8" fill="#1e1b4b"/>
+  <circle cx="70" cy="15" r="8" fill="#1e1b4b"/>
+  <circle cx="40" cy="8" r="7" fill="#1e1b4b"/>
+  <circle cx="60" cy="8" r="7" fill="#1e1b4b"/>
+  <circle cx="50" cy="5" r="6" fill="#1e1b4b"/>
+  <!-- Sunglasses -->
+  <rect x="30" y="28" width="16" height="10" rx="3" fill="#1e1b4b"/>
+  <rect x="54" y="28" width="16" height="10" rx="3" fill="#1e1b4b"/>
+  <line x1="46" y1="33" x2="54" y2="33" stroke="#1e1b4b" stroke-width="2"/>
+  <!-- Lens shine -->
+  <line x1="33" y1="30" x2="40" y2="30" stroke="#60a5fa" stroke-width="1"/>
+  <line x1="57" y1="30" x2="64" y2="30" stroke="#60a5fa" stroke-width="1"/>
+  <!-- Big smile -->
+  <path d="M38 42 Q50 52 62 42" fill="white" stroke="#1e1b4b" stroke-width="2"/>
+  <!-- Arms (dancing pose) -->
+  <path d="M20 55 L10 40" stroke="#a78bfa" stroke-width="8" stroke-linecap="round"/>
+  <path d="M80 55 L90 40" stroke="#a78bfa" stroke-width="8" stroke-linecap="round"/>
+  <!-- Hands -->
+  <circle cx="10" cy="40" r="5" fill="#a78bfa"/>
+  <circle cx="90" cy="40" r="5" fill="#a78bfa"/>
+  <!-- Legs (dance stance) -->
+  <rect x="33" y="83" width="12" height="14" rx="3" fill="#7c3aed" transform="rotate(-10 39 90)"/>
+  <rect x="55" y="83" width="12" height="14" rx="3" fill="#7c3aed" transform="rotate(10 61 90)"/>
+  <!-- Platform shoes -->
+  <rect x="30" y="93" width="16" height="6" rx="2" fill="#fbbf24"/>
+  <rect x="54" y="93" width="16" height="6" rx="2" fill="#fbbf24"/>
+  <!-- Sparkles around -->
+  <polygon points="15,60 17,63 20,63 18,66 19,70 15,67 11,70 12,66 10,63 13,63" fill="#fbbf24"/>
+  <polygon points="85,55 87,58 90,58 88,61 89,65 85,62 81,65 82,61 80,58 83,58" fill="#ec4899"/>
+</svg>
