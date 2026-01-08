@@ -41,6 +41,7 @@ const BotPresetSchema = z.object({
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
   provider: z.enum(['ollama', 'openrouter']).optional().default('ollama'),
   personality: z.string().max(500).optional(),
+  iconSvg: z.string().optional(), // Custom SVG icon from robot generator
   ollamaConfig: z.object({
     temperature: z.number().min(0).max(2).optional(),
     top_p: z.number().min(0).max(1).optional(),
@@ -50,6 +51,9 @@ const BotPresetSchema = z.object({
     seed: z.number().optional(),
   }).optional(),
 });
+
+// Robot SVG Generator API base URL
+const ROBOT_API_URL = process.env.ROBOT_API_URL || 'http://localhost:9009';
 
 // ============================================================================
 // Ollama Status & Models
@@ -161,6 +165,68 @@ router.post('/ollama/pull', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
+// Robot Icon Generator (proxy to port 9009)
+// ============================================================================
+
+/**
+ * GET /api/bot/robot-icon
+ * Generate a single random robot SVG icon
+ */
+router.get('/robot-icon', async (req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${ROBOT_API_URL}/bot`);
+    if (!response.ok) {
+      throw new Error(`Robot API returned ${response.status}`);
+    }
+    const svg = await response.text();
+    res.type('image/svg+xml').send(svg);
+  } catch (error: any) {
+    res.status(503).json({
+      error: 'Robot icon generator unavailable',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/bot/robot-icons?count=N
+ * Generate multiple random robot SVG icons as JSON array
+ */
+router.get('/robot-icons', async (req: Request, res: Response) => {
+  try {
+    const count = Math.min(Math.max(parseInt(req.query.count as string) || 5, 1), 20);
+    const response = await fetch(`${ROBOT_API_URL}/bots/json?count=${count}`);
+    if (!response.ok) {
+      throw new Error(`Robot API returned ${response.status}`);
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (error: any) {
+    res.status(503).json({
+      error: 'Robot icon generator unavailable',
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/bot/robot-icon/health
+ * Check if robot icon generator is available
+ */
+router.get('/robot-icon/health', async (req: Request, res: Response) => {
+  try {
+    const response = await fetch(`${ROBOT_API_URL}/health`);
+    if (!response.ok) {
+      throw new Error(`Robot API returned ${response.status}`);
+    }
+    const data = await response.json();
+    res.json({ available: true, ...data });
+  } catch (error: any) {
+    res.json({ available: false, error: error.message });
+  }
+});
+
+// ============================================================================
 // Bot Presets (Saved Configurations)
 // ============================================================================
 
@@ -222,6 +288,7 @@ router.post('/presets', async (req: Request, res: Response) => {
         difficulty: data.difficulty,
         provider: data.provider || 'ollama',
         personality: data.personality,
+        iconSvg: data.iconSvg,
         ollamaConfig: data.ollamaConfig || {},
       },
     });
@@ -266,6 +333,7 @@ router.put('/presets/:id', async (req: Request, res: Response) => {
         difficulty: data.difficulty,
         provider: data.provider,
         personality: data.personality,
+        iconSvg: data.iconSvg,
         ollamaConfig: data.ollamaConfig,
       },
     });

@@ -5,6 +5,7 @@ import Lobby from './pages/Lobby';
 import Game from './pages/Game';
 import GameHistory from './pages/GameHistory';
 import AIStats from './pages/AIStats';
+import BotCreator from './pages/BotCreator';
 import Login from './pages/Login';
 import { useAppSelector, useAppDispatch } from './store/hooks';
 import { logout, updateToken } from './store/slices/authSlice';
@@ -70,6 +71,7 @@ function App() {
         <Route path="/history" element={<GameHistory />} />
         <Route path="/history/:roomCode" element={<GameHistory />} />
         <Route path="/ai-stats" element={<AIStats />} />
+        <Route path="/bot-creator" element={<BotCreator />} />
       </Routes>
     </div>
   );

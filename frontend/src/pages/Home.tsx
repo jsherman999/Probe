@@ -365,7 +365,7 @@ export default function Home() {
           )}
         </div>
 
-        <div className="flex justify-center gap-6">
+        <div className="flex justify-center gap-6 flex-wrap">
           <Link
             to="/history"
             className="text-text-secondary hover:text-accent transition-colors"
@@ -377,6 +377,12 @@ export default function Home() {
             className="text-text-secondary hover:text-accent transition-colors"
           >
             AI Stats &rarr;
+          </Link>
+          <Link
+            to="/bot-creator"
+            className="text-text-secondary hover:text-accent transition-colors"
+          >
+            Bot Creator &rarr;
           </Link>
         </div>
 

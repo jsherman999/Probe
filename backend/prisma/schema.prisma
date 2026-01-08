@@ -61,6 +61,7 @@ model GamePlayer {
   backPadding       Int      @default(0) // Number of blanks at back
   revealedPositions Json     @default("[]")
   missedLetters     String[] @default([]) // Letters guessed incorrectly against this player
+  guessedWords      String[] @default([]) // Words guessed against this player (correct or incorrect)
   totalScore        Int      @default(0)
   isEliminated      Boolean  @default(false)
   joinedAt          DateTime @default(now())
@@ -125,6 +126,7 @@ model BotPreset {
   provider     String   @default("ollama") // ollama or openrouter
   personality  String?  // Optional personality prompt
   ollamaConfig Json     @default("{}") // OllamaGenerateOptions as JSON
+  iconSvg      String?  // Custom SVG icon for the bot (from robot generator API)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

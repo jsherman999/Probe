@@ -3,8 +3,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useOllama } from '../hooks/useOllama';
-import { BotConfig, getBotPresets, BotPreset, LLMProvider } from '../services/botApi';
+import { useNavigate } from 'react-router-dom';
+import { useOllama, generateBotNameFromModel } from '../hooks/useOllama';
+import { BotConfig, getBotPresets, BotPreset } from '../services/botApi';
 import Modal from './Modal';
 
 interface BotConfigModalProps {
@@ -14,9 +15,10 @@ interface BotConfigModalProps {
 }
 
 export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModalProps) {
-  const { models, isLoading, error, refresh, provider, setProvider } = useOllama();
+  const navigate = useNavigate();
+  const { combinedModels, isLoading, error, refresh, getProviderForModel } = useOllama();
 
-  const [displayName, setDisplayName] = useState('Bot Player');
+  const [displayName, setDisplayName] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -24,6 +26,7 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
   const [personality, setPersonality] = useState('');
   const [presets, setPresets] = useState<BotPreset[]>([]);
   const [selectedPreset, setSelectedPreset] = useState<string>('');
+  const [selectedPresetIcon, setSelectedPresetIcon] = useState<string | null>(null);
 
   // Load presets on mount
   useEffect(() => {
@@ -34,12 +37,28 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
     }
   }, [isOpen]);
 
-  // Auto-select first model if available
+  // Helper to get full model string with size for name generation
+  const getModelWithSize = (modelName: string): string => {
+    const model = combinedModels.find(m => m.name === modelName);
+    return model ? `${model.name} (${model.sizeFormatted})` : modelName;
+  };
+
+  // Auto-select first model if available and set default name
   useEffect(() => {
-    if (models.length > 0 && !selectedModel) {
-      setSelectedModel(models[0].name);
+    if (combinedModels.length > 0 && !selectedModel) {
+      const firstModel = combinedModels[0];
+      setSelectedModel(firstModel.name);
+      setDisplayName(generateBotNameFromModel(`${firstModel.name} (${firstModel.sizeFormatted})`));
     }
-  }, [models, selectedModel]);
+  }, [combinedModels, selectedModel]);
+
+  // Handle model selection change - always generate new name
+  const handleModelChange = (modelName: string) => {
+    setSelectedModel(modelName);
+    if (modelName) {
+      setDisplayName(generateBotNameFromModel(getModelWithSize(modelName)));
+    }
+  };
 
   // Load preset values when selected
   const handlePresetSelect = (presetId: string) => {
@@ -51,14 +70,18 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
       setDifficulty(preset.difficulty as 'easy' | 'medium' | 'hard');
       setPersonality(preset.personality || '');
       setTemperature(preset.ollamaConfig?.temperature || 0.7);
+      setSelectedPresetIcon(preset.iconSvg || null);
+    } else {
+      setSelectedPresetIcon(null);
     }
   };
 
   const handleSubmit = () => {
     if (!selectedModel) return;
 
+    const provider = getProviderForModel(selectedModel);
     const config: BotConfig = {
-      displayName: displayName.trim() || 'Bot Player',
+      displayName: displayName.trim() || generateBotNameFromModel(selectedModel),
       modelName: selectedModel,
       difficulty,
       provider,
@@ -72,19 +95,21 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
     resetForm();
   };
 
-  const handleProviderChange = (newProvider: LLMProvider) => {
-    setProvider(newProvider);
-    setSelectedModel(''); // Clear model selection when switching providers
-  };
-
   const resetForm = () => {
-    setDisplayName('Bot Player');
-    setSelectedModel(models[0]?.name || '');
+    const firstModel = combinedModels[0];
+    if (firstModel) {
+      setSelectedModel(firstModel.name);
+      setDisplayName(generateBotNameFromModel(`${firstModel.name} (${firstModel.sizeFormatted})`));
+    } else {
+      setSelectedModel('');
+      setDisplayName('');
+    }
     setDifficulty('medium');
     setShowAdvanced(false);
     setTemperature(0.7);
     setPersonality('');
     setSelectedPreset('');
+    setSelectedPresetIcon(null);
   };
 
   const handleClose = () => {
@@ -125,62 +150,29 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
 
         {!isLoading && !error && (
           <>
-            {/* Provider Toggle */}
+            {/* Model Selection - TOP FIELD */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                AI Provider
+                AI Model
               </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleProviderChange('ollama')}
-                  className={`flex-1 py-2 px-3 rounded-md border transition-colors ${
-                    provider === 'ollama'
-                      ? 'bg-blue-500 text-white border-blue-500'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  🖥️ Local (Ollama)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleProviderChange('openrouter')}
-                  className={`flex-1 py-2 px-3 rounded-md border transition-colors ${
-                    provider === 'openrouter'
-                      ? 'bg-purple-500 text-white border-purple-500'
-                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  ☁️ Cloud (OpenRouter)
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {provider === 'ollama'
-                  ? 'Uses local Ollama server for AI responses'
-                  : 'Uses OpenRouter cloud API (free models only)'}
-              </p>
+              <select
+                value={selectedModel}
+                onChange={(e) => handleModelChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a model...</option>
+                {combinedModels.map(model => (
+                  <option key={`${model.provider}-${model.name}`} value={model.name}>
+                    {model.displayLabel}
+                  </option>
+                ))}
+              </select>
+              {combinedModels.length === 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  No models found. Run <code className="bg-gray-100 px-1">ollama pull llama3.2</code> for local models or configure OpenRouter API key.
+                </p>
+              )}
             </div>
-
-            {/* Presets */}
-            {presets.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Load from Preset
-                </label>
-                <select
-                  value={selectedPreset}
-                  onChange={(e) => handlePresetSelect(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Custom Configuration --</option>
-                  {presets.map(preset => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.presetName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             {/* Bot Name */}
             <div>
@@ -191,37 +183,93 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Enter bot name..."
-                maxLength={20}
+                placeholder="Auto-generated from model..."
+                maxLength={50}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Auto-generated from model selection.
+              </p>
             </div>
 
-            {/* Model Selection */}
+            {/* Saved Bots / Presets - Now shown first */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                AI Model
-              </label>
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select a model...</option>
-                {models.map(model => (
-                  <option key={model.name} value={model.name}>
-                    {model.name} ({model.sizeFormatted})
-                  </option>
-                ))}
-              </select>
-              {models.length === 0 && (
-                <p className="text-sm text-gray-500 mt-1">
-                  {provider === 'ollama'
-                    ? <>No models found. Run <code className="bg-gray-100 px-1">ollama pull llama3.2</code> to download a model.</>
-                    : 'No free models available from OpenRouter.'}
-                </p>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  {presets.length > 0 ? 'Quick Add Saved Bot' : 'Saved Bots'}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleClose();
+                    navigate('/bot-creator');
+                  }}
+                  className="text-xs text-blue-500 hover:text-blue-700"
+                >
+                  + Create New Bot
+                </button>
+              </div>
+              {presets.length > 0 ? (
+                <div className="space-y-2 max-h-40 overflow-y-auto mb-2">
+                  {presets.map(preset => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handlePresetSelect(preset.id)}
+                      className={`w-full flex items-center gap-3 p-2 rounded-md border transition-colors text-left ${
+                        selectedPreset === preset.id
+                          ? 'bg-blue-50 border-blue-500'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {/* Icon */}
+                      <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                        {preset.iconSvg ? (
+                          <div
+                            className="w-6 h-6"
+                            dangerouslySetInnerHTML={{ __html: preset.iconSvg }}
+                          />
+                        ) : (
+                          <span className="text-lg">🤖</span>
+                        )}
+                      </div>
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{preset.displayName}</div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {preset.difficulty} · {preset.modelName.split(':')[0]}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 py-2">
+                  No saved bots. <button
+                    type="button"
+                    onClick={() => {
+                      handleClose();
+                      navigate('/bot-creator');
+                    }}
+                    className="text-blue-500 hover:underline"
+                  >
+                    Create one
+                  </button> to quickly add bots to games.
+                </div>
               )}
             </div>
+
+            {/* Divider */}
+            {presets.length > 0 && (
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-2 text-gray-500">or configure manually</span>
+                </div>
+              </div>
+            )}
 
             {/* Difficulty */}
             <div>

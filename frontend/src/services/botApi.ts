@@ -38,7 +38,9 @@ export interface BotPreset {
   displayName: string;
   modelName: string;
   difficulty: string;
+  provider?: string;
   personality?: string;
+  iconSvg?: string;
   ollamaConfig: Record<string, any>;
   createdAt: string;
   updatedAt: string;
@@ -141,5 +143,37 @@ export async function getBotStats(): Promise<{
   ollamaAvailable: boolean;
 }> {
   const response = await api.get('/bot/stats');
+  return response.data;
+}
+
+// ============================================================================
+// Robot Icon Generator API
+// ============================================================================
+
+/**
+ * Generate a single random robot SVG icon
+ */
+export async function generateRobotIcon(): Promise<string> {
+  const response = await api.get('/bot/robot-icon', {
+    responseType: 'text',
+  });
+  return response.data;
+}
+
+/**
+ * Generate multiple random robot SVG icons
+ */
+export async function generateRobotIcons(count: number = 5): Promise<string[]> {
+  const response = await api.get('/bot/robot-icons', {
+    params: { count: Math.min(Math.max(count, 1), 20) },
+  });
+  return response.data.bots;
+}
+
+/**
+ * Check if robot icon generator is available
+ */
+export async function checkRobotIconHealth(): Promise<{ available: boolean; error?: string }> {
+  const response = await api.get('/bot/robot-icon/health');
   return response.data;
 }
