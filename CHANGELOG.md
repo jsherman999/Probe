@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Eliminated Player Targeting**: Turn advancement now properly skips eliminated players
+  - `handleTurnTimeout` in GameManager now filters for active players before advancing
+  - Prevents game from continuing to target eliminated players
+- **Bot Expose Card Auto-Selection**: Bots now properly auto-expose when a human draws an expose card
+  - Added `handlePendingExposeCard` helper function for game start and turn changes
+  - Bot automatically selects a random unrevealed position when affected by expose card
+- **Bot Letter Parsing**: Improved LLM response parsing for letter guesses
+  - Now handles responses with whitespace like `"  D"` correctly
+  - Better extraction of single letters from verbose responses (e.g., "I guess D", "The letter is D")
+
+### Changed
+- **UI Letter Tiles**: Removed horizontal scroll in favor of dynamic tile sizing
+  - Tiles now shrink based on word length to fit on one line
+  - Updated main game view, blank selection modal, duplicate selection modal, and expose selection modal
+  - Progressive sizing: larger tiles for short words, smaller for longer words (up to 12 letters)
+
 ## [0.7.0] - 2025-01-04 - Phase 8: Observer Mode
 
 ### Added

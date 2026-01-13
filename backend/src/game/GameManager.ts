@@ -38,6 +38,34 @@ interface ViewerGuess {
   submittedAt: Date;
 }
 
+// Turn card types and their probabilities
+interface TurnCard {
+  type: string;
+  label: string;
+  probability: number;
+  multiplier?: number;
+}
+
+const TURN_CARDS: TurnCard[] = [
+  { type: 'normal', label: 'Take your normal turn', probability: 60 },
+  { type: 'additional', label: 'Take an additional turn', probability: 5 },
+  { type: 'expose_left', label: 'Player on your left exposes a letter', probability: 5 },
+  { type: 'expose_right', label: 'Player on your right exposes a letter', probability: 5 },
+  { type: 'bonus_20', label: 'Add 20 to your score', probability: 5 },
+  { type: 'double', label: 'Double the value of your first guess', probability: 5, multiplier: 2 },
+  { type: 'triple', label: 'Triple the value of your first guess', probability: 5, multiplier: 3 },
+  { type: 'quadruple', label: 'Quadruple the value of your first guess', probability: 5, multiplier: 4 },
+  { type: 'quintuple', label: 'Quintuple the value of your first guess', probability: 5, multiplier: 5 },
+];
+
+export interface TurnCardInfo {
+  type: string;
+  label: string;
+  multiplier?: number;
+  affectedPlayerId?: string;
+  affectedPlayerName?: string;
+}
+
 export class GameManager {
   private wordValidator: WordValidator;
   private scoringEngine: ScoringEngine;
@@ -48,6 +76,65 @@ export class GameManager {
     this.wordValidator = new WordValidator();
     this.scoringEngine = new ScoringEngine();
     this.wordValidator.loadDictionary();
+  }
+
+  // Draw a random turn card based on weighted probabilities
+  private drawTurnCard(): TurnCard {
+    const totalWeight = TURN_CARDS.reduce((sum, card) => sum + card.probability, 0);
+    let random = Math.random() * totalWeight;
+
+    for (const card of TURN_CARDS) {
+      random -= card.probability;
+      if (random <= 0) {
+        return card;
+      }
+    }
+
+    // Fallback to normal (shouldn't happen)
+    return TURN_CARDS[0];
+  }
+
+  // Helper to get effective player ID (userId for humans, botId for bots)
+  private getPlayerId(player: { userId: string | null; botId: string | null }): string {
+    return (player.userId ?? player.botId)!;
+  }
+
+  // Helper to get display name (from user for humans, botDisplayName for bots)
+  private getPlayerDisplayName(player: { user?: { displayName: string } | null; botDisplayName?: string | null }): string {
+    return player.user?.displayName ?? player.botDisplayName ?? 'Unknown';
+  }
+
+  // Get adjacent player in turn order
+  // direction: 'left' = next player, 'right' = previous player
+  private getAdjacentPlayer(
+    players: any[],
+    currentPlayerId: string,
+    direction: 'left' | 'right'
+  ): { playerId: string; displayName: string } | null {
+    // Filter to only active players and sort by turn order
+    const activePlayers = players
+      .filter(p => !p.isEliminated)
+      .sort((a, b) => a.turnOrder - b.turnOrder);
+
+    if (activePlayers.length < 2) return null;
+
+    const currentIndex = activePlayers.findIndex(p => this.getPlayerId(p) === currentPlayerId);
+    if (currentIndex === -1) return null;
+
+    let targetIndex: number;
+    if (direction === 'left') {
+      // Next player in turn order (wraps around)
+      targetIndex = (currentIndex + 1) % activePlayers.length;
+    } else {
+      // Previous player in turn order (wraps around)
+      targetIndex = (currentIndex - 1 + activePlayers.length) % activePlayers.length;
+    }
+
+    const targetPlayer = activePlayers[targetIndex];
+    return {
+      playerId: this.getPlayerId(targetPlayer),
+      displayName: this.getPlayerDisplayName(targetPlayer),
+    };
   }
 
   private generateRoomCode(username: string): string {
@@ -244,17 +331,18 @@ export class GameManager {
           },
         });
 
-        // Record results
+        // Record results (only for human players)
         const allPlayers = await prisma.gamePlayer.findMany({
           where: { gameId: game.id },
         });
         const sortedPlayers = [...allPlayers].sort((a, b) => b.totalScore - a.totalScore);
+        const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
         await Promise.all(
-          sortedPlayers.map(async (p, index) =>
+          humanPlayers.map(async (p, index) =>
             prisma.gameResult.create({
               data: {
                 gameId: game.id,
-                playerId: p.userId,
+                playerId: p.userId!,
                 finalScore: p.totalScore,
                 placement: index + 1,
               },
@@ -287,7 +375,7 @@ export class GameManager {
         await prisma.game.update({
           where: { id: game.id },
           data: {
-            currentTurnPlayerId: nextPlayer.userId,
+            currentTurnPlayerId: nextPlayer.userId || nextPlayer.botId,
             currentTurnStartedAt: new Date(),
           },
         });
@@ -334,14 +422,15 @@ export class GameManager {
       },
     });
 
-    // Record results based on current scores
+    // Record results based on current scores (only for human players)
     const sortedPlayers = [...game.players].sort((a, b) => b.totalScore - a.totalScore);
+    const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
     await Promise.all(
-      sortedPlayers.map(async (p, index) =>
+      humanPlayers.map(async (p, index) =>
         prisma.gameResult.create({
           data: {
             gameId: game.id,
-            playerId: p.userId,
+            playerId: p.userId!,
             finalScore: p.totalScore,
             placement: index + 1,
           },
@@ -446,7 +535,8 @@ export class GameManager {
       throw new Error('Not in word selection phase');
     }
 
-    const player = game.players.find(p => p.userId === userId);
+    // Find player by userId or botId (userId parameter may be a botId)
+    const player = game.players.find(p => p.userId === userId || p.botId === userId);
     if (!player) {
       throw new Error('Not in this game');
     }
@@ -480,14 +570,46 @@ export class GameManager {
     const allReady = updatedPlayers.every(p => p.secretWord !== null);
 
     if (allReady) {
-      // Start the game
+      // Draw initial turn card for the first player
+      const initialCard = this.drawTurnCard();
+      let pendingExposePlayerId: string | null = null;
+
+      // Handle expose cards for initial player - first player could be human or bot
+      const sortedPlayers = [...updatedPlayers].sort((a, b) => a.turnOrder - b.turnOrder);
+      const firstPlayer = sortedPlayers[0];
+      const firstPlayerId = firstPlayer.userId || firstPlayer.botId;
+
+      if (initialCard.type === 'expose_left' || initialCard.type === 'expose_right') {
+        const direction = initialCard.type === 'expose_left' ? 'left' : 'right';
+        const firstIndex = 0;
+        const targetIndex = direction === 'left'
+          ? (firstIndex + 1) % sortedPlayers.length
+          : (firstIndex - 1 + sortedPlayers.length) % sortedPlayers.length;
+        pendingExposePlayerId = sortedPlayers[targetIndex].userId || sortedPlayers[targetIndex].botId;
+      }
+
+      // Handle bonus_20 for initial player
+      if (initialCard.type === 'bonus_20') {
+        await prisma.gamePlayer.update({
+          where: { id: firstPlayer.id },
+          data: {
+            totalScore: firstPlayer.totalScore + 20,
+          },
+        });
+      }
+
+      // Start the game with initial turn card
       const updatedGame = await prisma.game.update({
         where: { id: game.id },
         data: {
           status: 'ACTIVE',
           startedAt: new Date(),
-          currentTurnPlayerId: updatedPlayers[0].userId,
+          currentTurnPlayerId: firstPlayerId,
           currentTurnStartedAt: new Date(),
+          currentTurnCard: initialCard.type,
+          turnCardMultiplier: initialCard.multiplier || 1,
+          turnCardUsed: false,
+          pendingExposePlayerId,
         },
         include: {
           players: {
@@ -542,11 +664,19 @@ export class GameManager {
       throw new Error('Game not active');
     }
 
-    if (game.currentTurnPlayerId !== playerId) {
+    // playerId could be userId or botId
+    const currentPlayer = game.players.find(p => p.userId === playerId || p.botId === playerId);
+    if (!currentPlayer) {
+      throw new Error('Player not in game');
+    }
+
+    const currentPlayerId = currentPlayer.userId || currentPlayer.botId;
+    if (game.currentTurnPlayerId !== currentPlayerId) {
       throw new Error('Not your turn');
     }
 
-    const targetPlayer = game.players.find(p => p.userId === targetPlayerId);
+    // targetPlayerId could be userId or botId
+    const targetPlayer = game.players.find(p => p.userId === targetPlayerId || p.botId === targetPlayerId);
     if (!targetPlayer || targetPlayer.isEliminated) {
       throw new Error('Invalid target player');
     }
@@ -571,30 +701,45 @@ export class GameManager {
     let pointsScored = 0;
     let blankMissPenalty = false;
 
-    // If BLANK guess with multiple unrevealed blanks, require target player to choose
+    // If BLANK guess with multiple unrevealed blanks, auto-select based on position:
+    // - Back blanks (after the word): expose from rightmost to leftmost
+    // - Front blanks (before the word): expose from leftmost to rightmost (only after all back blanks done)
     if (isBlankGuess && positions.length > 1) {
-      return {
-        blankSelectionRequired: true,
-        positions,
-        targetPlayerId,
-        guessingPlayerId: playerId,
-        roomCode,
-        letter,
-      };
+      const frontPadding = targetPlayer.frontPadding || 0;
+      const backPadding = targetPlayer.backPadding || 0;
+      const wordLength = word.length;
+
+      // Separate unrevealed blanks into front and back
+      const frontBlankPositions = positions.filter(p => p < frontPadding);
+      const backBlankPositions = positions.filter(p => p >= wordLength - backPadding);
+
+      let selectedPosition: number;
+      if (backBlankPositions.length > 0) {
+        // Pick rightmost back blank (highest index)
+        selectedPosition = Math.max(...backBlankPositions);
+        console.log(`🎲 Multiple blanks - back blanks available at ${backBlankPositions.join(',')} - selecting rightmost: ${selectedPosition}`);
+      } else if (frontBlankPositions.length > 0) {
+        // Pick leftmost front blank (lowest index)
+        selectedPosition = Math.min(...frontBlankPositions);
+        console.log(`🎲 Multiple blanks - only front blanks at ${frontBlankPositions.join(',')} - selecting leftmost: ${selectedPosition}`);
+      } else {
+        // Fallback to rightmost (shouldn't happen)
+        selectedPosition = Math.max(...positions);
+        console.log(`🎲 Multiple blanks at positions ${positions.join(',')} - fallback to rightmost: ${selectedPosition}`);
+      }
+
+      // Filter positions to only the selected one
+      positions.splice(0, positions.length, selectedPosition);
     }
 
     // If regular letter guess with multiple unrevealed positions (duplicate letters),
-    // require target player to choose which one to reveal
+    // auto-select one randomly
     if (!isBlankGuess && positions.length > 1) {
-      console.log(`🔀 Duplicate letter "${letter}" found at positions ${positions.join(',')} - requiring target to choose`);
-      return {
-        duplicateSelectionRequired: true,
-        positions,
-        targetPlayerId,
-        guessingPlayerId: playerId,
-        roomCode,
-        letter,
-      };
+      const randomIndex = Math.floor(Math.random() * positions.length);
+      const selectedPosition = positions[randomIndex];
+      console.log(`🎲 Duplicate letter "${letter}" found at positions ${positions.join(',')} - auto-selected random: ${selectedPosition}`);
+      // Filter positions to only the selected one
+      positions.splice(0, positions.length, selectedPosition);
     }
 
     // Penalty for guessing BLANK when no blanks are available
@@ -603,12 +748,11 @@ export class GameManager {
       pointsScored = -50;
 
       // Deduct points from the guessing player
-      const guessingPlayer = game.players.find(p => p.userId === playerId);
-      if (guessingPlayer) {
+      if (currentPlayer) {
         await prisma.gamePlayer.update({
-          where: { id: guessingPlayer.id },
+          where: { id: currentPlayer.id },
           data: {
-            totalScore: guessingPlayer.totalScore - 50, // Allow negative scores
+            totalScore: currentPlayer.totalScore - 50, // Allow negative scores
           },
         });
       }
@@ -622,40 +766,77 @@ export class GameManager {
       });
 
       // Calculate score based on position (5, 10, 15 pattern)
-      // Blanks score 0 points
       const isBlankPosition = (pos: number) => word[pos] === this.BLANK_CHAR;
-      pointsScored = this.scoringEngine.calculateScore(positions, isBlankPosition);
+      let basePoints = this.scoringEngine.calculateScore(positions, isBlankPosition);
+
+      // Apply turn card multiplier for the first successful hit
+      let multiplierApplied = false;
+      console.log(`🎴 ==================== MULTIPLIER CHECK ====================`);
+      console.log(`🎴 Base points: ${basePoints}`);
+      console.log(`🎴 Turn card: ${game.currentTurnCard}`);
+      console.log(`🎴 Turn card multiplier: ${game.turnCardMultiplier} (type: ${typeof game.turnCardMultiplier})`);
+      console.log(`🎴 Turn card used: ${game.turnCardUsed} (type: ${typeof game.turnCardUsed})`);
+      console.log(`🎴 Condition check: basePoints > 0 = ${basePoints > 0}, multiplier > 1 = ${game.turnCardMultiplier > 1}, !used = ${!game.turnCardUsed}`);
+
+      if (basePoints > 0 && game.turnCardMultiplier > 1 && !game.turnCardUsed) {
+        pointsScored = basePoints * game.turnCardMultiplier;
+        multiplierApplied = true;
+        console.log(`🎴 ✅ Multiplier x${game.turnCardMultiplier} APPLIED: ${basePoints} * ${game.turnCardMultiplier} = ${pointsScored}`);
+      } else {
+        pointsScored = basePoints;
+        console.log(`🎴 ❌ Multiplier NOT applied. Reason: ${basePoints <= 0 ? 'no points' : game.turnCardMultiplier <= 1 ? 'no multiplier card' : 'already used'}`);
+      }
+      console.log(`🎴 ==========================================================`);
+
+      // Check if this guess completed the word (revealed final letter)
+      const wordCompleted = revealedPositions.every(p => p);
+
+      // Award word completion bonus if applicable
+      if (wordCompleted) {
+        const completionBonus = this.scoringEngine.WORD_COMPLETION_BONUS;
+        pointsScored += completionBonus;
+        console.log(`🏆 WORD COMPLETED! Adding ${completionBonus} point bonus (total: ${pointsScored})`);
+      }
 
       // Update target player's revealed positions and elimination status
       await prisma.gamePlayer.update({
         where: { id: targetPlayer.id },
         data: {
           revealedPositions: JSON.stringify(revealedPositions),
-          isEliminated: revealedPositions.every(p => p),
+          isEliminated: wordCompleted,
         },
       });
 
       // Award points to the GUESSING player (not the target)
       if (pointsScored > 0) {
-        const guessingPlayer = game.players.find(p => p.userId === playerId);
-        if (guessingPlayer) {
-          console.log(`💰 Awarding ${pointsScored} points to GUESSING player ${playerId} (was ${guessingPlayer.totalScore}, now ${guessingPlayer.totalScore + pointsScored})`);
+        if (currentPlayer) {
+          console.log(`💰 Awarding ${pointsScored} points to GUESSING player ${playerId} (was ${currentPlayer.totalScore}, now ${currentPlayer.totalScore + pointsScored})`);
           await prisma.gamePlayer.update({
-            where: { id: guessingPlayer.id },
+            where: { id: currentPlayer.id },
             data: {
-              totalScore: guessingPlayer.totalScore + pointsScored,
+              totalScore: currentPlayer.totalScore + pointsScored,
             },
           });
         }
       }
+
+      // Mark turn card as used after first successful hit (for multiplier cards)
+      // Also reset currentTurnStartedAt so frontend timer resets for continued turn
+      await prisma.game.update({
+        where: { id: game.id },
+        data: {
+          ...(multiplierApplied ? { turnCardUsed: true } : {}),
+          currentTurnStartedAt: new Date(), // Reset timer for continued turn
+        },
+      });
     }
 
     // Record turn
     await prisma.gameTurn.create({
       data: {
         gameId: game.id,
-        playerId,
-        targetPlayerId,
+        playerId: currentPlayer.id,
+        targetPlayerId: targetPlayer.id,
         guessedLetter: letter,
         isCorrect,
         positionsRevealed: positions,
@@ -663,6 +844,10 @@ export class GameManager {
         turnNumber: game.roundNumber,
       },
     });
+
+    // Track whether turn is changing to a new player
+    let turnCardInfo: TurnCardInfo | null = null;
+    let nextTurnPlayerId = playerId; // Default: player keeps turn on hit
 
     // If incorrect, advance turn and track missed letter
     if (!isCorrect) {
@@ -677,17 +862,94 @@ export class GameManager {
         });
       }
 
-      const currentIndex = game.players.findIndex(p => p.userId === playerId);
-      const nextIndex = (currentIndex + 1) % game.players.length;
-      const nextPlayer = game.players[nextIndex];
+      // Check if current player has "additional" turn card that hasn't been used
+      if (game.currentTurnCard === 'additional' && !game.turnCardUsed) {
+        // Player gets to keep their turn despite miss, but card is consumed
+        nextTurnPlayerId = playerId;
+        await prisma.game.update({
+          where: { id: game.id },
+          data: {
+            turnCardUsed: true,
+            currentTurnStartedAt: new Date(),
+          },
+        });
+      } else {
+        // Normal turn transition - find next player
+        // Include ALL players in turn rotation (eliminated players can still guess others' letters)
+        const allPlayers = [...game.players].sort((a, b) => a.turnOrder - b.turnOrder);
 
-      await prisma.game.update({
-        where: { id: game.id },
-        data: {
-          currentTurnPlayerId: nextPlayer.userId,
-          currentTurnStartedAt: new Date(),
-        },
-      });
+        const currentIndex = allPlayers.findIndex(p => this.getPlayerId(p) === playerId);
+        const nextIndex = (currentIndex + 1) % allPlayers.length;
+        const nextPlayer = allPlayers[nextIndex];
+        nextTurnPlayerId = this.getPlayerId(nextPlayer);
+
+        // Draw a turn card for the next player
+        const drawnCard = this.drawTurnCard();
+        let pendingExposePlayerId: string | null = null;
+        let bonusPointsAwarded = 0;
+
+        // Handle expose cards
+        if (drawnCard.type === 'expose_left' || drawnCard.type === 'expose_right') {
+          const direction = drawnCard.type === 'expose_left' ? 'left' : 'right';
+          const affectedPlayer = this.getAdjacentPlayer(game.players, this.getPlayerId(nextPlayer), direction);
+          if (affectedPlayer) {
+            pendingExposePlayerId = affectedPlayer.playerId;
+            turnCardInfo = {
+              type: drawnCard.type,
+              label: drawnCard.label,
+              affectedPlayerId: affectedPlayer.playerId,
+              affectedPlayerName: affectedPlayer.displayName,
+            };
+          } else {
+            // No valid adjacent player, treat as normal turn
+            turnCardInfo = {
+              type: 'normal',
+              label: 'Take your normal turn',
+            };
+          }
+        } else if (drawnCard.type === 'bonus_20') {
+          // Immediately award 20 bonus points (works for both humans and bots)
+          bonusPointsAwarded = 20;
+          const nextPlayerId = this.getPlayerId(nextPlayer);
+          const playerToBonus = game.players.find(p => this.getPlayerId(p) === nextPlayerId);
+          if (playerToBonus) {
+            await prisma.gamePlayer.update({
+              where: { id: playerToBonus.id },
+              data: {
+                totalScore: playerToBonus.totalScore + 20,
+              },
+            });
+            console.log(`🎁 BONUS_20 AWARDED: ${this.getPlayerDisplayName(playerToBonus)} received 20 bonus points`);
+          }
+          turnCardInfo = {
+            type: drawnCard.type,
+            label: drawnCard.label,
+          };
+        } else {
+          turnCardInfo = {
+            type: drawnCard.type,
+            label: drawnCard.label,
+            multiplier: drawnCard.multiplier,
+          };
+        }
+
+        // Log when multiplier card is drawn
+        if (drawnCard.multiplier && drawnCard.multiplier > 1) {
+          console.log(`🎴 MULTIPLIER CARD DRAWN: ${drawnCard.type} (x${drawnCard.multiplier}) for player ${nextPlayer.userId || nextPlayer.botId}`);
+        }
+
+        await prisma.game.update({
+          where: { id: game.id },
+          data: {
+            currentTurnPlayerId: nextPlayer.userId || nextPlayer.botId,
+            currentTurnStartedAt: new Date(),
+            currentTurnCard: drawnCard.type,
+            turnCardMultiplier: drawnCard.multiplier || 1,
+            turnCardUsed: false,
+            pendingExposePlayerId,
+          },
+        });
+      }
     }
 
     // Check if game is over
@@ -695,8 +957,9 @@ export class GameManager {
       where: { gameId: game.id },
     });
 
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {
@@ -708,14 +971,15 @@ export class GameManager {
         },
       });
 
-      // Record results
+      // Record results (only for human players - bots don't have User records)
       const sorted = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sorted.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sorted.map((p, index) =>
+        humanPlayers.map((p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -748,7 +1012,8 @@ export class GameManager {
       wordCompleted: revealedPositions.every(p => p),
       gameOver,
       finalResults,
-      currentTurnPlayerId: isCorrect ? playerId : game.players[(game.players.findIndex(p => p.userId === playerId) + 1) % game.players.length].userId,
+      currentTurnPlayerId: nextTurnPlayerId,
+      turnCardInfo, // Info about the turn card drawn for the next player (or null if hit)
       game: updatedGame, // Include full game state for frontend
     };
   }
@@ -797,10 +1062,10 @@ export class GameManager {
     // Reveal only the selected position
     revealedPositions[selectedPosition] = true;
 
-    // Blanks always score 0 points
-    const pointsScored = 0;
+    // Score blanks like regular letters using position-based scoring
+    const pointsScored = this.scoringEngine.getPositionPoints(selectedPosition);
 
-    // Update player
+    // Update target player
     await prisma.gamePlayer.update({
       where: { id: targetPlayer.id },
       data: {
@@ -809,26 +1074,43 @@ export class GameManager {
       },
     });
 
+    // Award points to the GUESSING player
+    if (pointsScored > 0) {
+      const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
+      if (guessingPlayer) {
+        await prisma.gamePlayer.update({
+          where: { id: guessingPlayer.id },
+          data: {
+            totalScore: guessingPlayer.totalScore + pointsScored,
+          },
+        });
+      }
+    }
+
     // Record turn
-    await prisma.gameTurn.create({
-      data: {
-        gameId: game.id,
-        playerId: guessingPlayerId,
-        targetPlayerId,
-        guessedLetter: 'BLANK',
-        isCorrect: true,
-        positionsRevealed: [selectedPosition],
-        pointsScored,
-        turnNumber: game.roundNumber,
-      },
-    });
+    const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
+    if (guessingPlayer) {
+      await prisma.gameTurn.create({
+        data: {
+          gameId: game.id,
+          playerId: guessingPlayer.id,
+          targetPlayerId: targetPlayer.id,
+          guessedLetter: 'BLANK',
+          isCorrect: true,
+          positionsRevealed: [selectedPosition],
+          pointsScored,
+          turnNumber: game.roundNumber,
+        },
+      });
+    }
 
     // Check for game over - fetch fresh player data after update
     const updatedPlayers = await prisma.gamePlayer.findMany({
       where: { gameId: game.id },
     });
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {
@@ -838,12 +1120,13 @@ export class GameManager {
       });
 
       const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sortedPlayers.map(async (p, index) =>
+        humanPlayers.map(async (p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -938,7 +1221,7 @@ export class GameManager {
 
     // Award points to the GUESSING player
     if (pointsScored > 0) {
-      const guessingPlayer = game.players.find(p => p.userId === guessingPlayerId);
+      const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
       if (guessingPlayer) {
         await prisma.gamePlayer.update({
           where: { id: guessingPlayer.id },
@@ -950,25 +1233,29 @@ export class GameManager {
     }
 
     // Record turn
-    await prisma.gameTurn.create({
-      data: {
-        gameId: game.id,
-        playerId: guessingPlayerId,
-        targetPlayerId,
-        guessedLetter: letter,
-        isCorrect: true,
-        positionsRevealed: [selectedPosition],
-        pointsScored,
-        turnNumber: game.roundNumber,
-      },
-    });
+    const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
+    if (guessingPlayer) {
+      await prisma.gameTurn.create({
+        data: {
+          gameId: game.id,
+          playerId: guessingPlayer.id,
+          targetPlayerId: targetPlayer.id,
+          guessedLetter: letter,
+          isCorrect: true,
+          positionsRevealed: [selectedPosition],
+          pointsScored,
+          turnNumber: game.roundNumber,
+        },
+      });
+    }
 
     // Check for game over
     const updatedPlayers = await prisma.gamePlayer.findMany({
       where: { gameId: game.id },
     });
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {
@@ -978,12 +1265,13 @@ export class GameManager {
       });
 
       const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sortedPlayers.map(async (p, index) =>
+        humanPlayers.map(async (p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -1018,6 +1306,152 @@ export class GameManager {
     };
   }
 
+  // Resolve expose card selection - affected player chooses which of their letters to expose
+  async resolveExposeCard(
+    roomCode: string,
+    affectedPlayerId: string,
+    selectedPosition: number
+  ): Promise<any> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: {
+        players: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    if (!game || game.status !== 'ACTIVE') {
+      throw new Error('Game not active');
+    }
+
+    // Verify this is the player who should be exposing
+    if (game.pendingExposePlayerId !== affectedPlayerId) {
+      throw new Error('Not your expose selection');
+    }
+
+    const affectedPlayer = game.players.find(p => this.getPlayerId(p) === affectedPlayerId);
+    if (!affectedPlayer) {
+      throw new Error('Player not found');
+    }
+
+    // Find the active player who drew the card (they get the points)
+    // Note: currentTurnPlayerId might be a bot
+    const activePlayer = game.players.find(p => this.getPlayerId(p) === game.currentTurnPlayerId);
+
+    const word = affectedPlayer.paddedWord || affectedPlayer.secretWord!;
+    const revealedPositions = JSON.parse(affectedPlayer.revealedPositions as any) as boolean[];
+
+    // Validate the selected position is valid and unrevealed
+    if (selectedPosition < 0 || selectedPosition >= word.length) {
+      throw new Error('Invalid position');
+    }
+    if (revealedPositions[selectedPosition]) {
+      throw new Error('Position already revealed');
+    }
+
+    // Reveal the selected position
+    revealedPositions[selectedPosition] = true;
+
+    // Calculate points for the exposed position (active player gets these points)
+    const pointsScored = this.scoringEngine.getPositionPoints(selectedPosition);
+
+    // Update affected player's revealed positions
+    await prisma.gamePlayer.update({
+      where: { id: affectedPlayer.id },
+      data: {
+        revealedPositions: JSON.stringify(revealedPositions),
+        isEliminated: revealedPositions.every(p => p),
+      },
+    });
+
+    // Get the exposed letter for logging
+    const exposedLetter = word[selectedPosition];
+    const affectedPlayerName = this.getPlayerDisplayName(affectedPlayer);
+
+    // Award points to the active player who drew the expose card
+    if (activePlayer) {
+      await prisma.gamePlayer.update({
+        where: { id: activePlayer.id },
+        data: {
+          totalScore: { increment: pointsScored },
+        },
+      });
+      const activePlayerName = this.getPlayerDisplayName(activePlayer);
+      console.log(`🎴 EXPOSE CARD RESOLVED: ${affectedPlayerName} exposed letter "${exposedLetter}" at position ${selectedPosition}`);
+      console.log(`🎴 ${activePlayerName} earned ${pointsScored} points from the exposed letter`);
+    } else {
+      console.log(`🎴 EXPOSE CARD RESOLVED: ${affectedPlayerName} exposed letter "${exposedLetter}" at position ${selectedPosition}`);
+    }
+
+    // Clear the pending expose selection
+    await prisma.game.update({
+      where: { id: game.id },
+      data: {
+        pendingExposePlayerId: null,
+      },
+    });
+
+    // Check for game over
+    const updatedPlayers = await prisma.gamePlayer.findMany({
+      where: { gameId: game.id },
+    });
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
+
+    let finalResults = null;
+    if (gameOver) {
+      await prisma.game.update({
+        where: { id: game.id },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      });
+
+      const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
+      finalResults = await Promise.all(
+        humanPlayers.map(async (p, index) =>
+          prisma.gameResult.create({
+            data: {
+              gameId: game.id,
+              playerId: p.userId!,
+              finalScore: p.totalScore,
+              placement: index + 1,
+            },
+            include: {
+              player: true,
+            },
+          })
+        )
+      );
+
+      try {
+        await this.archiveGame(game.id);
+      } catch (archiveError) {
+        console.error('Failed to archive game:', archiveError);
+      }
+    }
+
+    const updatedGame = await this.getGameByRoomCode(roomCode);
+
+    return {
+      affectedPlayerId,
+      selectedPosition,
+      revealedLetter: word[selectedPosition],
+      revealedWord: revealedPositions.map((revealed, i) => (revealed ? word[i] : null)),
+      wordCompleted: revealedPositions.every(p => p),
+      gameOver,
+      finalResults,
+      game: updatedGame,
+      // Points info for the active player who drew the expose card
+      pointsScored,
+      activePlayerId: game.currentTurnPlayerId,
+      activePlayerName: activePlayer?.user?.displayName || 'Unknown',
+    };
+  }
+
   // Process a full word guess attempt ("Guess Now!" feature)
   async processWordGuess(
     roomCode: string,
@@ -1042,12 +1476,12 @@ export class GameManager {
       throw new Error('Game not active');
     }
 
-    const targetPlayer = game.players.find(p => p.userId === targetPlayerId);
+    const targetPlayer = game.players.find(p => this.getPlayerId(p) === targetPlayerId);
     if (!targetPlayer || targetPlayer.isEliminated) {
       throw new Error('Invalid target player');
     }
 
-    const guessingPlayer = game.players.find(p => p.userId === guessingPlayerId);
+    const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
     if (!guessingPlayer) {
       throw new Error('Guessing player not found');
     }
@@ -1065,8 +1499,24 @@ export class GameManager {
 
     let pointsChange = 0;
     if (isCorrect) {
-      // Correct guess: +100 if 5+ unrevealed, +50 otherwise
-      pointsChange = unrevealedCount >= 5 ? 100 : 50;
+      // Base bonus: +100 if 5+ unrevealed, +50 otherwise
+      const baseBonus = unrevealedCount >= 5 ? 100 : 50;
+
+      // Calculate value of all unexposed positions (including blanks)
+      const unrevealedPositions: number[] = [];
+      for (let i = 0; i < paddedWord.length; i++) {
+        if (!revealedPositions[i]) {
+          unrevealedPositions.push(i);
+        }
+      }
+
+      const unrevealedPositionsValue = this.scoringEngine.calculateScore(unrevealedPositions);
+      pointsChange = baseBonus + unrevealedPositionsValue;
+
+      console.log(`🎯 WORD GUESS CORRECT!`);
+      console.log(`   Base bonus: ${baseBonus} points (${unrevealedCount} unrevealed)`);
+      console.log(`   Unrevealed positions (letters + blanks): ${unrevealedPositions.length} = ${unrevealedPositionsValue} points`);
+      console.log(`   Total award: ${pointsChange} points`);
 
       // Reveal all positions and eliminate the target
       const allRevealed = new Array(paddedWord.length).fill(true);
@@ -1080,6 +1530,7 @@ export class GameManager {
     } else {
       // Incorrect guess: -50 points
       pointsChange = -50;
+      console.log(`❌ WORD GUESS INCORRECT: ${guessedWord} != ${actualWord} (-50 points)`);
     }
 
     // Update guessing player's score
@@ -1092,7 +1543,7 @@ export class GameManager {
 
     // If wrong guess, advance to next player's turn
     if (!isCorrect) {
-      const currentIndex = game.players.findIndex(p => p.userId === guessingPlayerId);
+      const currentIndex = game.players.findIndex(p => this.getPlayerId(p) === guessingPlayerId);
       let nextIndex = (currentIndex + 1) % game.players.length;
 
       // Skip eliminated players
@@ -1104,11 +1555,12 @@ export class GameManager {
       }
 
       const nextPlayer = game.players[nextIndex];
+      const nextPlayerId = this.getPlayerId(nextPlayer);
 
       await prisma.game.update({
         where: { id: game.id },
         data: {
-          currentTurnPlayerId: nextPlayer.userId,
+          currentTurnPlayerId: nextPlayerId,
           currentTurnStartedAt: new Date(),
         },
       });
@@ -1118,8 +1570,8 @@ export class GameManager {
     await prisma.gameTurn.create({
       data: {
         gameId: game.id,
-        playerId: guessingPlayerId,
-        targetPlayerId,
+        playerId: guessingPlayer.id,
+        targetPlayerId: targetPlayer.id,
         guessedLetter: `WORD:${guessedWord}`,
         isCorrect,
         positionsRevealed: isCorrect ? Array.from({ length: paddedWord.length }, (_, i) => i) : [],
@@ -1133,8 +1585,9 @@ export class GameManager {
       where: { gameId: game.id },
     });
 
-    const activePlayers = updatedPlayers.filter(p => !p.isEliminated);
-    const gameOver = activePlayers.length <= 1;
+    const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
+    // Game ends when ALL words are revealed (no targetable players remain)
+    const gameOver = playersWithUnrevealedWords.length === 0;
 
     let finalResults = null;
     if (gameOver) {
@@ -1147,12 +1600,13 @@ export class GameManager {
       });
 
       const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
+      const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
       finalResults = await Promise.all(
-        sortedPlayers.map(async (p, index) =>
+        humanPlayers.map(async (p, index) =>
           prisma.gameResult.create({
             data: {
               gameId: game.id,
-              playerId: p.userId,
+              playerId: p.userId!,
               finalScore: p.totalScore,
               placement: index + 1,
             },
@@ -1203,20 +1657,39 @@ export class GameManager {
     }
 
     // Find the player whose turn timed out
-    const timedOutPlayer = game.players.find(p => p.userId === game.currentTurnPlayerId);
+    const timedOutPlayer = game.players.find(p => this.getPlayerId(p) === game.currentTurnPlayerId);
     if (!timedOutPlayer) {
       throw new Error('Current player not found');
     }
 
-    // Advance to the next player
-    const currentIndex = game.players.findIndex(p => p.userId === game.currentTurnPlayerId);
-    const nextIndex = (currentIndex + 1) % game.players.length;
-    const nextPlayer = game.players[nextIndex];
+    // Get active (non-eliminated) players sorted by turn order
+    const activePlayers = game.players
+      .filter(p => !p.isEliminated)
+      .sort((a, b) => a.turnOrder - b.turnOrder);
+
+    // If only one active player remains, game should be over
+    if (activePlayers.length <= 1) {
+      throw new Error('Game should be over - only one active player');
+    }
+
+    // Find current player's position among active players
+    const currentActiveIndex = activePlayers.findIndex(p => this.getPlayerId(p) === game.currentTurnPlayerId);
+
+    // If current player is eliminated (shouldn't happen but handle it), start from first active player
+    let nextActiveIndex: number;
+    if (currentActiveIndex === -1) {
+      nextActiveIndex = 0;
+    } else {
+      nextActiveIndex = (currentActiveIndex + 1) % activePlayers.length;
+    }
+
+    const nextPlayer = activePlayers[nextActiveIndex];
+    const nextPlayerId = this.getPlayerId(nextPlayer);
 
     await prisma.game.update({
       where: { id: game.id },
       data: {
-        currentTurnPlayerId: nextPlayer.userId,
+        currentTurnPlayerId: nextPlayerId,
         currentTurnStartedAt: new Date(),
       },
     });
@@ -1224,10 +1697,10 @@ export class GameManager {
     const updatedGame = await this.getGameByRoomCode(roomCode);
 
     return {
-      timedOutPlayerId: timedOutPlayer.userId,
-      timedOutPlayerName: timedOutPlayer.user?.displayName || 'Unknown',
-      nextPlayerId: nextPlayer.userId,
-      nextPlayerName: nextPlayer.user?.displayName || 'Unknown',
+      timedOutPlayerId: this.getPlayerId(timedOutPlayer),
+      timedOutPlayerName: this.getPlayerDisplayName(timedOutPlayer),
+      nextPlayerId: nextPlayerId,
+      nextPlayerName: this.getPlayerDisplayName(nextPlayer),
       game: updatedGame,
     };
   }
@@ -1293,6 +1766,13 @@ export class GameManager {
       throw new Error('Game not found');
     }
 
+    // Helper to get player display name by internal ID
+    const getPlayerName = (internalId: string): string => {
+      const player = game.players.find(p => p.id === internalId);
+      if (!player) return 'Unknown';
+      return player.isBot ? (player.botDisplayName || 'Bot') : (player.user?.displayName || 'Unknown');
+    };
+
     // Build archive data
     const archiveData = {
       id: game.id,
@@ -1302,8 +1782,9 @@ export class GameManager {
       startedAt: game.startedAt,
       completedAt: game.completedAt,
       players: game.players.map(p => ({
+        id: p.id,  // Include internal ID for turn lookups
         userId: p.userId,
-        displayName: p.user?.displayName || 'Unknown',
+        displayName: p.isBot ? p.botDisplayName : (p.user?.displayName || 'Unknown'),
         secretWord: p.secretWord,
         paddedWord: p.paddedWord,
         frontPadding: p.frontPadding,
@@ -1311,23 +1792,38 @@ export class GameManager {
         totalScore: p.totalScore,
         isEliminated: p.isEliminated,
         turnOrder: p.turnOrder,
+        isBot: p.isBot,
+        botId: p.botId,
+        // LLM configuration for bots
+        botModelName: p.botModelName,
+        botDifficulty: p.botDifficulty,
+        botConfig: p.botConfig,
       })),
       turns: game.turns.map(t => ({
         turnNumber: t.turnNumber,
         playerId: t.playerId,
+        playerName: getPlayerName(t.playerId),  // Add resolved name
         targetPlayerId: t.targetPlayerId,
+        targetPlayerName: getPlayerName(t.targetPlayerId),  // Add resolved name
         guessedLetter: t.guessedLetter,
         isCorrect: t.isCorrect,
         positionsRevealed: t.positionsRevealed,
         pointsScored: t.pointsScored,
         createdAt: t.createdAt,
       })),
-      results: game.results.map(r => ({
-        playerId: r.playerId,
-        displayName: r.player?.displayName || 'Unknown',
-        finalScore: r.finalScore,
-        placement: r.placement,
-      })),
+      // Generate results for ALL players (including bots), sorted by score
+      results: game.players
+        .map(p => ({
+          playerId: p.userId || p.botId || p.id,
+          displayName: p.isBot ? (p.botDisplayName || 'Bot') : (p.user?.displayName || 'Unknown'),
+          finalScore: p.totalScore || 0,
+          isBot: p.isBot,
+        }))
+        .sort((a, b) => b.finalScore - a.finalScore)
+        .map((r, index) => ({
+          ...r,
+          placement: index + 1,
+        })),
       viewerGuesses: this.viewerGuesses.get(game.roomCode) || [],
     };
 
@@ -1343,6 +1839,43 @@ export class GameManager {
     await fs.writeFile(filepath, JSON.stringify(archiveData, null, 2));
 
     console.log(`📁 Game archived to ${filepath}`);
+  }
+
+  // Re-archive a game by room code (for migrating old files)
+  async reArchiveGame(roomCode: string): Promise<void> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+    });
+
+    if (!game) {
+      throw new Error('Game not found in database');
+    }
+
+    await this.archiveGame(game.id);
+    console.log(`📁 Re-archived game ${roomCode}`);
+  }
+
+  // Re-archive all completed games that are still in the database
+  async migrateAllGameHistory(): Promise<{ migrated: string[]; failed: string[] }> {
+    const completedGames = await prisma.game.findMany({
+      where: { status: 'COMPLETED' },
+    });
+
+    const migrated: string[] = [];
+    const failed: string[] = [];
+
+    for (const game of completedGames) {
+      try {
+        await this.archiveGame(game.id);
+        migrated.push(game.roomCode);
+        console.log(`✅ Migrated ${game.roomCode}`);
+      } catch (err) {
+        failed.push(game.roomCode);
+        console.error(`❌ Failed to migrate ${game.roomCode}:`, err);
+      }
+    }
+
+    return { migrated, failed };
   }
 
   // Handle viewer (observer) word guess
@@ -1454,6 +1987,79 @@ export class GameManager {
     const filepath = path.join(DATA_DIR, matchingFile);
     const content = await fs.readFile(filepath, 'utf-8');
     return JSON.parse(content);
+  }
+
+  // Get aggregated bot stats from all archived games
+  async getBotStats(): Promise<any[]> {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+
+    const files = await fs.readdir(DATA_DIR);
+    const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+    const botStats: any[] = [];
+
+    for (const filename of jsonFiles) {
+      const filepath = path.join(DATA_DIR, filename);
+      const content = await fs.readFile(filepath, 'utf-8');
+      const data = JSON.parse(content);
+
+      // Find bot players in this game
+      const botPlayers = data.players?.filter((p: any) => p.isBot) || [];
+
+      for (const bot of botPlayers) {
+        // Find bot's result (placement and final score)
+        const result = data.results?.find((r: any) =>
+          r.playerId === bot.botId || r.displayName === bot.displayName
+        );
+
+        // Count correct/incorrect guesses from turns
+        const botTurns = data.turns?.filter((t: any) =>
+          t.playerId === bot.botId
+        ) || [];
+        const correctGuesses = botTurns.filter((t: any) => t.isCorrect).length;
+        const incorrectGuesses = botTurns.filter((t: any) => !t.isCorrect).length;
+
+        // Calculate accuracy
+        const totalGuesses = correctGuesses + incorrectGuesses;
+        const accuracy = totalGuesses > 0 ? Math.round((correctGuesses / totalGuesses) * 100) : 0;
+
+        botStats.push({
+          // Game info
+          roomCode: data.roomCode,
+          completedAt: data.completedAt,
+          playerCount: data.players?.length || 0,
+
+          // Bot identity
+          botName: bot.displayName || bot.botDisplayName || 'Unknown Bot',
+          botId: bot.botId,
+
+          // LLM config
+          modelName: bot.botModelName || 'Unknown',
+          difficulty: bot.botDifficulty || 'Unknown',
+          config: bot.botConfig || {},
+
+          // Performance
+          score: result?.finalScore || bot.totalScore || 0,
+          placement: result?.placement || 0,
+          totalPlayers: data.results?.length || data.players?.length || 0,
+
+          // Guessing stats
+          correctGuesses,
+          incorrectGuesses,
+          totalGuesses,
+          accuracy,
+
+          // Word info
+          secretWord: bot.secretWord,
+          wordLength: bot.wordLength || bot.secretWord?.length || 0,
+        });
+      }
+    }
+
+    // Sort by date descending
+    return botStats.sort((a, b) =>
+      new Date(b.completedAt || 0).getTime() - new Date(a.completedAt || 0).getTime()
+    );
   }
 
   // Cleanup stale games (WAITING status older than 30 minutes)
@@ -1608,18 +2214,28 @@ export class GameManager {
       roundNumber: game.roundNumber,
       turnTimerSeconds: game.turnTimerSeconds,
       currentTurnStartedAt: game.currentTurnStartedAt,
+      // Turn card fields
+      currentTurnCard: game.currentTurnCard,
+      turnCardMultiplier: game.turnCardMultiplier,
+      turnCardUsed: game.turnCardUsed,
+      pendingExposePlayerId: game.pendingExposePlayerId,
       players: game.players.map((p: any) => {
         // Use paddedWord if available, otherwise secretWord
         const word = p.paddedWord || p.secretWord;
         const wordLength = word?.length || 0;
 
         // Include the player's own secret word (without blanks) if this is their data
-        const isOwnPlayer = forUserId && p.userId === forUserId;
+        // For bots, forUserId might be the botId
+        const isOwnPlayer = forUserId && (p.userId === forUserId || p.botId === forUserId);
 
         return {
           id: p.id,
           userId: p.userId,
-          displayName: p.user?.displayName || 'Unknown',
+          botId: p.botId,
+          isBot: p.isBot || false,
+          displayName: p.isBot ? p.botDisplayName : (p.user?.displayName || 'Unknown'),
+          botModelName: p.botModelName,
+          botDifficulty: p.botDifficulty,
           turnOrder: p.turnOrder,
           wordLength: wordLength,
           hasSelectedWord: p.secretWord !== null,
@@ -1640,5 +2256,106 @@ export class GameManager {
         };
       }),
     };
+  }
+
+  // ============================================================================
+  // Bot Player Methods
+  // ============================================================================
+
+  /**
+   * Add a bot player to a game
+   */
+  async addBotPlayer(roomCode: string, bot: any): Promise<any> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: { players: true },
+    });
+
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    if (game.status !== 'WAITING' && game.status !== 'WORD_SELECTION') {
+      throw new Error('Cannot add bot after game has started');
+    }
+
+    if (game.players.length >= game.maxPlayers) {
+      throw new Error('Game is full');
+    }
+
+    // Check if bot already in game
+    const existingBot = game.players.find(p => p.botId === bot.id);
+    if (existingBot) {
+      return this.getGameByRoomCode(roomCode);
+    }
+
+    const updatedGame = await prisma.game.update({
+      where: { id: game.id },
+      data: {
+        players: {
+          create: {
+            botId: bot.id,
+            isBot: true,
+            botDisplayName: bot.displayName || bot.config?.displayName || 'Bot',
+            botModelName: bot.config?.modelName,
+            botDifficulty: bot.config?.difficulty || 'medium',
+            botConfig: bot.config || {},
+            turnOrder: game.players.length,
+          },
+        },
+      },
+      include: {
+        players: {
+          include: {
+            user: true,
+          },
+        },
+      },
+    });
+
+    return this.sanitizeGame(updatedGame);
+  }
+
+  /**
+   * Remove a bot player from a game
+   */
+  async removeBotPlayer(roomCode: string, botId: string): Promise<any> {
+    const game = await prisma.game.findUnique({
+      where: { roomCode },
+      include: { players: true },
+    });
+
+    if (!game) {
+      throw new Error('Game not found');
+    }
+
+    if (game.status !== 'WAITING') {
+      throw new Error('Cannot remove bot after game has started');
+    }
+
+    const botPlayer = game.players.find(p => p.botId === botId);
+    if (!botPlayer) {
+      throw new Error('Bot not in this game');
+    }
+
+    await prisma.gamePlayer.delete({
+      where: { id: botPlayer.id },
+    });
+
+    // Re-order remaining players
+    const remainingPlayers = game.players
+      .filter(p => p.botId !== botId)
+      .sort((a, b) => a.turnOrder - b.turnOrder);
+
+    await Promise.all(
+      remainingPlayers.map((p, index) =>
+        prisma.gamePlayer.update({
+          where: { id: p.id },
+          data: { turnOrder: index },
+        })
+      )
+    );
+
+    return this.getGameByRoomCode(roomCode);
   }
 }

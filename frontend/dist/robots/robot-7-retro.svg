@@ -1,0 +1,22 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Head -->
+  <rect x="24" y="16" width="52" height="48" fill="#E8B4B8" stroke="#000" stroke-width="3"/>
+  <!-- Eyes -->
+  <rect x="32" y="26" width="10" height="12" fill="#000"/>
+  <rect x="58" y="26" width="10" height="12" fill="#000"/>
+  <!-- Eyebrows -->
+  <line x1="32" y1="22" x2="42" y2="20" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+  <line x1="58" y1="20" x2="68" y2="22" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+  <!-- Nose -->
+  <rect x="47" y="42" width="6" height="8" fill="#000"/>
+  <!-- Mouth -->
+  <path d="M 40 54 L 60 54" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+  <!-- Body -->
+  <rect x="28" y="64" width="44" height="30" fill="#D4AF37" stroke="#000" stroke-width="3"/>
+  <!-- Controls -->
+  <circle cx="42" cy="74" r="3" fill="#000"/>
+  <circle cx="50" cy="74" r="3" fill="#000"/>
+  <circle cx="58" cy="74" r="3" fill="#000"/>
+  <rect x="40" y="82" width="4" height="8" fill="#000"/>
+  <rect x="56" y="82" width="4" height="8" fill="#000"/>
+</svg>

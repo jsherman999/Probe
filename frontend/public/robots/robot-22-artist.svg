@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Body -->
+  <rect x="30" y="45" width="40" height="35" rx="5" fill="#ec4899"/>
+  <!-- Head -->
+  <rect x="25" y="15" width="50" height="35" rx="8" fill="#f472b6"/>
+  <!-- Beret -->
+  <ellipse cx="50" cy="15" rx="20" ry="8" fill="#be185d"/>
+  <circle cx="50" cy="10" r="4" fill="#be185d"/>
+  <!-- Eyes -->
+  <circle cx="38" cy="32" r="5" fill="white"/>
+  <circle cx="62" cy="32" r="5" fill="white"/>
+  <circle cx="38" cy="32" r="2" fill="#1e1b4b"/>
+  <circle cx="62" cy="32" r="2" fill="#1e1b4b"/>
+  <!-- Happy mouth -->
+  <path d="M42 42 Q50 48 58 42" fill="none" stroke="#1e1b4b" stroke-width="2" stroke-linecap="round"/>
+  <!-- Arms -->
+  <rect x="20" y="50" width="10" height="20" rx="3" fill="#f472b6"/>
+  <rect x="70" y="50" width="10" height="20" rx="3" fill="#f472b6"/>
+  <!-- Paint palette -->
+  <ellipse cx="18" cy="65" rx="10" ry="7" fill="#fcd34d"/>
+  <circle cx="14" cy="63" r="2" fill="#ef4444"/>
+  <circle cx="18" cy="60" r="2" fill="#3b82f6"/>
+  <circle cx="22" cy="63" r="2" fill="#22c55e"/>
+  <circle cx="18" cy="67" r="2" fill="#8b5cf6"/>
+  <!-- Paintbrush -->
+  <line x1="80" y1="55" x2="88" y2="45" stroke="#92400e" stroke-width="3"/>
+  <path d="M88 45 L92 40 L90 38 L86 43 Z" fill="#f472b6"/>
+  <!-- Legs -->
+  <rect x="35" y="80" width="12" height="15" rx="3" fill="#ec4899"/>
+  <rect x="53" y="80" width="12" height="15" rx="3" fill="#ec4899"/>
+</svg>

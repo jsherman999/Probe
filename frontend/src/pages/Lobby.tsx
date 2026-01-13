@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGame } from '../store/slices/gameSlice';
 import socketService from '../services/socket';
+import BotConfigModal from '../components/BotConfigModal';
+import BotPlayerCard from '../components/BotPlayerCard';
+import { useLocalhost } from '../hooks/useOllama';
+import { BotConfig } from '../services/botApi';
 
 // Timer preset options
 const TIMER_PRESETS = [
@@ -22,6 +26,8 @@ export default function Lobby() {
   const [error, setError] = useState('');
   const [customMinutes, setCustomMinutes] = useState(5);
   const [customSeconds, setCustomSeconds] = useState(0);
+  const [showBotModal, setShowBotModal] = useState(false);
+  const { isLocalhost, isChecking: isCheckingLocalhost } = useLocalhost();
 
   useEffect(() => {
     if (!token || !user) return;
@@ -73,12 +79,24 @@ export default function Lobby() {
       dispatch(setGame(data.game));
     };
 
+    const onBotJoined = (data: any) => {
+      console.log('🤖 Bot joined:', data.displayName);
+      dispatch(setGame(data.game));
+    };
+
+    const onBotLeft = (data: any) => {
+      console.log('🤖 Bot left:', data.displayName);
+      dispatch(setGame(data.game));
+    };
+
     socket.on('gameState', onGameState);
     socket.on('playerJoined', onPlayerJoined);
     socket.on('playerLeft', onPlayerLeft);
     socket.on('wordSelectionPhase', onWordSelectionPhase);
     socket.on('gameStarted', onGameStarted);
     socket.on('timerSettingsUpdated', onTimerSettingsUpdated);
+    socket.on('botJoined', onBotJoined);
+    socket.on('botLeft', onBotLeft);
     socket.on('error', onError);
 
     // Function to join game when connected
@@ -103,10 +121,31 @@ export default function Lobby() {
       socket.off('wordSelectionPhase', onWordSelectionPhase);
       socket.off('gameStarted', onGameStarted);
       socket.off('timerSettingsUpdated', onTimerSettingsUpdated);
+      socket.off('botJoined', onBotJoined);
+      socket.off('botLeft', onBotLeft);
       socket.off('error', onError);
       socket.off('connect', joinWhenConnected);
     };
   }, [roomCode, token, user, dispatch, navigate]);
+
+  const handleAddBot = (config: BotConfig) => {
+    const socket = socketService.getSocket();
+    if (!socket || !socketService.isConnected()) {
+      setError('Connection lost. Please refresh the page.');
+      return;
+    }
+    socket.emit('addBotToGame', { roomCode, botConfig: config });
+    setShowBotModal(false);
+  };
+
+  const handleRemoveBot = (botId: string) => {
+    const socket = socketService.getSocket();
+    if (!socket || !socketService.isConnected()) {
+      setError('Connection lost. Please refresh the page.');
+      return;
+    }
+    socket.emit('removeBotFromGame', { roomCode, botId });
+  };
 
   const handleStartGame = () => {
     const socket = socketService.getSocket();
@@ -151,6 +190,7 @@ export default function Lobby() {
   const isHost = game.hostId === user?.id;
   const playerCount = game.players.length;
   const canStart = isHost && playerCount >= 2;
+  const canAddBot = isHost && isLocalhost && !isCheckingLocalhost && game.status === 'WAITING' && playerCount < 4;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -172,30 +212,55 @@ export default function Lobby() {
         )}
 
         <div className="mb-6">
-          <h2 className="text-xl font-semibold mb-3">
-            Players ({playerCount}/4)
-          </h2>
-          <div className="space-y-2">
-            {game.players.map((player) => (
-              <div
-                key={player.userId}
-                className="flex items-center justify-between bg-primary-bg p-4 rounded-lg"
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-xl font-semibold">
+              Players ({playerCount}/4)
+            </h2>
+            {canAddBot && (
+              <button
+                onClick={() => setShowBotModal(true)}
+                className="btn-secondary text-sm flex items-center gap-1"
               >
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-white font-bold">
-                    {player.displayName.charAt(0).toUpperCase()}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Add AI Player
+              </button>
+            )}
+          </div>
+          <div className="space-y-2">
+            {game.players.map((player: any) => (
+              player.isBot ? (
+                <BotPlayerCard
+                  key={player.botId || player.id}
+                  botId={player.botId}
+                  displayName={player.displayName}
+                  modelName={player.botModelName}
+                  difficulty={player.botDifficulty}
+                  canRemove={isHost && isLocalhost && game.status === 'WAITING'}
+                  onRemove={() => handleRemoveBot(player.botId)}
+                />
+              ) : (
+                <div
+                  key={player.userId || player.id}
+                  className="flex items-center justify-between bg-primary-bg p-4 rounded-lg"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-white font-bold">
+                      {player.displayName.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-semibold">{player.displayName}</p>
+                      {player.userId === game.hostId && (
+                        <span className="text-sm text-warning">Host</span>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">{player.displayName}</p>
-                    {player.userId === game.hostId && (
-                      <span className="text-sm text-warning">Host</span>
-                    )}
-                  </div>
+                  {game.status === 'WORD_SELECTION' && player.hasSelectedWord && (
+                    <span className="text-success font-semibold">✓ Ready</span>
+                  )}
                 </div>
-                {game.status === 'WORD_SELECTION' && player.hasSelectedWord && (
-                  <span className="text-success font-semibold">✓ Ready</span>
-                )}
-              </div>
+              )
             ))}
             {playerCount < 4 && Array.from({ length: 4 - playerCount }).map((_, i) => (
               <div key={`empty-${i}`} className="bg-primary-bg/30 p-4 rounded-lg border-2 border-dashed border-tile-border">
@@ -291,6 +356,13 @@ export default function Lobby() {
           </p>
         </div>
       </div>
+
+      {/* Bot Configuration Modal */}
+      <BotConfigModal
+        isOpen={showBotModal}
+        onClose={() => setShowBotModal(false)}
+        onAdd={handleAddBot}
+      />
     </div>
   );
 }

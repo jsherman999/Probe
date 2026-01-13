@@ -34,6 +34,16 @@ router.get('/history/all', authenticate, async (req: any, res) => {
   }
 });
 
+// Get AI/Bot stats from all games - MUST be before /:roomCode
+router.get('/bot-stats', authenticate, async (req: any, res) => {
+  try {
+    const stats = await gameManager.getBotStats();
+    res.json(stats);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get specific archived game by room code - MUST be before /:roomCode
 router.get('/history/game/:roomCode', authenticate, async (req: any, res) => {
   try {
@@ -44,6 +54,16 @@ router.get('/history/game/:roomCode', authenticate, async (req: any, res) => {
     if (error.message === 'Game history not found') {
       return res.status(404).json({ error: error.message });
     }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Migrate all game history (re-archive games still in database)
+router.post('/history/migrate', authenticate, async (req: any, res) => {
+  try {
+    const result = await gameManager.migrateAllGameHistory();
+    res.json(result);
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Pirate Bot - Seafaring robot -->
+  <defs>
+    <linearGradient id="pirate-hat" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b"/>
+      <stop offset="100%" style="stop-color:#0f172a"/>
+    </linearGradient>
+    <linearGradient id="pirate-body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#64748b"/>
+      <stop offset="100%" style="stop-color:#475569"/>
+    </linearGradient>
+  </defs>
+  <!-- Pirate hat -->
+  <path d="M15 35 Q20 15 50 18 Q80 15 85 35 L75 35 Q50 25 25 35 Z" fill="url(#pirate-hat)"/>
+  <!-- Skull on hat -->
+  <circle cx="50" cy="26" r="6" fill="#f8fafc"/>
+  <circle cx="48" cy="25" r="1.5" fill="#0f172a"/>
+  <circle cx="52" cy="25" r="1.5" fill="#0f172a"/>
+  <ellipse cx="50" cy="29" rx="2" ry="1" fill="#0f172a"/>
+  <!-- Crossbones -->
+  <line x1="42" y1="30" x2="58" y2="22" stroke="#f8fafc" stroke-width="2" stroke-linecap="round"/>
+  <line x1="42" y1="22" x2="58" y2="30" stroke="#f8fafc" stroke-width="2" stroke-linecap="round"/>
+  <!-- Head -->
+  <rect x="25" y="35" width="50" height="38" rx="8" fill="url(#pirate-body)"/>
+  <!-- Eye patch -->
+  <circle cx="62" cy="50" r="10" fill="#0f172a"/>
+  <line x1="52" y1="42" x2="72" y2="42" stroke="#0f172a" stroke-width="3"/>
+  <!-- Good eye -->
+  <circle cx="38" cy="50" r="8" fill="white"/>
+  <circle cx="38" cy="50" r="4" fill="#1e293b"/>
+  <circle cx="37" cy="49" r="1.5" fill="white"/>
+  <!-- Scar -->
+  <line x1="30" y1="45" x2="26" y2="55" stroke="#dc2626" stroke-width="2" stroke-linecap="round"/>
+  <!-- Stubble/beard shadow -->
+  <ellipse cx="50" cy="70" rx="15" ry="5" fill="#334155"/>
+  <!-- Smirk -->
+  <path d="M40 62 Q50 68 55 62" fill="none" stroke="#1e293b" stroke-width="2" stroke-linecap="round"/>
+  <!-- Gold tooth -->
+  <rect x="48" y="63" width="4" height="4" rx="1" fill="#fbbf24"/>
+  <!-- Body -->
+  <rect x="28" y="75" width="44" height="20" rx="5" fill="url(#pirate-body)"/>
+  <!-- Striped shirt -->
+  <line x1="32" y1="78" x2="32" y2="95" stroke="#dc2626" stroke-width="3"/>
+  <line x1="40" y1="78" x2="40" y2="95" stroke="#dc2626" stroke-width="3"/>
+  <line x1="48" y1="78" x2="48" y2="95" stroke="#dc2626" stroke-width="3"/>
+  <line x1="56" y1="78" x2="56" y2="95" stroke="#dc2626" stroke-width="3"/>
+  <line x1="64" y1="78" x2="64" y2="95" stroke="#dc2626" stroke-width="3"/>
+</svg>

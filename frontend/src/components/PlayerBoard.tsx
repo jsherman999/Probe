@@ -1,3 +1,5 @@
+import { getRobotIconUrl } from '../utils/robotIcons';
+
 interface PlayerBoardProps {
   playerName: string;
   score: number;
@@ -6,6 +8,9 @@ interface PlayerBoardProps {
   isTarget: boolean;
   isEliminated: boolean;
   isCurrentUser: boolean;
+  isBot?: boolean;
+  botId?: string;
+  botModelName?: string;
   onClick?: () => void;
 }
 
@@ -17,8 +22,13 @@ export default function PlayerBoard({
   isTarget,
   isEliminated,
   isCurrentUser,
+  isBot,
+  botId,
+  botModelName,
   onClick,
 }: PlayerBoardProps) {
+  // Get robot icon URL for bots
+  const robotIconUrl = isBot && botId ? getRobotIconUrl(botId) : null;
   return (
     <div
       onClick={onClick}
@@ -28,18 +38,35 @@ export default function PlayerBoard({
         ${isActive ? 'ring-2 ring-player-active' : ''}
         ${isEliminated ? 'opacity-50' : ''}
         ${onClick && !isEliminated ? 'hover:ring-2 hover:ring-accent' : ''}
+        ${isBot ? 'border-l-4 border-l-cyan-500' : ''}
       `}
     >
       <div className="flex justify-between items-center mb-3">
         <div>
-          <p className="font-bold text-lg">
+          <p className="font-bold text-lg flex items-center gap-2">
+            {isBot && robotIconUrl && (
+              <span className="w-6 h-6 flex-shrink-0" title="AI Player">
+                <img src={robotIconUrl} alt="Bot" className="w-full h-full object-contain" />
+              </span>
+            )}
             {playerName} {isCurrentUser && '(You)'}
+            {isBot && (
+              <span className="px-1.5 py-0.5 text-xs bg-cyan-600/30 text-cyan-400 rounded font-normal">
+                AI
+              </span>
+            )}
           </p>
+          {isBot && botModelName && (
+            <span className="text-xs text-cyan-400/70">{botModelName}</span>
+          )}
           {isEliminated && (
             <span className="text-xs text-player-eliminated">Eliminated</span>
           )}
-          {isActive && !isEliminated && (
+          {isActive && !isEliminated && !isBot && (
             <span className="text-xs text-player-active">• Active Turn</span>
+          )}
+          {isActive && !isEliminated && isBot && (
+            <span className="text-xs text-cyan-400 animate-pulse">• AI Thinking...</span>
           )}
         </div>
         <div className="text-right">

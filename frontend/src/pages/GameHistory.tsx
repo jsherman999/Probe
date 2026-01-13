@@ -19,7 +19,9 @@ interface GameDetail {
   startedAt: string;
   completedAt: string;
   players: {
-    userId: string;
+    id?: string;        // Internal database ID
+    userId: string | null;
+    botId?: string | null;
     displayName: string;
     secretWord: string;
     paddedWord: string;
@@ -28,11 +30,14 @@ interface GameDetail {
     totalScore: number;
     isEliminated: boolean;
     turnOrder: number;
+    isBot?: boolean;
   }[];
   turns: {
     turnNumber: number;
     playerId: string;
+    playerName?: string;         // New: resolved player name
     targetPlayerId: string;
+    targetPlayerName?: string;   // New: resolved target name
     guessedLetter: string;
     isCorrect: boolean;
     positionsRevealed: number[];
@@ -44,6 +49,16 @@ interface GameDetail {
     displayName: string;
     finalScore: number;
     placement: number;
+    isBot?: boolean;
+  }[];
+  viewerGuesses?: {
+    viewerId: string;
+    viewerName: string;
+    targetPlayerId: string;
+    targetPlayerName: string;
+    guessedWord: string;
+    isCorrect: boolean;
+    submittedAt: string;
   }[];
 }
 
@@ -180,7 +195,7 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
   const { token } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
-    const fetchGame = async () => {
+    const fetchGame = async (retryCount = 0): Promise<void> => {
       try {
         const response = await fetch(`${API_URL}/game/history/game/${roomCode}`, {
           headers: {
@@ -189,6 +204,13 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
         });
 
         if (!response.ok) {
+          // If not found and we have retries left, wait and try again
+          // This handles the race condition when navigating immediately after game ends
+          if (response.status === 404 && retryCount < 3) {
+            console.log(`Game history not ready yet, retrying in ${(retryCount + 1) * 500}ms...`);
+            await new Promise(resolve => setTimeout(resolve, (retryCount + 1) * 500));
+            return fetchGame(retryCount + 1);
+          }
           throw new Error('Failed to fetch game details');
         }
 
@@ -227,11 +249,23 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
     );
   }
 
-  // Build a map of player IDs to display names
+  // Build a comprehensive map of all player IDs to display names
+  // This handles internal IDs, user IDs, and bot IDs
   const playerNames: Record<string, string> = {};
   game.players.forEach((p) => {
-    playerNames[p.userId] = p.displayName;
+    // Map all possible IDs to the display name
+    if (p.id) playerNames[p.id] = p.displayName;
+    if (p.userId) playerNames[p.userId] = p.displayName;
+    if (p.botId) playerNames[p.botId] = p.displayName;
   });
+
+  // Helper to get player name from turn data (uses new fields or fallback to lookup)
+  const getPlayerName = (turn: typeof game.turns[0], isTarget: boolean): string => {
+    if (isTarget) {
+      return turn.targetPlayerName || playerNames[turn.targetPlayerId] || 'Unknown';
+    }
+    return turn.playerName || playerNames[turn.playerId] || 'Unknown';
+  };
 
   return (
     <div className="min-h-screen p-4">
@@ -279,34 +313,48 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
         <div className="card mb-6">
           <h2 className="text-xl font-bold mb-4">Secret Words</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {game.players.map((player) => (
-              <div key={player.userId} className="bg-primary-bg p-4 rounded-lg">
-                <p className="font-semibold mb-2">{player.displayName}</p>
-                <div className="flex gap-1 flex-wrap">
-                  {(player.paddedWord || player.secretWord).split('').map((char, i) => {
-                    const isBlank = char === '\u2022';
-                    return (
-                      <div
-                        key={i}
-                        className={`w-8 h-8 rounded flex items-center justify-center font-bold ${
-                          isBlank
-                            ? 'bg-gray-600 text-gray-400'
-                            : 'bg-accent text-white'
-                        }`}
-                      >
-                        {char}
-                      </div>
-                    );
-                  })}
+            {game.players.map((player, index) => {
+              const wordLength = (player.paddedWord || player.secretWord).length;
+              let tileSizeClass = 'w-8 h-8';
+              let textSizeClass = 'text-base';
+
+              if (wordLength >= 10) {
+                tileSizeClass = 'w-6 h-6';
+                textSizeClass = 'text-sm';
+              } else if (wordLength === 9) {
+                tileSizeClass = 'w-7 h-7';
+                textSizeClass = 'text-base';
+              }
+
+              return (
+                <div key={player.id || player.userId || player.botId || `player-${index}`} className="bg-primary-bg p-4 rounded-lg">
+                  <p className="font-semibold mb-2">{player.displayName}</p>
+                  <div className="flex gap-1 overflow-x-auto pb-2">
+                    {(player.paddedWord || player.secretWord).split('').map((char, i) => {
+                      const isBlank = char === '\u2022';
+                      return (
+                        <div
+                          key={i}
+                          className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} flex-shrink-0 ${
+                            isBlank
+                              ? 'bg-gray-600 text-gray-400'
+                              : 'bg-accent text-white'
+                          }`}
+                        >
+                          {char}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-text-muted text-sm mt-2">
+                    Word: {player.secretWord}
+                    {(player.frontPadding > 0 || player.backPadding > 0) && (
+                      <span> (Padding: {player.frontPadding}/{player.backPadding})</span>
+                    )}
+                  </p>
                 </div>
-                <p className="text-text-muted text-sm mt-2">
-                  Word: {player.secretWord}
-                  {(player.frontPadding > 0 || player.backPadding > 0) && (
-                    <span> (Padding: {player.frontPadding}/{player.backPadding})</span>
-                  )}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -326,7 +374,7 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
                 >
                   <div>
                     <span className="font-semibold">
-                      {playerNames[turn.playerId] || 'Unknown'}
+                      {getPlayerName(turn, false)}
                     </span>
                     <span className="text-text-muted"> guessed </span>
                     <span className="font-mono font-bold">
@@ -334,7 +382,7 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
                     </span>
                     <span className="text-text-muted"> on </span>
                     <span className="font-semibold">
-                      {playerNames[turn.targetPlayerId] || 'Unknown'}
+                      {getPlayerName(turn, true)}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -344,7 +392,12 @@ function GameHistoryDetail({ roomCode }: { roomCode: string }) {
                         <span className="text-success">HIT</span>
                       </>
                     ) : (
-                      <span className="text-error">MISS</span>
+                      <>
+                        {turn.pointsScored < 0 && (
+                          <span className="text-error">{turn.pointsScored}</span>
+                        )}
+                        <span className="text-error">MISS</span>
+                      </>
                     )}
                   </div>
                 </div>

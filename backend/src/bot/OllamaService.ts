@@ -1,0 +1,392 @@
+/**
+ * OllamaService - Client for interacting with the local Ollama API
+ *
+ * Ollama API documentation: https://github.com/ollama/ollama/blob/main/docs/api.md
+ */
+
+import {
+  LLMProvider,
+  OllamaModel,
+  OllamaModelInfo,
+  OllamaGenerateOptions,
+  OllamaGenerateRequest,
+  OllamaGenerateResponse,
+  OllamaChatMessage,
+  OllamaChatRequest,
+  OllamaChatResponse,
+  OllamaPullProgress,
+} from './types';
+
+export class OllamaService implements LLMProvider {
+  private baseUrl: string;
+  private defaultTimeout: number;
+
+  constructor(baseUrl = 'http://localhost:11434', defaultTimeout = 60000) {
+    this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+    this.defaultTimeout = defaultTimeout;
+  }
+
+  getProviderName(): string {
+    return 'ollama';
+  }
+
+  /**
+   * Check if Ollama server is running and accessible
+   */
+  async isAvailable(): Promise<boolean> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(`${this.baseUrl}/api/tags`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get Ollama version information
+   */
+  async getVersion(): Promise<string | null> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch(`${this.baseUrl}/api/version`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json() as { version?: string };
+      return data.version || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * List all downloaded/available models
+   */
+  async listModels(): Promise<OllamaModel[]> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(`${this.baseUrl}/api/tags`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Failed to list models: ${response.statusText}`);
+      }
+
+      const data = await response.json() as { models?: OllamaModel[] };
+      return data.models || [];
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout while listing models');
+      }
+      throw new Error(`Failed to list models: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get detailed information about a specific model
+   */
+  async getModelInfo(modelName: string): Promise<OllamaModelInfo> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(`${this.baseUrl}/api/show`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: modelName }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Failed to get model info: ${response.statusText}`);
+      }
+
+      return await response.json() as OllamaModelInfo;
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout while getting model info');
+      }
+      throw new Error(`Failed to get model info: ${error.message}`);
+    }
+  }
+
+  /**
+   * Pull/download a model from Ollama registry
+   * @param modelName - Name of the model to pull (e.g., "llama3.2:3b")
+   * @param onProgress - Optional callback for progress updates
+   */
+  async pullModel(
+    modelName: string,
+    onProgress?: (progress: OllamaPullProgress) => void
+  ): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/pull`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: modelName, stream: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to pull model: ${response.statusText}`);
+      }
+
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          try {
+            const progress = JSON.parse(line) as OllamaPullProgress;
+            if (onProgress) {
+              onProgress(progress);
+            }
+          } catch {
+            // Ignore malformed JSON lines
+          }
+        }
+      }
+    } catch (error: any) {
+      throw new Error(`Failed to pull model: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate a text response from the model
+   * @param modelName - Name of the model to use
+   * @param prompt - The prompt to send
+   * @param options - Generation options (temperature, etc.)
+   * @param systemPrompt - Optional system prompt
+   */
+  async generate(
+    modelName: string,
+    prompt: string,
+    options?: OllamaGenerateOptions,
+    systemPrompt?: string
+  ): Promise<string> {
+    console.log(`🔮 [OllamaService] Generating with model: ${modelName}`);
+    console.log(`🔮 [OllamaService] Prompt length: ${prompt.length} chars`);
+    const startTime = Date.now();
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
+
+      const request: OllamaGenerateRequest = {
+        model: modelName,
+        prompt,
+        stream: false,
+        options: this.mergeOptions(options),
+      };
+
+      if (systemPrompt) {
+        request.system = systemPrompt;
+      }
+
+      console.log(`🔮 [OllamaService] Sending request to ${this.baseUrl}/api/generate`);
+
+      const response = await fetch(`${this.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const elapsed = Date.now() - startTime;
+      console.log(`🔮 [OllamaService] Response received in ${elapsed}ms, status: ${response.status}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`🔮 [OllamaService] Generation failed: ${response.statusText} - ${errorText}`);
+        throw new Error(`Generation failed: ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json() as OllamaGenerateResponse;
+      console.log(`🔮 [OllamaService] Response text: "${data.response.substring(0, 100)}${data.response.length > 100 ? '...' : ''}"`);
+      return data.response;
+    } catch (error: any) {
+      const elapsed = Date.now() - startTime;
+      if (error.name === 'AbortError') {
+        console.error(`🔮 [OllamaService] Request TIMEOUT after ${elapsed}ms`);
+        throw new Error('Request timeout during generation');
+      }
+      console.error(`🔮 [OllamaService] Generation ERROR after ${elapsed}ms: ${error.message}`);
+      throw new Error(`Generation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Chat completion with message history
+   * @param modelName - Name of the model to use
+   * @param messages - Array of chat messages
+   * @param options - Generation options
+   */
+  async chat(
+    modelName: string,
+    messages: OllamaChatMessage[],
+    options?: OllamaGenerateOptions
+  ): Promise<string> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.defaultTimeout);
+
+      const request: OllamaChatRequest = {
+        model: modelName,
+        messages,
+        stream: false,
+        options: this.mergeOptions(options),
+      };
+
+      const response = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Chat failed: ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json() as OllamaChatResponse;
+      return data.message.content;
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout during chat');
+      }
+      throw new Error(`Chat failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate with streaming response
+   * @param modelName - Name of the model to use
+   * @param prompt - The prompt to send
+   * @param onToken - Callback for each token
+   * @param options - Generation options
+   */
+  async generateStream(
+    modelName: string,
+    prompt: string,
+    onToken: (token: string) => void,
+    options?: OllamaGenerateOptions
+  ): Promise<string> {
+    try {
+      const request: OllamaGenerateRequest = {
+        model: modelName,
+        prompt,
+        stream: true,
+        options: this.mergeOptions(options),
+      };
+
+      const response = await fetch(`${this.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Generation failed: ${response.statusText}`);
+      }
+
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          try {
+            const data: OllamaGenerateResponse = JSON.parse(line);
+            if (data.response) {
+              fullResponse += data.response;
+              onToken(data.response);
+            }
+          } catch {
+            // Ignore malformed JSON lines
+          }
+        }
+      }
+
+      return fullResponse;
+    } catch (error: any) {
+      throw new Error(`Streaming generation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Merge user options with sensible defaults for game play
+   */
+  private mergeOptions(options?: OllamaGenerateOptions): OllamaGenerateOptions {
+    return {
+      temperature: 0.7,
+      top_p: 0.9,
+      top_k: 40,
+      num_predict: 100,      // Keep responses short for game actions
+      repeat_penalty: 1.1,
+      ...options,
+    };
+  }
+
+  /**
+   * Format bytes to human-readable string
+   */
+  static formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  }
+}
+
+// Export singleton instance with default configuration
+export const ollamaService = new OllamaService();

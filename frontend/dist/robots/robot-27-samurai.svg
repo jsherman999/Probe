@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Body (armor) -->
+  <rect x="28" y="48" width="44" height="35" rx="3" fill="#dc2626"/>
+  <!-- Armor plates -->
+  <rect x="28" y="55" width="44" height="4" fill="#991b1b"/>
+  <rect x="28" y="65" width="44" height="4" fill="#991b1b"/>
+  <rect x="28" y="75" width="44" height="4" fill="#991b1b"/>
+  <!-- Chest symbol -->
+  <circle cx="50" cy="58" r="6" fill="#fbbf24"/>
+  <!-- Head -->
+  <rect x="28" y="20" width="44" height="32" rx="5" fill="#e5e5e5"/>
+  <!-- Kabuto helmet -->
+  <path d="M20 25 L50 8 L80 25 L75 35 L25 35 Z" fill="#1e1b4b"/>
+  <!-- Helmet crest -->
+  <ellipse cx="50" cy="10" rx="3" ry="8" fill="#fbbf24"/>
+  <!-- Face mask (menpo) -->
+  <path d="M32 38 L50 48 L68 38 L68 52 L50 55 L32 52 Z" fill="#374151"/>
+  <!-- Eyes -->
+  <rect x="36" y="28" width="8" height="4" fill="#1e1b4b"/>
+  <rect x="56" y="28" width="8" height="4" fill="#1e1b4b"/>
+  <circle cx="40" cy="30" r="1.5" fill="#ef4444"/>
+  <circle cx="60" cy="30" r="1.5" fill="#ef4444"/>
+  <!-- Arms (armor) -->
+  <rect x="18" y="50" width="10" height="20" rx="3" fill="#dc2626"/>
+  <rect x="72" y="50" width="10" height="20" rx="3" fill="#dc2626"/>
+  <!-- Katana on back -->
+  <line x1="78" y1="40" x2="85" y2="85" stroke="#71717a" stroke-width="3"/>
+  <rect x="83" y="83" width="6" height="12" rx="1" fill="#1e1b4b"/>
+  <!-- Legs -->
+  <rect x="33" y="83" width="14" height="14" rx="3" fill="#1e1b4b"/>
+  <rect x="53" y="83" width="14" height="14" rx="3" fill="#1e1b4b"/>
+</svg>

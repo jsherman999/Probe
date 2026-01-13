@@ -3,13 +3,21 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { setGame } from '../store/slices/gameSlice';
 import socketService from '../services/socket';
+import { getRobotIconUrl } from '../utils/robotIcons';
 
 // Toast notification component
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+  // Use a ref to store onClose so we can use it without adding it as a dependency
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
+    // Auto-dismiss after 5 seconds
+    const timer = setTimeout(() => {
+      onCloseRef.current();
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [message]); // Reset timer when message changes
 
   return (
     <div className="fixed top-4 right-4 z-50 bg-warning text-black px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-pulse">
@@ -35,8 +43,9 @@ export default function Game() {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [showMyWord, setShowMyWord] = useState(false);
+  const [pendingGuess, setPendingGuess] = useState<string | null>(null); // Track letter being guessed
 
   // Blank selection state
   const [blankSelectionPending, setBlankSelectionPending] = useState<{
@@ -85,6 +94,32 @@ export default function Game() {
     isCorrect: boolean;
     submittedAt: Date;
   }>>([]);
+
+  // Turn change flash state
+  const [turnChangeFlash, setTurnChangeFlash] = useState<{
+    isMyTurn: boolean;
+    playerName: string;
+  } | null>(null);
+
+  // Turn card state
+  const [currentTurnCard, setCurrentTurnCard] = useState<{
+    type: string;
+    label: string;
+    multiplier?: number;
+    affectedPlayerId?: string;
+    affectedPlayerName?: string;
+  } | null>(null);
+
+  // Expose selection state
+  const [exposeSelectionPending, setExposeSelectionPending] = useState<{
+    affectedPlayerId: string;
+    affectedPlayerName: string;
+    activePlayerId: string;
+    deadline: number;
+    paddedWord: string;
+    revealedPositions: boolean[];
+  } | null>(null);
+  const [exposeSelectionTimeRemaining, setExposeSelectionTimeRemaining] = useState<number>(0);
 
   // Blank selection countdown timer effect
   useEffect(() => {
@@ -139,6 +174,24 @@ export default function Game() {
 
     return () => clearInterval(interval);
   }, [wordGuessActive]);
+
+  // Expose selection countdown timer effect
+  useEffect(() => {
+    if (!exposeSelectionPending) {
+      setExposeSelectionTimeRemaining(0);
+      return;
+    }
+
+    const updateExposeTimer = () => {
+      const remaining = Math.max(0, Math.floor((exposeSelectionPending.deadline - Date.now()) / 1000));
+      setExposeSelectionTimeRemaining(remaining);
+    };
+
+    updateExposeTimer();
+    const interval = setInterval(updateExposeTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [exposeSelectionPending]);
 
   // Handler to initiate word guess
   const handleInitiateWordGuess = (targetPlayerId: string) => {
@@ -226,6 +279,23 @@ export default function Game() {
     setDuplicateSelectionPending(null);
   };
 
+  // Handler to select expose card position (for affected player choosing their own letter to reveal)
+  const handleExposePositionSelect = (position: number) => {
+    if (!exposeSelectionPending || !roomCode) return;
+
+    const socket = socketService.getSocket();
+    if (!socket) return;
+
+    console.log('📤 Emitting selectExposePosition:', position);
+    socket.emit('selectExposePosition', {
+      roomCode,
+      position,
+    });
+
+    // Clear pending state immediately for responsive UI
+    setExposeSelectionPending(null);
+  };
+
   // Handler to leave game
   const handleLeaveGame = () => {
     if (!roomCode) return;
@@ -295,12 +365,15 @@ export default function Game() {
     };
   }, [game.status, game.currentTurnStartedAt, game.turnTimerSeconds, updateTimeRemaining]);
 
+  // Helper to get player's unique identifier (userId for humans, botId for bots)
+  const getPlayerId = (player: any) => player.userId || player.botId;
+
   // Auto-select opponent in 2-player games when it's my turn
   useEffect(() => {
     if (game.status === 'ACTIVE' && game.currentTurnPlayerId === user?.id) {
       const otherPlayers = game.players.filter(p => p.userId !== user?.id && !p.isEliminated);
       if (otherPlayers.length === 1) {
-        setSelectedTarget(otherPlayers[0].userId);
+        setSelectedTarget(getPlayerId(otherPlayers[0]));
       }
     }
   }, [game.status, game.currentTurnPlayerId, game.players, user?.id]);
@@ -323,6 +396,27 @@ export default function Game() {
       if (data.viewerGuesses && data.viewerGuesses.length > 0) {
         setViewerGuesses(data.viewerGuesses);
       }
+      // Set turn card info from game state
+      if (data.currentTurnCard) {
+        const cardLabels: Record<string, string> = {
+          normal: 'Take your normal turn',
+          additional: 'Take an additional turn',
+          expose_left: 'Player on your left exposes a letter',
+          expose_right: 'Player on your right exposes a letter',
+          bonus_20: '+20 bonus points!',
+          double: 'Double your first guess!',
+          triple: 'Triple your first guess!',
+          quadruple: 'Quadruple your first guess!',
+          quintuple: 'Quintuple your first guess!',
+        };
+        setCurrentTurnCard({
+          type: data.currentTurnCard,
+          label: cardLabels[data.currentTurnCard] || data.currentTurnCard,
+          multiplier: data.turnCardMultiplier > 1 ? data.turnCardMultiplier : undefined,
+        });
+      } else {
+        setCurrentTurnCard(null);
+      }
     };
 
     // Listen for word selection events
@@ -344,7 +438,39 @@ export default function Game() {
 
     const onLetterGuessed = (result: any) => {
       console.log('🎯 Letter guessed:', result.letter, result.isCorrect ? 'HIT' : 'MISS');
-      dispatch(setGame(result.game || result));
+      setPendingGuess(null); // Clear pending state
+
+      // Update game state
+      if (result.game) {
+        dispatch(setGame(result.game));
+
+        // Update turn card state from game (fixes stale card display after turn changes)
+        if (result.game.currentTurnCard) {
+          const cardLabels: Record<string, string> = {
+            normal: 'Take your normal turn',
+            additional: 'Take an additional turn',
+            expose_left: 'Player on your left exposes a letter',
+            expose_right: 'Player on your right exposes a letter',
+            bonus_20: '+20 bonus points!',
+            double: 'Double your first guess!',
+            triple: 'Triple your first guess!',
+            quadruple: 'Quadruple your first guess!',
+            quintuple: 'Quintuple your first guess!',
+          };
+          setCurrentTurnCard({
+            type: result.game.currentTurnCard,
+            label: cardLabels[result.game.currentTurnCard] || result.game.currentTurnCard,
+            multiplier: result.game.turnCardMultiplier > 1 ? result.game.turnCardMultiplier : undefined,
+          });
+        } else {
+          setCurrentTurnCard(null);
+        }
+      }
+
+      // If game ended, also request fresh state to ensure we have all data
+      if (result.gameOver) {
+        socket.emit('getGame', { roomCode });
+      }
     };
 
     const onWordCompleted = (data: any) => {
@@ -355,7 +481,7 @@ export default function Game() {
 
     const onGameOver = (results: any) => {
       console.log('🎮 Game over:', results);
-      // Request fresh game state
+      // Request fresh game state to ensure we have the latest with all scores
       socket.emit('getGame', { roomCode });
     };
 
@@ -387,6 +513,24 @@ export default function Game() {
       setToastMessage(`${data.timedOutPlayerName}'s turn timed out!`);
     };
 
+    const onTurnChanged = (data: any) => {
+      console.log('🔄 Turn changed:', data);
+      setPendingGuess(null); // Clear pending state on turn change
+      dispatch(setGame(data.game));
+
+      // Show turn change flash notification
+      const isMyTurn = data.currentPlayerId === user?.id;
+      setTurnChangeFlash({
+        isMyTurn,
+        playerName: data.currentPlayerName,
+      });
+
+      // Auto-dismiss after 2 seconds
+      setTimeout(() => {
+        setTurnChangeFlash(null);
+      }, 2000);
+    };
+
     const onBlankSelectionRequired = (data: any) => {
       console.log('🎲 Blank selection required:', data);
       // Only set pending if current user is the target
@@ -405,6 +549,7 @@ export default function Game() {
     const onBlankSelected = (data: any) => {
       console.log('🎯 Blank selected:', data);
       setBlankSelectionPending(null);
+      setPendingGuess(null); // Clear pending guess state
       setToastMessage(null); // Clear the "waiting for opponent" toast
       dispatch(setGame(data.game || data));
       if (data.autoSelected) {
@@ -431,6 +576,7 @@ export default function Game() {
     const onDuplicateSelected = (data: any) => {
       console.log('🎯 Duplicate selected:', data);
       setDuplicateSelectionPending(null);
+      setPendingGuess(null); // Clear pending guess state
       setToastMessage(null); // Clear the "waiting for opponent" toast
       dispatch(setGame(data.game || data));
       if (data.autoSelected) {
@@ -462,7 +608,16 @@ export default function Game() {
       setShowWordGuessModal(false);
       setWordGuessInput('');
       setToastMessage(null);
-      dispatch(setGame(data.game || data));
+
+      // Update game state - ensure we get the latest
+      if (data.game) {
+        dispatch(setGame(data.game));
+      }
+
+      // If game ended, also request fresh state to ensure we have all data
+      if (data.gameOver) {
+        socket.emit('getGame', { roomCode });
+      }
 
       // Show result toast
       if (data.isCorrect) {
@@ -499,6 +654,63 @@ export default function Game() {
       );
     };
 
+    // Turn card drawn for a player
+    const onTurnCardDrawn = (data: any) => {
+      console.log('🎴 Turn card drawn:', data.turnCard?.type);
+      setCurrentTurnCard(data.turnCard);
+    };
+
+    // Expose card requires affected player to choose a position
+    const onExposeCardRequired = (data: any) => {
+      console.log('🎴 Expose card required:', data);
+      console.log('🎴 paddedWord:', data.paddedWord);
+      console.log('🎴 revealedPositions:', data.revealedPositions, typeof data.revealedPositions);
+
+      // Parse revealedPositions if it's a JSON string
+      let revealedPos = data.revealedPositions;
+      if (typeof revealedPos === 'string') {
+        try {
+          revealedPos = JSON.parse(revealedPos);
+        } catch {
+          revealedPos = [];
+        }
+      }
+      // Ensure it's an array
+      if (!Array.isArray(revealedPos)) {
+        revealedPos = [];
+      }
+
+      const paddedWord = data.paddedWord || '';
+      console.log('🎴 Parsed - paddedWord:', paddedWord, 'length:', paddedWord.length);
+      console.log('🎴 Parsed - revealedPositions:', revealedPos, 'length:', revealedPos.length);
+
+      setExposeSelectionPending({
+        affectedPlayerId: data.affectedPlayerId,
+        affectedPlayerName: data.affectedPlayerName,
+        activePlayerId: data.activePlayerId,
+        deadline: data.deadline,
+        paddedWord: paddedWord,
+        revealedPositions: revealedPos,
+      });
+    };
+
+    // Expose card resolved (player selected position)
+    const onExposeCardResolved = (data: any) => {
+      console.log('🎴 Expose card resolved:', data);
+      setExposeSelectionPending(null);
+      setExposeSelectionTimeRemaining(0);
+      // Update game state
+      if (data.game) {
+        dispatch(setGame(data.game));
+      }
+      // Show toast with exposed letter info
+      if (data.message) {
+        setToastMessage(data.message);
+      } else if (data.revealedLetter && data.exposedByName) {
+        setToastMessage(`${data.exposedByName} exposed the letter "${data.revealedLetter}"`);
+      }
+    };
+
     const onError = (err: any) => {
       console.error('❌ Socket error:', err);
       setError(err.message || 'An error occurred');
@@ -522,7 +734,11 @@ export default function Game() {
     socket.on('gameEnded', onGameEnded);
     socket.on('playerLeft', onPlayerLeft);
     socket.on('turnTimeout', onTurnTimeout);
+    socket.on('turnChanged', onTurnChanged);
     socket.on('viewerGuessResult', onViewerGuessResult);
+    socket.on('turnCardDrawn', onTurnCardDrawn);
+    socket.on('exposeCardRequired', onExposeCardRequired);
+    socket.on('exposeCardResolved', onExposeCardResolved);
     socket.on('error', onError);
 
     // Join room and get current game state when component mounts
@@ -557,7 +773,11 @@ export default function Game() {
       socket.off('gameEnded', onGameEnded);
       socket.off('playerLeft', onPlayerLeft);
       socket.off('turnTimeout', onTurnTimeout);
+      socket.off('turnChanged', onTurnChanged);
       socket.off('viewerGuessResult', onViewerGuessResult);
+      socket.off('turnCardDrawn', onTurnCardDrawn);
+      socket.off('exposeCardRequired', onExposeCardRequired);
+      socket.off('exposeCardResolved', onExposeCardResolved);
       socket.off('error', onError);
       socket.off('connect', syncGameState);
     };
@@ -610,11 +830,22 @@ export default function Game() {
       return;
     }
 
+    // Prevent double-clicks while waiting for response
+    if (pendingGuess) {
+      return;
+    }
+
+    setPendingGuess(letter);
     socketService.emit('guessLetter', {
       roomCode,
       targetPlayerId: selectedTarget,
       letter,
     });
+
+    // Safety timeout - clear pending state after 5 seconds if no response
+    setTimeout(() => {
+      setPendingGuess((current) => (current === letter ? null : current));
+    }, 5000);
   };
 
   // Word selection phase
@@ -631,10 +862,18 @@ export default function Game() {
             </p>
             <div className="space-y-2 mb-6">
               {[...game.players].sort((a, b) => a.turnOrder - b.turnOrder).map(p => (
-                <div key={p.userId} className="flex justify-between items-center p-3 bg-primary-bg rounded">
-                  <span>{p.displayName}</span>
+                <div key={getPlayerId(p)} className="flex justify-between items-center p-3 bg-primary-bg rounded">
+                  <span className="flex items-center gap-2">
+                    {p.isBot && p.botId && (
+                      <span className="w-5 h-5 flex-shrink-0" title="AI Player">
+                        <img src={getRobotIconUrl(p.botId)} alt="Bot" className="w-full h-full object-contain" />
+                      </span>
+                    )}
+                    {p.displayName}
+                    {p.isBot && <span className="text-xs text-cyan-400">(AI)</span>}
+                  </span>
                   <span className={p.hasSelectedWord ? 'text-success' : 'text-text-muted'}>
-                    {p.hasSelectedWord ? '✓' : '...'}
+                    {p.hasSelectedWord ? '✓' : p.isBot ? '🤖 Selecting...' : '...'}
                   </span>
                 </div>
               ))}
@@ -790,10 +1029,10 @@ export default function Game() {
           <div className="space-y-2 mb-6">
             {sortedPlayers.map((player, index) => (
               <div
-                key={player.userId}
+                key={getPlayerId(player)}
                 className={`flex justify-between items-center p-3 rounded ${
                   index === 0 ? 'bg-accent/20 border border-accent' : 'bg-primary-bg'
-                }`}
+                } ${player.isBot ? 'border-l-4 border-l-cyan-500' : ''}`}
               >
                 <div className="flex items-center gap-3">
                   <span
@@ -803,9 +1042,15 @@ export default function Game() {
                   >
                     {index + 1}
                   </span>
-                  <span className="font-semibold">
+                  <span className="font-semibold flex items-center gap-2">
+                    {player.isBot && player.botId && (
+                      <span className="w-5 h-5 flex-shrink-0" title="AI Player">
+                        <img src={getRobotIconUrl(player.botId)} alt="Bot" className="w-full h-full object-contain" />
+                      </span>
+                    )}
                     {player.displayName}
                     {player.userId === user?.id && ' (You)'}
+                    {player.isBot && <span className="text-xs text-cyan-400">(AI)</span>}
                   </span>
                 </div>
                 <span className="text-xl font-bold">{player.totalScore} pts</span>
@@ -902,6 +1147,29 @@ export default function Game() {
         <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
       )}
 
+      {/* Turn change flash notification */}
+      {turnChangeFlash && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center pointer-events-none animate-pulse ${
+          turnChangeFlash.isMyTurn
+            ? 'bg-green-500/30'
+            : 'bg-blue-500/20'
+        }`}>
+          <div className={`text-center p-8 rounded-2xl ${
+            turnChangeFlash.isMyTurn
+              ? 'bg-green-600/90 text-white shadow-2xl shadow-green-500/50 scale-110'
+              : 'bg-secondary-bg/95 text-white shadow-xl'
+          }`}>
+            <p className="text-5xl mb-4">{turnChangeFlash.isMyTurn ? '🎯' : '⏳'}</p>
+            <p className="text-3xl font-bold mb-2">
+              {turnChangeFlash.isMyTurn ? "YOUR TURN!" : `${turnChangeFlash.playerName}'s Turn`}
+            </p>
+            {turnChangeFlash.isMyTurn && (
+              <p className="text-lg opacity-90">Make your move!</p>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Blank selection modal */}
       {blankSelectionPending && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
@@ -923,33 +1191,56 @@ export default function Game() {
             </p>
 
             {/* Word display with clickable blanks */}
-            <div className="flex flex-wrap justify-center gap-1 mb-4">
-              {game.players
-                .find(p => p.userId === user?.id)
-                ?.revealedPositions.map((letter, i) => {
-                  const isClickableBlank = blankSelectionPending.positions.includes(i);
-                  const isBlank = letter === 'BLANK';
+            {(() => {
+              const wordLength = game.players.find(p => p.userId === user?.id)?.revealedPositions.length || 0;
+              // Dynamic sizing - shrink for longer words
+              let tileSizeClass: string;
+              let textSizeClass: string;
 
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => isClickableBlank && handleBlankPositionSelect(i)}
-                      disabled={!isClickableBlank}
-                      className={`w-10 h-10 rounded flex items-center justify-center font-bold text-lg transition-all ${
-                        isClickableBlank
-                          ? 'bg-warning text-black cursor-pointer hover:bg-yellow-400 hover:scale-110 ring-2 ring-warning animate-pulse'
-                          : letter
-                            ? isBlank
-                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                              : 'bg-accent text-white cursor-not-allowed'
-                            : 'bg-secondary-bg text-text-muted cursor-not-allowed'
-                      }`}
-                    >
-                      {isClickableBlank ? '?' : letter ? (isBlank ? '•' : letter) : '?'}
-                    </button>
-                  );
-                })}
-            </div>
+              if (wordLength <= 6) {
+                tileSizeClass = 'w-10 h-10';
+                textSizeClass = 'text-lg';
+              } else if (wordLength <= 8) {
+                tileSizeClass = 'w-8 h-8';
+                textSizeClass = 'text-base';
+              } else if (wordLength <= 10) {
+                tileSizeClass = 'w-7 h-7';
+                textSizeClass = 'text-sm';
+              } else {
+                tileSizeClass = 'w-6 h-6';
+                textSizeClass = 'text-xs';
+              }
+
+              return (
+                <div className="flex gap-0.5 justify-center flex-wrap pb-2 mb-4">
+                  {game.players
+                    .find(p => p.userId === user?.id)
+                    ?.revealedPositions.map((letter, i) => {
+                      const isClickableBlank = blankSelectionPending.positions.includes(i);
+                      const isBlank = letter === 'BLANK';
+
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => isClickableBlank && handleBlankPositionSelect(i)}
+                          disabled={!isClickableBlank}
+                          className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all ${
+                            isClickableBlank
+                              ? 'bg-warning text-black cursor-pointer hover:bg-yellow-400 hover:scale-110 ring-2 ring-warning animate-pulse'
+                              : letter
+                                ? isBlank
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                  : 'bg-accent text-white cursor-not-allowed'
+                                : 'bg-secondary-bg text-text-muted cursor-not-allowed'
+                          }`}
+                        >
+                          {isClickableBlank ? '?' : letter ? (isBlank ? '•' : letter) : '?'}
+                        </button>
+                      );
+                    })}
+                </div>
+              );
+            })()}
 
             <p className="text-sm text-text-muted">
               Click on a yellow position to reveal that blank
@@ -979,38 +1270,170 @@ export default function Game() {
             </p>
 
             {/* Word display with clickable duplicate positions */}
-            <div className="flex flex-wrap justify-center gap-1 mb-4">
-              {game.players
-                .find(p => p.userId === user?.id)
-                ?.revealedPositions.map((letter, i) => {
-                  const isClickableDuplicate = duplicateSelectionPending.positions.includes(i);
-                  const isBlank = letter === 'BLANK';
+            {(() => {
+              const wordLength = game.players.find(p => p.userId === user?.id)?.revealedPositions.length || 0;
+              // Dynamic sizing - shrink for longer words
+              let tileSizeClass: string;
+              let textSizeClass: string;
 
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => isClickableDuplicate && handleDuplicatePositionSelect(i)}
-                      disabled={!isClickableDuplicate}
-                      className={`w-10 h-10 rounded flex items-center justify-center font-bold text-lg transition-all ${
-                        isClickableDuplicate
-                          ? 'bg-warning text-black cursor-pointer hover:bg-yellow-400 hover:scale-110 ring-2 ring-warning animate-pulse'
-                          : letter
-                            ? isBlank
-                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                              : 'bg-accent text-white cursor-not-allowed'
-                            : 'bg-secondary-bg text-text-muted cursor-not-allowed'
-                      }`}
-                    >
-                      {isClickableDuplicate ? duplicateSelectionPending.letter : letter ? (isBlank ? '•' : letter) : '?'}
-                    </button>
-                  );
-                })}
-            </div>
+              if (wordLength <= 6) {
+                tileSizeClass = 'w-10 h-10';
+                textSizeClass = 'text-lg';
+              } else if (wordLength <= 8) {
+                tileSizeClass = 'w-8 h-8';
+                textSizeClass = 'text-base';
+              } else if (wordLength <= 10) {
+                tileSizeClass = 'w-7 h-7';
+                textSizeClass = 'text-sm';
+              } else {
+                tileSizeClass = 'w-6 h-6';
+                textSizeClass = 'text-xs';
+              }
+
+              return (
+                <div className="flex gap-0.5 justify-center flex-wrap pb-2 mb-4">
+                  {game.players
+                    .find(p => p.userId === user?.id)
+                    ?.revealedPositions.map((letter, i) => {
+                      const isClickableDuplicate = duplicateSelectionPending.positions.includes(i);
+                      const isBlank = letter === 'BLANK';
+
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => isClickableDuplicate && handleDuplicatePositionSelect(i)}
+                          disabled={!isClickableDuplicate}
+                          className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all ${
+                            isClickableDuplicate
+                              ? 'bg-warning text-black cursor-pointer hover:bg-yellow-400 hover:scale-110 ring-2 ring-warning animate-pulse'
+                              : letter
+                                ? isBlank
+                                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                                  : 'bg-accent text-white cursor-not-allowed'
+                                : 'bg-secondary-bg text-text-muted cursor-not-allowed'
+                          }`}
+                        >
+                          {isClickableDuplicate ? duplicateSelectionPending.letter : letter ? (isBlank ? '•' : letter) : '?'}
+                        </button>
+                      );
+                    })}
+                </div>
+              );
+            })()}
 
             <p className="text-sm text-text-muted">
               Click on a yellow position to reveal that "{duplicateSelectionPending.letter}"
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Expose selection modal - for players who must reveal one of their own letters */}
+      {exposeSelectionPending && exposeSelectionPending.affectedPlayerId === user?.id && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="card w-full max-w-md text-center">
+            <h2 className="text-2xl font-bold mb-2 text-orange-400">🎴 Expose a Letter!</h2>
+            <p className="text-text-secondary mb-4">
+              The active player drew an expose card. You must reveal one of your letters!
+            </p>
+
+            {/* Countdown timer */}
+            <div className={`text-3xl font-mono font-bold mb-4 ${
+              exposeSelectionTimeRemaining <= 10 ? 'text-error animate-pulse' :
+              exposeSelectionTimeRemaining <= 20 ? 'text-warning' : 'text-orange-400'
+            }`}>
+              {exposeSelectionTimeRemaining}s
+            </div>
+            <p className="text-sm text-text-muted mb-4">
+              (Rightmost unrevealed position will be auto-selected on timeout)
+            </p>
+
+            {/* Word display with clickable unrevealed positions - showing actual letters */}
+            {(() => {
+              // Use the padded word from the expose card event data
+              const paddedWord = exposeSelectionPending.paddedWord;
+              const revealedPositions = exposeSelectionPending.revealedPositions;
+              const wordLength = paddedWord.length;
+
+              // Debug info
+              console.log('🎴 Modal rendering - paddedWord:', paddedWord, 'revealedPositions:', revealedPositions);
+
+              // Handle empty data case
+              if (!paddedWord || wordLength === 0) {
+                return (
+                  <div className="text-error mb-4">
+                    Error: Could not load your word. Please wait for auto-selection.
+                  </div>
+                );
+              }
+
+              // Dynamic sizing - shrink for longer words
+              let tileSizeClass: string;
+              let textSizeClass: string;
+
+              if (wordLength <= 6) {
+                tileSizeClass = 'w-10 h-10';
+                textSizeClass = 'text-lg';
+              } else if (wordLength <= 8) {
+                tileSizeClass = 'w-8 h-8';
+                textSizeClass = 'text-base';
+              } else if (wordLength <= 10) {
+                tileSizeClass = 'w-7 h-7';
+                textSizeClass = 'text-sm';
+              } else {
+                tileSizeClass = 'w-6 h-6';
+                textSizeClass = 'text-xs';
+              }
+
+              // The blank character used in the backend
+              const BLANK_CHAR = '\u2022'; // bullet character
+
+              return (
+                <div className="flex gap-0.5 justify-center flex-wrap pb-2 mb-4">
+                  {paddedWord.split('').map((char, i) => {
+                    const isUnrevealed = !revealedPositions[i];
+                    const isBlank = char === BLANK_CHAR;
+
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          console.log('🎴 Button clicked:', i, 'isUnrevealed:', isUnrevealed);
+                          if (isUnrevealed) {
+                            handleExposePositionSelect(i);
+                          }
+                        }}
+                        disabled={!isUnrevealed}
+                        className={`${tileSizeClass} rounded flex items-center justify-center font-bold ${textSizeClass} transition-all ${
+                          isUnrevealed
+                            ? isBlank
+                              ? 'bg-gray-500 text-gray-200 cursor-pointer hover:bg-gray-400 hover:scale-110 ring-2 ring-gray-400'
+                              : 'bg-orange-500 text-black cursor-pointer hover:bg-orange-400 hover:scale-110 ring-2 ring-orange-400 animate-pulse'
+                            : isBlank
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                              : 'bg-accent text-white cursor-not-allowed'
+                        }`}
+                      >
+                        {char}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            <p className="text-sm text-text-muted">
+              Click any highlighted position (orange letters or gray blanks) to reveal it
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Expose selection banner - for other players to see who must expose */}
+      {exposeSelectionPending && exposeSelectionPending.affectedPlayerId !== user?.id && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-40 bg-orange-600/90 text-white px-6 py-3 rounded-lg shadow-lg">
+          <span className="font-bold">🎴 {exposeSelectionPending.affectedPlayerName}</span>
+          <span className="ml-2">must expose a letter... ({exposeSelectionTimeRemaining}s)</span>
         </div>
       )}
 
@@ -1020,7 +1443,7 @@ export default function Game() {
           <div className="card w-full max-w-md text-center">
             <h2 className="text-2xl font-bold mb-2">🎯 Guess the Word!</h2>
             <p className="text-text-secondary mb-4">
-              Type the word you think {game.players.find(p => p.userId === wordGuessActive.targetPlayerId)?.displayName} has chosen.
+              Type the word you think {game.players.find(p => getPlayerId(p) === wordGuessActive.targetPlayerId)?.displayName} has chosen.
             </p>
 
             {/* Countdown timer */}
@@ -1078,7 +1501,7 @@ export default function Game() {
           <div className="card w-full max-w-md text-center">
             <h2 className="text-xl font-bold mb-2">🎯 Word Guess in Progress</h2>
             <p className="text-text-secondary mb-4">
-              {wordGuessActive.guessingPlayerName} is guessing {game.players.find(p => p.userId === wordGuessActive.targetPlayerId)?.displayName}'s word...
+              {wordGuessActive.guessingPlayerName} is guessing {game.players.find(p => getPlayerId(p) === wordGuessActive.targetPlayerId)?.displayName}'s word...
             </p>
             <div className={`text-3xl font-mono font-bold ${
               wordGuessTimeRemaining <= 10 ? 'text-error animate-pulse' :
@@ -1096,7 +1519,7 @@ export default function Game() {
           <div className="card w-full max-w-md text-center">
             <h2 className="text-2xl font-bold mb-2">👁️ Viewer Guess</h2>
             <p className="text-text-secondary mb-4">
-              Guess {game.players.find(p => p.userId === viewerGuessTarget)?.displayName}'s word
+              Guess {game.players.find(p => getPlayerId(p) === viewerGuessTarget)?.displayName}'s word
             </p>
 
             <input
@@ -1159,10 +1582,36 @@ export default function Game() {
           <div className="text-right">
             <p className="text-sm text-text-muted">Round {game.roundNumber}</p>
             <p className="text-lg font-semibold">
-              {myTurn ? "Your Turn" : "Waiting..."}
+              {myTurn ? "Your Turn" : (() => {
+                const currentPlayer = game.players.find(p => getPlayerId(p) === game.currentTurnPlayerId);
+                if (currentPlayer?.isBot) {
+                  return `🤖 ${currentPlayer.displayName}'s Turn`;
+                }
+                return `${currentPlayer?.displayName || 'Player'}'s Turn`;
+              })()}
             </p>
           </div>
         </div>
+
+        {/* Bot turn indicator banner */}
+        {(() => {
+          const botPlayer = game.status === 'ACTIVE'
+            ? game.players.find(p => getPlayerId(p) === game.currentTurnPlayerId && p.isBot)
+            : null;
+          if (!botPlayer) return null;
+          return (
+            <div className="bg-cyan-600/20 border border-cyan-500 rounded-lg p-3 mb-4 flex items-center justify-center gap-3">
+              {botPlayer.botId && (
+                <span className="w-8 h-8 flex-shrink-0 animate-pulse">
+                  <img src={getRobotIconUrl(botPlayer.botId)} alt="Bot" className="w-full h-full object-contain" />
+                </span>
+              )}
+              <span className="text-cyan-400 font-semibold">
+                {botPlayer.displayName} is thinking...
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Game controls */}
         {!isObserver && game.status === 'ACTIVE' && (
@@ -1187,25 +1636,45 @@ export default function Game() {
         {/* Player boards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           {[...game.players].sort((a, b) => a.turnOrder - b.turnOrder).map((player) => {
+            const playerId = getPlayerId(player);
             const isMe = player.userId === user?.id;
-            const isTarget = selectedTarget === player.userId;
-            const isActive = game.currentTurnPlayerId === player.userId;
+            const isBot = player.isBot;
+            const isTarget = selectedTarget === playerId;
+            const isActive = game.currentTurnPlayerId === playerId;
 
             return (
               <div
-                key={player.userId}
-                onClick={() => !isMe && !player.isEliminated && myTurn && setSelectedTarget(player.userId)}
+                key={playerId}
+                onClick={() => !isMe && !player.isEliminated && myTurn && setSelectedTarget(playerId)}
                 className={`card cursor-pointer transition-all ${
                   isTarget ? 'ring-4 ring-warning' : ''
                 } ${isActive && !isTarget ? 'ring-2 ring-green-500' : ''} ${
                   player.isEliminated ? 'opacity-50' : ''
-                }`}
+                } ${isBot ? 'border-l-4 border-l-cyan-500' : ''}`}
               >
                 <div className="flex justify-between items-center mb-3">
                   <div>
-                    <p className="font-bold">{player.displayName} {isMe && '(You)'}</p>
+                    <p className="font-bold flex items-center gap-2">
+                      {isBot && player.botId && (
+                        <span className="w-6 h-6 flex-shrink-0" title="AI Player">
+                          <img src={getRobotIconUrl(player.botId)} alt="Bot" className="w-full h-full object-contain" />
+                        </span>
+                      )}
+                      {player.displayName} {isMe && '(You)'}
+                      {isBot && (
+                        <span className="px-1.5 py-0.5 text-xs bg-cyan-600/30 text-cyan-400 rounded font-normal">
+                          AI
+                        </span>
+                      )}
+                    </p>
+                    {isBot && player.botModelName && (
+                      <span className="text-xs text-cyan-400/70">{player.botModelName}</span>
+                    )}
                     {player.isEliminated && (
                       <span className="text-xs text-player-eliminated">Eliminated</span>
+                    )}
+                    {isActive && !player.isEliminated && isBot && (
+                      <span className="text-xs text-cyan-400 animate-pulse">AI thinking...</span>
                     )}
                     {/* Show secret word toggle for own player */}
                     {isMe && player.mySecretWord && (
@@ -1231,34 +1700,62 @@ export default function Game() {
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-1">
-                  {player.revealedPositions.map((letter, i) => {
-                    const isBlank = letter === 'BLANK';
-                    // Calculate point value: 5, 10, 15 repeating pattern
-                    const pointValues = [5, 10, 15];
-                    const pointValue = pointValues[i % 3];
+                {/* Calculate dynamic sizing based on word length - tiles shrink to fit */}
+                {(() => {
+                  const wordLength = player.revealedPositions.length;
+                  // Calculate tile size dynamically - shrink for longer words
+                  // Base sizes decrease as word length increases to fit on one line
+                  let tileSizeClass: string;
+                  let textSizeClass: string;
 
-                    return (
-                      <div key={i} className="flex flex-col items-center">
-                        <div
-                          className={
-                            letter
-                              ? isBlank
-                                ? 'letter-tile-revealed bg-gray-600 text-gray-400'
-                                : 'letter-tile-revealed'
-                              : 'letter-tile-concealed'
-                          }
-                        >
-                          {letter ? (isBlank ? '\u2022' : letter) : '?'}
-                        </div>
-                        {/* Show point value for unrevealed positions */}
-                        {!letter && (
-                          <span className="text-xs text-text-muted mt-0.5">{pointValue}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                  if (wordLength <= 5) {
+                    tileSizeClass = 'w-12 h-12 md:w-14 md:h-14';
+                    textSizeClass = 'text-xl md:text-2xl';
+                  } else if (wordLength <= 7) {
+                    tileSizeClass = 'w-10 h-10 md:w-12 md:h-12';
+                    textSizeClass = 'text-lg md:text-xl';
+                  } else if (wordLength <= 9) {
+                    tileSizeClass = 'w-8 h-8 md:w-10 md:h-10';
+                    textSizeClass = 'text-base md:text-lg';
+                  } else if (wordLength <= 11) {
+                    tileSizeClass = 'w-7 h-7 md:w-8 md:h-8';
+                    textSizeClass = 'text-sm md:text-base';
+                  } else {
+                    tileSizeClass = 'w-6 h-6 md:w-7 md:h-7';
+                    textSizeClass = 'text-xs md:text-sm';
+                  }
+
+                  return (
+                    <div className="flex gap-0.5 md:gap-1 justify-start pb-2">
+                      {player.revealedPositions.map((letter, i) => {
+                        const isBlank = letter === 'BLANK';
+                        // Calculate point value: 5, 10, 15 repeating pattern
+                        const pointValues = [5, 10, 15];
+                        const pointValue = pointValues[i % 3];
+
+                        return (
+                          <div key={i} className="flex flex-col items-center min-w-0">
+                            <div
+                              className={`${tileSizeClass} ${textSizeClass} flex items-center justify-center font-bold border-2 rounded transition-all duration-200 ${
+                                letter
+                                  ? isBlank
+                                    ? 'bg-gray-600 text-gray-400 border-tile-border'
+                                    : 'bg-tile-revealed border-tile-border text-primary-bg'
+                                  : 'bg-tile-concealed border-tile-border text-transparent'
+                              }`}
+                            >
+                              {letter ? (isBlank ? '\u2022' : letter) : '?'}
+                            </div>
+                            {/* Show point value for unrevealed positions */}
+                            {!letter && (
+                              <span className="text-xs text-text-muted mt-0.5">{pointValue}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
 
                 {/* Missed letters display */}
                 {player.missedLetters && player.missedLetters.length > 0 && (
@@ -1270,12 +1767,40 @@ export default function Game() {
                   </div>
                 )}
 
+                {/* Guessed words display */}
+                {player.guessedWords && player.guessedWords.length > 0 && (
+                  <div className="mt-1 text-sm">
+                    <span className="text-orange-400">Guessed: </span>
+                    <span className="text-orange-300 font-mono">
+                      {player.guessedWords.join(', ')}
+                    </span>
+                  </div>
+                )}
+
+                {/* Turn card button - only for active player viewing their own card */}
+                {isActive && isMe && !player.isEliminated && currentTurnCard && (
+                  <div
+                    className={`mt-3 w-full py-2 px-3 font-bold rounded text-center text-sm ${
+                      currentTurnCard.type === 'normal'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-red-600 text-white'
+                    }`}
+                  >
+                    <div>🎴 {currentTurnCard.label}</div>
+                    {currentTurnCard.multiplier && !game.turnCardUsed && (
+                      <div className="text-xs mt-1 opacity-80">
+                        (First hit x{currentTurnCard.multiplier})
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Guess Now button - only for other players who aren't eliminated (not for observers) */}
                 {!isObserver && !isMe && !player.isEliminated && !wordGuessActive && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleInitiateWordGuess(player.userId);
+                      handleInitiateWordGuess(playerId);
                     }}
                     className="mt-3 w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded transition-colors text-sm"
                   >
@@ -1288,7 +1813,7 @@ export default function Game() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setViewerGuessTarget(player.userId);
+                      setViewerGuessTarget(playerId);
                     }}
                     className="mt-3 w-full py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded transition-colors text-sm"
                   >
@@ -1307,24 +1832,42 @@ export default function Game() {
               {selectedTarget ? 'Select a letter to guess' : 'Select a player first'}
             </p>
             <div className="grid grid-cols-9 md:grid-cols-13 gap-2">
-              {alphabet.map((letter) => (
-                <button
-                  key={letter}
-                  onClick={() => handleLetterGuess(letter)}
-                  disabled={!selectedTarget}
-                  className="aspect-square bg-secondary-bg hover:bg-accent text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  {letter}
-                </button>
-              ))}
+              {alphabet.map((letter) => {
+                const isPending = pendingGuess === letter;
+                const isDisabled = !selectedTarget || (pendingGuess !== null && !isPending);
+                return (
+                  <button
+                    key={letter}
+                    onClick={() => handleLetterGuess(letter)}
+                    disabled={isDisabled}
+                    className={`aspect-square font-bold rounded transition-colors ${
+                      isPending
+                        ? 'bg-accent text-white animate-pulse'
+                        : 'bg-secondary-bg hover:bg-accent text-white'
+                    } ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  >
+                    {letter}
+                  </button>
+                );
+              })}
               {/* BLANK button for guessing blanks */}
-              <button
-                onClick={() => handleLetterGuess('BLANK')}
-                disabled={!selectedTarget}
-                className="col-span-2 aspect-[2/1] bg-gray-600 hover:bg-gray-500 text-gray-300 font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-sm"
-              >
-                BLANK
-              </button>
+              {(() => {
+                const isPending = pendingGuess === 'BLANK';
+                const isDisabled = !selectedTarget || (pendingGuess !== null && !isPending);
+                return (
+                  <button
+                    onClick={() => handleLetterGuess('BLANK')}
+                    disabled={isDisabled}
+                    className={`col-span-2 aspect-[2/1] font-bold rounded transition-colors text-sm ${
+                      isPending
+                        ? 'bg-gray-400 text-white animate-pulse'
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                    } ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  >
+                    BLANK
+                  </button>
+                );
+              })()}
             </div>
           </div>
         )}

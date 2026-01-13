@@ -1,0 +1,1149 @@
+{
+  "id": "7e4d2d7e-e065-46aa-8658-cb70229c86a7",
+  "roomCode": "jay_2601061643",
+  "status": "COMPLETED",
+  "createdAt": "2026-01-06T22:43:45.229Z",
+  "startedAt": "2026-01-06T22:46:04.533Z",
+  "completedAt": "2026-01-06T23:02:37.705Z",
+  "players": [
+    {
+      "id": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "userId": "36f32b00-e7a1-4ac6-a772-0fd6f1c04a8e",
+      "displayName": "jay",
+      "secretWord": "HYDROGEN",
+      "paddedWord": "••••HYDROGEN",
+      "frontPadding": 4,
+      "backPadding": 0,
+      "totalScore": 240,
+      "isEliminated": true,
+      "turnOrder": 0,
+      "isBot": false,
+      "botId": null,
+      "botModelName": null,
+      "botDifficulty": null,
+      "botConfig": null
+    },
+    {
+      "id": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "userId": null,
+      "displayName": "Googs Bot",
+      "secretWord": "JAZZED",
+      "paddedWord": "•JAZZED•••",
+      "frontPadding": 1,
+      "backPadding": 3,
+      "totalScore": -195,
+      "isEliminated": false,
+      "turnOrder": 3,
+      "isBot": true,
+      "botId": "bot_c67c32ab-088f-4c5c-8974-fb37602db194",
+      "botModelName": "google/gemini-2.0-flash-exp:free",
+      "botDifficulty": "hard",
+      "botConfig": {
+        "id": "bot_c67c32ab-088f-4c5c-8974-fb37602db194",
+        "provider": "openrouter",
+        "modelName": "google/gemini-2.0-flash-exp:free",
+        "difficulty": "hard",
+        "displayName": "Googs Bot",
+        "ollamaOptions": {
+          "top_k": 40,
+          "top_p": 0.9,
+          "num_predict": 100,
+          "temperature": 0.7
+        }
+      }
+    },
+    {
+      "id": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "userId": null,
+      "displayName": "McBot",
+      "secretWord": "BLAZER",
+      "paddedWord": "•BLAZER",
+      "frontPadding": 1,
+      "backPadding": 0,
+      "totalScore": -235,
+      "isEliminated": true,
+      "turnOrder": 1,
+      "isBot": true,
+      "botId": "bot_22f719b0-5929-4970-8c86-f7589262bd42",
+      "botModelName": "G_2:latest",
+      "botDifficulty": "hard",
+      "botConfig": {
+        "id": "bot_22f719b0-5929-4970-8c86-f7589262bd42",
+        "provider": "ollama",
+        "modelName": "G_2:latest",
+        "difficulty": "hard",
+        "displayName": "McBot",
+        "ollamaOptions": {
+          "top_k": 40,
+          "top_p": 0.9,
+          "num_predict": 100,
+          "temperature": 0.7
+        }
+      }
+    },
+    {
+      "id": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "userId": null,
+      "displayName": "I am bot",
+      "secretWord": "QUENCH",
+      "paddedWord": "QUENCH•",
+      "frontPadding": 0,
+      "backPadding": 1,
+      "totalScore": 30,
+      "isEliminated": true,
+      "turnOrder": 2,
+      "isBot": true,
+      "botId": "bot_403e3e8d-3af9-4594-9a98-da33d12b8c21",
+      "botModelName": "z-ai/glm-4.5-air:free",
+      "botDifficulty": "hard",
+      "botConfig": {
+        "id": "bot_403e3e8d-3af9-4594-9a98-da33d12b8c21",
+        "provider": "openrouter",
+        "modelName": "z-ai/glm-4.5-air:free",
+        "difficulty": "hard",
+        "displayName": "I am bot",
+        "ollamaOptions": {
+          "top_k": 40,
+          "top_p": 0.9,
+          "num_predict": 100,
+          "temperature": 0.7
+        }
+      }
+    }
+  ],
+  "turns": [
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "targetPlayerName": "McBot",
+      "guessedLetter": "E",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T22:46:25.567Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "targetPlayerName": "McBot",
+      "guessedLetter": "L",
+      "isCorrect": true,
+      "positionsRevealed": [
+        2
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T22:46:32.448Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "targetPlayerName": "McBot",
+      "guessedLetter": "A",
+      "isCorrect": true,
+      "positionsRevealed": [
+        3
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T22:46:38.904Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "targetPlayerName": "McBot",
+      "guessedLetter": "M",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:46:43.841Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T22:46:47.177Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        1
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T22:46:53.880Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "E",
+      "isCorrect": true,
+      "positionsRevealed": [
+        10
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T22:47:01.539Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:47:12.989Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "A",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:47:20.440Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "O",
+      "isCorrect": true,
+      "positionsRevealed": [
+        8
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T22:47:24.648Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        2
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T22:47:29.787Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        3
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T22:47:33.969Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:47:37.751Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "targetPlayerName": "McBot",
+      "guessedLetter": "Z",
+      "isCorrect": true,
+      "positionsRevealed": [
+        4
+      ],
+      "pointsScored": 40,
+      "createdAt": "2026-01-06T22:47:47.303Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "targetPlayerName": "McBot",
+      "guessedLetter": "WORD:BLAZE",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:48:14.047Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:48:49.263Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:48:52.809Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "N",
+      "isCorrect": true,
+      "positionsRevealed": [
+        3
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T22:49:02.754Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "E",
+      "isCorrect": true,
+      "positionsRevealed": [
+        2
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T22:49:05.205Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "R",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:49:11.756Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "I",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:49:22.188Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "N",
+      "isCorrect": true,
+      "positionsRevealed": [
+        11
+      ],
+      "pointsScored": 60,
+      "createdAt": "2026-01-06T22:49:29.882Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "S",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:49:37.043Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:49:41.351Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "N",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:49:46.814Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:49:54.367Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "H",
+      "isCorrect": true,
+      "positionsRevealed": [
+        4
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T22:50:02.035Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "R",
+      "isCorrect": true,
+      "positionsRevealed": [
+        7
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T22:50:08.078Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:50:11.483Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "targetPlayerName": "McBot",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:50:16.980Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "E",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 75,
+      "createdAt": "2026-01-06T22:50:21.759Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "R",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:50:32.914Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:50:36.773Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "D",
+      "isCorrect": true,
+      "positionsRevealed": [
+        6
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T22:50:42.382Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "targetPlayerName": "McBot",
+      "guessedLetter": "WORD:BLAZER",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "pointsScored": 50,
+      "createdAt": "2026-01-06T22:50:43.803Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "L",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:50:52.270Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "I",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:51:35.328Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "T",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:51:43.582Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "A",
+      "isCorrect": true,
+      "positionsRevealed": [
+        2
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T22:51:51.605Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "O",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:51:57.232Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "BLANK",
+      "isCorrect": true,
+      "positionsRevealed": [
+        6
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T22:52:01.435Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "A",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:52:05.901Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "S",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:52:15.725Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "H",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:52:26.146Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "D",
+      "isCorrect": true,
+      "positionsRevealed": [
+        6
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T22:52:31.862Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "L",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:52:36.966Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "S",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:52:42.083Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "L",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:52:47.633Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "C",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:53:03.425Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "U",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:53:13.212Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:53:18.129Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:53:23.043Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "I",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:53:54.419Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:54:00.795Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "M",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:54:05.641Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:54:09.123Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "N",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:54:40.246Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:54:43.898Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "W",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:54:50.902Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "O",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:54:55.526Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "H",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 15,
+      "createdAt": "2026-01-06T22:54:59.545Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:55:04.214Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "C",
+      "isCorrect": true,
+      "positionsRevealed": [
+        4
+      ],
+      "pointsScored": 10,
+      "createdAt": "2026-01-06T22:55:17.877Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "B",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:55:26.615Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:55:31.189Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "C",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:55:38.516Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "U",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:55:46.131Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "W",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:56:05.040Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "M",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:56:13.447Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "W",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:56:23.374Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "playerName": "Googs Bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "F",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:56:27.362Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "D",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:57:11.515Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "U",
+      "isCorrect": true,
+      "positionsRevealed": [
+        1
+      ],
+      "pointsScored": 40,
+      "createdAt": "2026-01-06T22:57:22.207Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "f00c6cd4-4fa9-4b8c-a47b-4cdd50ad2394",
+      "playerName": "McBot",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "BLANK",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": -50,
+      "createdAt": "2026-01-06T22:57:28.407Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "G",
+      "isCorrect": true,
+      "positionsRevealed": [
+        9
+      ],
+      "pointsScored": 5,
+      "createdAt": "2026-01-06T22:57:35.376Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "playerName": "jay",
+      "targetPlayerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "targetPlayerName": "I am bot",
+      "guessedLetter": "WORD:QUENCH",
+      "isCorrect": true,
+      "positionsRevealed": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "pointsScored": 50,
+      "createdAt": "2026-01-06T22:57:37.014Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "a373a1e5-08f8-4c78-9b7a-aa7ba0fb6041",
+      "targetPlayerName": "jay",
+      "guessedLetter": "Y",
+      "isCorrect": true,
+      "positionsRevealed": [
+        5
+      ],
+      "pointsScored": 65,
+      "createdAt": "2026-01-06T22:57:39.205Z"
+    },
+    {
+      "turnNumber": 1,
+      "playerId": "96b5144c-d32a-41b8-8083-e1044933a391",
+      "playerName": "I am bot",
+      "targetPlayerId": "32d704e8-e038-4513-aed1-aeeb4df7e83f",
+      "targetPlayerName": "Googs Bot",
+      "guessedLetter": "F",
+      "isCorrect": false,
+      "positionsRevealed": [],
+      "pointsScored": 0,
+      "createdAt": "2026-01-06T22:57:45.609Z"
+    }
+  ],
+  "results": [
+    {
+      "playerId": "36f32b00-e7a1-4ac6-a772-0fd6f1c04a8e",
+      "displayName": "jay",
+      "finalScore": 240,
+      "isBot": false,
+      "placement": 1
+    },
+    {
+      "playerId": "bot_403e3e8d-3af9-4594-9a98-da33d12b8c21",
+      "displayName": "I am bot",
+      "finalScore": 30,
+      "isBot": true,
+      "placement": 2
+    },
+    {
+      "playerId": "bot_c67c32ab-088f-4c5c-8974-fb37602db194",
+      "displayName": "Googs Bot",
+      "finalScore": -195,
+      "isBot": true,
+      "placement": 3
+    },
+    {
+      "playerId": "bot_22f719b0-5929-4970-8c86-f7589262bd42",
+      "displayName": "McBot",
+      "finalScore": -235,
+      "isBot": true,
+      "placement": 4
+    }
+  ],
+  "viewerGuesses": []
+}

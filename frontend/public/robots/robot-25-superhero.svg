@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Cape -->
+  <path d="M25 45 Q15 70 20 95 L50 85 L80 95 Q85 70 75 45 Z" fill="#dc2626"/>
+  <!-- Body -->
+  <rect x="30" y="45" width="40" height="35" rx="5" fill="#2563eb"/>
+  <!-- Hero emblem -->
+  <polygon points="50,50 55,60 65,60 57,67 60,77 50,71 40,77 43,67 35,60 45,60" fill="#fbbf24"/>
+  <!-- Head -->
+  <rect x="25" y="15" width="50" height="35" rx="8" fill="#3b82f6"/>
+  <!-- Mask -->
+  <path d="M25 25 L40 30 L50 25 L60 30 L75 25 L75 35 L60 35 L50 40 L40 35 L25 35 Z" fill="#1e40af"/>
+  <!-- Eyes (determined) -->
+  <rect x="34" y="28" width="10" height="6" rx="2" fill="white"/>
+  <rect x="56" y="28" width="10" height="6" rx="2" fill="white"/>
+  <rect x="37" y="29" width="4" height="4" fill="#1e1b4b"/>
+  <rect x="59" y="29" width="4" height="4" fill="#1e1b4b"/>
+  <!-- Determined mouth -->
+  <line x1="42" y1="44" x2="58" y2="44" stroke="#1e1b4b" stroke-width="2" stroke-linecap="round"/>
+  <!-- Arms (flexing) -->
+  <ellipse cx="22" cy="55" rx="8" ry="12" fill="#3b82f6"/>
+  <ellipse cx="78" cy="55" rx="8" ry="12" fill="#3b82f6"/>
+  <!-- Legs -->
+  <rect x="35" y="80" width="12" height="15" rx="3" fill="#1e40af"/>
+  <rect x="53" y="80" width="12" height="15" rx="3" fill="#1e40af"/>
+  <!-- Boots -->
+  <rect x="35" y="90" width="12" height="5" rx="2" fill="#dc2626"/>
+  <rect x="53" y="90" width="12" height="5" rx="2" fill="#dc2626"/>
+</svg>

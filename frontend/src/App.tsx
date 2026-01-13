@@ -4,6 +4,8 @@ import Home from './pages/Home';
 import Lobby from './pages/Lobby';
 import Game from './pages/Game';
 import GameHistory from './pages/GameHistory';
+import AIStats from './pages/AIStats';
+import BotCreator from './pages/BotCreator';
 import Login from './pages/Login';
 import { useAppSelector, useAppDispatch } from './store/hooks';
 import { logout, updateToken } from './store/slices/authSlice';
@@ -20,6 +22,12 @@ function App() {
     socketService.setAuthErrorHandler(() => {
       console.log('🔒 Auth error - logging out');
       dispatch(logout());
+    });
+
+    // Handle token refresh from socket service
+    socketService.setTokenRefreshedHandler((newToken: string) => {
+      console.log('🔄 Token refreshed from socket, updating store');
+      dispatch(updateToken(newToken));
     });
   }, [dispatch]);
 
@@ -62,6 +70,8 @@ function App() {
         <Route path="/game/:roomCode" element={<Game />} />
         <Route path="/history" element={<GameHistory />} />
         <Route path="/history/:roomCode" element={<GameHistory />} />
+        <Route path="/ai-stats" element={<AIStats />} />
+        <Route path="/bot-creator" element={<BotCreator />} />
       </Routes>
     </div>
   );

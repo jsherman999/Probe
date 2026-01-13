@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Body -->
+  <rect x="30" y="45" width="40" height="35" rx="5" fill="#6366f1"/>
+  <!-- Head -->
+  <rect x="25" y="15" width="50" height="35" rx="8" fill="#818cf8"/>
+  <!-- Lab Glasses -->
+  <circle cx="38" cy="30" r="8" fill="none" stroke="#1e1b4b" stroke-width="2"/>
+  <circle cx="62" cy="30" r="8" fill="none" stroke="#1e1b4b" stroke-width="2"/>
+  <line x1="46" y1="30" x2="54" y2="30" stroke="#1e1b4b" stroke-width="2"/>
+  <!-- Eyes behind glasses -->
+  <circle cx="38" cy="30" r="3" fill="#1e1b4b"/>
+  <circle cx="62" cy="30" r="3" fill="#1e1b4b"/>
+  <!-- Lab coat collar -->
+  <path d="M35 50 L50 60 L65 50" fill="none" stroke="white" stroke-width="3"/>
+  <!-- Arms -->
+  <rect x="20" y="50" width="10" height="20" rx="3" fill="#818cf8"/>
+  <rect x="70" y="50" width="10" height="20" rx="3" fill="#818cf8"/>
+  <!-- Beaker in hand -->
+  <path d="M75 65 L78 75 L82 75 L85 65 Z" fill="#22d3ee" stroke="#0891b2" stroke-width="1"/>
+  <ellipse cx="80" cy="72" rx="3" ry="2" fill="#67e8f9"/>
+  <!-- Legs -->
+  <rect x="35" y="80" width="12" height="15" rx="3" fill="#6366f1"/>
+  <rect x="53" y="80" width="12" height="15" rx="3" fill="#6366f1"/>
+  <!-- Antenna -->
+  <line x1="50" y1="15" x2="50" y2="8" stroke="#6366f1" stroke-width="2"/>
+  <circle cx="50" cy="5" r="3" fill="#22d3ee"/>
+</svg>

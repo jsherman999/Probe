@@ -16,8 +16,6 @@ model User {
 
   hostedGames   Game[]        @relation("HostedGames")
   gamePlayers   GamePlayer[]
-  turnsPlayed   GameTurn[]    @relation("PlayerTurns")
-  turnsTargeted GameTurn[]    @relation("TargetedTurns")
   gameResults   GameResult[]
 
   @@map("users")
@@ -33,6 +31,10 @@ model Game {
   roundNumber          Int       @default(1)
   turnTimerSeconds     Int       @default(300) // 5 minutes default, min 10 seconds
   currentTurnStartedAt DateTime?
+  currentTurnCard      String?   // Card type for current turn (normal, additional, expose_left, etc.)
+  turnCardMultiplier   Int       @default(1) // Multiplier for first successful guess (1-5)
+  turnCardUsed         Boolean   @default(false) // Whether the card/multiplier effect has been used this turn
+  pendingExposePlayerId String?  // Player who must expose a letter (for expose cards)
   createdAt            DateTime  @default(now())
   startedAt            DateTime?
   completedAt          DateTime?
@@ -48,7 +50,9 @@ model Game {
 model GamePlayer {
   id                String   @id @default(uuid())
   gameId            String
-  userId            String
+  userId            String?  // Nullable for bot players
+  botId             String?  // Bot identifier (for bot players)
+  isBot             Boolean  @default(false)
   turnOrder         Int
   secretWord        String?
   secretWordHash    String?
@@ -57,14 +61,25 @@ model GamePlayer {
   backPadding       Int      @default(0) // Number of blanks at back
   revealedPositions Json     @default("[]")
   missedLetters     String[] @default([]) // Letters guessed incorrectly against this player
+  guessedWords      String[] @default([]) // Words guessed against this player (correct or incorrect)
   totalScore        Int      @default(0)
   isEliminated      Boolean  @default(false)
   joinedAt          DateTime @default(now())
 
+  // Bot-specific fields (stored as JSON for flexibility)
+  botDisplayName    String?  // Bot's display name
+  botModelName      String?  // Ollama model used
+  botDifficulty     String?  // easy, medium, hard
+  botConfig         Json?    // Full bot configuration (ollamaOptions, personality, etc.)
+
   game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
+
+  turnsPlayed   GameTurn[] @relation("PlayerTurns")
+  turnsTargeted GameTurn[] @relation("TargetedTurns")
 
   @@unique([gameId, userId])
+  @@unique([gameId, botId])
   @@map("game_players")
 }
 
@@ -80,9 +95,9 @@ model GameTurn {
   turnNumber        Int
   createdAt         DateTime @default(now())
 
-  game         Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  player       User @relation("PlayerTurns", fields: [playerId], references: [id])
-  targetPlayer User @relation("TargetedTurns", fields: [targetPlayerId], references: [id])
+  game         Game       @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  player       GamePlayer @relation("PlayerTurns", fields: [playerId], references: [id])
+  targetPlayer GamePlayer @relation("TargetedTurns", fields: [targetPlayerId], references: [id])
 
   @@map("game_turns")
 }
@@ -99,4 +114,21 @@ model GameResult {
   player User @relation(fields: [playerId], references: [id])
 
   @@map("game_results")
+}
+
+// Bot preset configurations (saved bot templates)
+model BotPreset {
+  id           String   @id @default(uuid())
+  presetName   String   @unique  // User-friendly name for the preset
+  displayName  String   // Default display name for bots using this preset
+  modelName    String   // LLM model name (e.g., "llama3.2:3b" for Ollama, "openai/gpt-4" for OpenRouter)
+  difficulty   String   @default("medium") // easy, medium, hard
+  provider     String   @default("ollama") // ollama or openrouter
+  personality  String?  // Optional personality prompt
+  ollamaConfig Json     @default("{}") // OllamaGenerateOptions as JSON
+  iconSvg      String?  // Custom SVG icon for the bot (from robot generator API)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("bot_presets")
 }
