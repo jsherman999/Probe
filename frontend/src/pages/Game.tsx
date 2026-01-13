@@ -7,10 +7,17 @@ import { getRobotIconUrl } from '../utils/robotIcons';
 
 // Toast notification component
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+  // Use a ref to store onClose so we can use it without adding it as a dependency
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
-    const timer = setTimeout(onClose, 4000);
+    // Auto-dismiss after 5 seconds
+    const timer = setTimeout(() => {
+      onCloseRef.current();
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [onClose]);
+  }, [message]); // Reset timer when message changes
 
   return (
     <div className="fixed top-4 right-4 z-50 bg-warning text-black px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-pulse">
@@ -1416,7 +1423,7 @@ export default function Game() {
             })()}
 
             <p className="text-sm text-text-muted">
-              Click on an orange position to reveal that letter
+              Click any highlighted position (orange letters or gray blanks) to reveal it
             </p>
           </div>
         </div>
@@ -1756,6 +1763,16 @@ export default function Game() {
                     <span className="text-red-400">Missed: </span>
                     <span className="text-red-300 font-mono">
                       {[...player.missedLetters].sort().join(', ')}
+                    </span>
+                  </div>
+                )}
+
+                {/* Guessed words display */}
+                {player.guessedWords && player.guessedWords.length > 0 && (
+                  <div className="mt-1 text-sm">
+                    <span className="text-orange-400">Guessed: </span>
+                    <span className="text-orange-300 font-mono">
+                      {player.guessedWords.join(', ')}
                     </span>
                   </div>
                 )}
