@@ -37,8 +37,9 @@ const corsOriginHandler = (origin: string | undefined, callback: (err: Error | n
     callback(null, true);
     return;
   }
-  // Allow ngrok, localtunnel, and other tunneling services
-  if (origin.includes('ngrok') || origin.includes('loca.lt') || origin.includes('localhost')) {
+  // Allow ngrok, localtunnel, cloudflare tunnels, and other tunneling services
+  if (origin.includes('ngrok') || origin.includes('loca.lt') || origin.includes('localhost') ||
+      origin.includes('trycloudflare.com') || origin.includes('cloudflare')) {
     callback(null, true);
     return;
   }

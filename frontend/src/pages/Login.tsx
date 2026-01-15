@@ -1,14 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppDispatch } from '../store/hooks';
 import { setCredentials } from '../store/slices/authSlice';
 import api from '../services/api';
+import { getApiBaseUrl } from '../utils/config';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
   const dispatch = useAppDispatch();
+
+  // Debug: show configuration info (useful for troubleshooting iOS)
+  useEffect(() => {
+    const info = [
+      `API URL: ${getApiBaseUrl()}`,
+      `Location: ${window.location.origin}`,
+      `Hostname: ${window.location.hostname}`,
+      `Port: ${window.location.port || '(default)'}`,
+      `Protocol: ${window.location.protocol}`,
+      `UA: ${navigator.userAgent.slice(0, 50)}...`,
+    ].join('\n');
+    setDebugInfo(info);
+    console.log('🔧 Debug info:', info);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,6 +32,7 @@ export default function Login() {
     setLoading(true);
 
     try {
+      console.log('🔐 Login attempt - API baseURL:', api.defaults.baseURL);
       const response = await api.post('/auth/login', {
         username: username.trim(),
         displayName: displayName.trim() || username.trim(),
@@ -23,7 +40,9 @@ export default function Login() {
 
       dispatch(setCredentials(response.data));
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed');
+      console.error('🔐 Login error:', err);
+      const errorMsg = err.response?.data?.error || err.message || 'Login failed';
+      setError(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
     } finally {
       setLoading(false);
     }
@@ -90,6 +109,14 @@ export default function Login() {
             <li>• Highest score wins!</li>
           </ul>
         </div>
+
+        {/* Debug info - tap to toggle */}
+        <details className="mt-4 text-xs text-text-secondary">
+          <summary className="cursor-pointer opacity-50 hover:opacity-100">Debug Info</summary>
+          <pre className="mt-2 p-2 bg-bg-secondary rounded text-[10px] overflow-x-auto whitespace-pre-wrap">
+            {debugInfo}
+          </pre>
+        </details>
       </div>
     </div>
   );

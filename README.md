@@ -245,6 +245,71 @@ A live backend log viewer is available for users on the hosting server (localhos
 ### Option 2: Native (macOS)
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
 
+## 🌐 Remote Access (Cloudflare Tunnel)
+
+The app supports single-port deployment for remote access via tunneling services like Cloudflare Tunnel or ngrok. This allows mobile devices and external users to access your locally-hosted game.
+
+### How It Works
+- **Single-port mode**: Backend serves both API and frontend static files on port 3000
+- **Dynamic URL detection**: Frontend automatically detects same-origin mode and uses relative URLs
+- **No `.env` required**: For tunnel deployment, remove/rename `frontend/.env` to enable dynamic detection
+
+### Setup with Cloudflare Tunnel (Free)
+
+1. **Install cloudflared**
+   ```bash
+   brew install cloudflared
+   ```
+
+2. **Quick Tunnel (Random URL - changes on restart)**
+   ```bash
+   cloudflared tunnel --url http://localhost:3000
+   ```
+   This gives you a random URL like `https://random-words.trycloudflare.com`
+
+3. **Using launchd (macOS service)**
+
+   A launchd plist is provided at `~/Library/LaunchAgents/com.probe.cloudflared.plist`:
+   ```bash
+   # Start tunnel
+   launchctl start com.probe.cloudflared
+
+   # Stop tunnel
+   launchctl stop com.probe.cloudflared
+
+   # Get current tunnel URL
+   grep -o 'https://[a-z-]*\.trycloudflare\.com' ~/cc_projects/Probe/logs/cloudflared.log | tail -1
+
+   # View logs
+   tail -f ~/cc_projects/Probe/logs/cloudflared.log
+   ```
+
+### Persistent URL (Optional)
+
+For a URL that doesn't change on restart, create a named tunnel:
+
+1. **Login to Cloudflare** (one-time)
+   ```bash
+   cloudflared tunnel login
+   ```
+
+2. **Create named tunnel**
+   ```bash
+   cloudflared tunnel create probe
+   ```
+
+3. **Run with persistent subdomain**
+   ```bash
+   cloudflared tunnel run --url http://localhost:3000 probe
+   ```
+
+This gives you a fixed `*.cfargotunnel.com` subdomain, or you can attach your own domain via Cloudflare DNS.
+
+### iOS/Mobile Notes
+- The app works on iOS Safari and Chrome via tunnel URLs
+- Ensure `frontend/.env` is removed/renamed for proper URL detection
+- Debug info is available on the login page (tap "Debug Info" to verify configuration)
+
 ## 📊 Scoring System
 
 ### Position-Based Scoring

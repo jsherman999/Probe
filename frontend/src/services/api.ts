@@ -3,10 +3,15 @@ import { getApiBaseUrl } from '../utils/config';
 
 const API_URL = getApiBaseUrl();
 
+// Only use credentials for cross-origin requests (iOS ITP blocks with credentials on same-origin)
+const isSameOrigin = API_URL.startsWith('/') || API_URL.startsWith(window.location.origin);
+
 const api = axios.create({
   baseURL: API_URL,
+  withCredentials: !isSameOrigin, // Only for cross-origin (iOS ITP workaround)
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true', // Bypass ngrok interstitial for API calls
   },
 });
 

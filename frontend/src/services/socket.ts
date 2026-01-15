@@ -3,6 +3,9 @@ import { getSocketUrl, getServerUrl } from '../utils/config';
 
 const SOCKET_URL = getSocketUrl();
 
+// Only use credentials for cross-origin requests (iOS ITP blocks with credentials)
+const isSameOrigin = SOCKET_URL === window.location.origin || SOCKET_URL.startsWith('/');
+
 interface SocketConfig {
   reconnectionAttempts: number;
   reconnectionDelay: number;
@@ -41,7 +44,7 @@ class SocketService {
       this.socket = null;
     }
 
-    console.log('🔌 Creating new socket connection to', SOCKET_URL);
+    console.log('🔌 Creating new socket connection to', SOCKET_URL, '(same-origin:', isSameOrigin, ')');
     this.socket = io(SOCKET_URL, {
       auth: { token },
       reconnection: true,
@@ -49,7 +52,11 @@ class SocketService {
       reconnectionDelay: this.config.reconnectionDelay,
       reconnectionDelayMax: this.config.reconnectionDelayMax,
       timeout: this.config.timeout,
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'], // Polling first for better proxy/tunnel compatibility
+      withCredentials: !isSameOrigin, // Only for cross-origin (iOS ITP workaround)
+      extraHeaders: {
+        'ngrok-skip-browser-warning': 'true', // Bypass ngrok interstitial
+      },
     });
 
     this.setupEventHandlers();
