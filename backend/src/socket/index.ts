@@ -1,8 +1,10 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import { spawn, ChildProcess } from 'child_process';
 import { GameManager } from '../game/GameManager';
 import { PrismaClient } from '@prisma/client';
 import { botManager, BotConfigInput, GameContext, PlayerInfo } from '../bot';
+import { isSocketFromLocalhost } from '../middleware/localOnly';
 
 const prisma = new PrismaClient();
 
@@ -62,6 +64,49 @@ interface AuthSocket extends Socket {
 
 // Bot turn timer constant (30 seconds for bots, regardless of game setting)
 const BOT_TIMER_SECONDS = 30;
+
+// Debug log streaming - localhost only
+const LOG_FILE_PATH = '/Users/jay/cc_projects/Probe/logs/backend.log';
+const debugLogSubscribers: Set<string> = new Set(); // socket IDs subscribed to debug logs
+let tailProcess: ChildProcess | null = null;
+let activeIo: Server | null = null;
+
+function startTailProcess(io: Server) {
+  if (tailProcess) return; // Already running
+
+  activeIo = io;
+  console.log('🔍 Starting debug log tail process...');
+
+  tailProcess = spawn('tail', ['-f', LOG_FILE_PATH]);
+
+  tailProcess.stdout?.on('data', (data: Buffer) => {
+    const lines = data.toString().split('\n').filter(line => line.trim());
+    if (debugLogSubscribers.size > 0 && activeIo) {
+      lines.forEach(line => {
+        debugLogSubscribers.forEach(socketId => {
+          activeIo?.to(socketId).emit('debugLogLine', { line, timestamp: new Date().toISOString() });
+        });
+      });
+    }
+  });
+
+  tailProcess.stderr?.on('data', (data: Buffer) => {
+    console.error('🔍 Debug log tail error:', data.toString());
+  });
+
+  tailProcess.on('close', (code) => {
+    console.log(`🔍 Debug log tail process exited with code ${code}`);
+    tailProcess = null;
+  });
+}
+
+function stopTailProcess() {
+  if (tailProcess) {
+    console.log('🔍 Stopping debug log tail process...');
+    tailProcess.kill();
+    tailProcess = null;
+  }
+}
 
 // Start or reset timer for a game
 function startTurnTimer(io: Server, roomCode: string, turnTimerSeconds: number, isBot: boolean = false, currentPlayerId?: string) {
@@ -1899,14 +1944,14 @@ export function setupSocketHandlers(io: Server) {
     socket.on('reconnect', async (data: { roomCode?: string }, callback) => {
       try {
         console.log(`🔄 User reconnecting: ${socket.username}`);
-        
+
         if (data.roomCode) {
           // Rejoin the room
           socket.join(data.roomCode);
-          
+
           // Get current game state
           const game = await gameManager.getGameByRoomCode(data.roomCode);
-          
+
           callback({ success: true, game });
         } else {
           callback({ success: true });
@@ -1916,10 +1961,50 @@ export function setupSocketHandlers(io: Server) {
       }
     });
 
+    // Debug log subscription - localhost only
+    socket.on('subscribeDebugLogs', (callback) => {
+      const clientAddress = socket.handshake.address;
+      console.log(`🔍 Debug log subscription attempt from: "${clientAddress}"`);
+
+      if (!isSocketFromLocalhost(clientAddress)) {
+        console.warn(`🔍 Debug log subscription denied for non-localhost: ${clientAddress}`);
+        callback({ success: false, error: `Debug logs only available from localhost (your address: ${clientAddress})` });
+        return;
+      }
+
+      console.log(`🔍 Debug log subscription started for ${socket.username} (${socket.id})`);
+      debugLogSubscribers.add(socket.id);
+
+      // Start the tail process if not already running
+      startTailProcess(io);
+
+      callback({ success: true });
+    });
+
+    socket.on('unsubscribeDebugLogs', (callback) => {
+      console.log(`🔍 Debug log subscription ended for ${socket.username} (${socket.id})`);
+      debugLogSubscribers.delete(socket.id);
+
+      // Stop tail process if no more subscribers
+      if (debugLogSubscribers.size === 0) {
+        stopTailProcess();
+      }
+
+      callback({ success: true });
+    });
+
     // Disconnect
     socket.on('disconnect', (reason) => {
       console.log(`✗ User disconnected: ${socket.username} (${socket.userId}) - Reason: ${reason}`);
-      
+
+      // Clean up debug log subscription if active
+      if (debugLogSubscribers.has(socket.id)) {
+        debugLogSubscribers.delete(socket.id);
+        if (debugLogSubscribers.size === 0) {
+          stopTailProcess();
+        }
+      }
+
       // Notify rooms about disconnection
       const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
       rooms.forEach(roomCode => {

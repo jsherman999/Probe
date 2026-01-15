@@ -9,20 +9,39 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isLocalhost = isLocalhost;
 exports.requireLocalhost = requireLocalhost;
 exports.isSocketFromLocalhost = isSocketFromLocalhost;
-/**
- * Check if a request is coming from localhost
- */
-function isLocalhost(ip) {
-    if (!ip)
-        return false;
-    // Check various localhost representations
-    const localhostIPs = [
+const os_1 = require("os");
+// Cache the server's own IP addresses
+let serverIPs = null;
+function getServerIPs() {
+    if (serverIPs)
+        return serverIPs;
+    serverIPs = new Set([
         '127.0.0.1',
         '::1',
         '::ffff:127.0.0.1',
         'localhost',
-    ];
-    return localhostIPs.includes(ip);
+    ]);
+    // Add all local network interface IPs
+    const nets = (0, os_1.networkInterfaces)();
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name] || []) {
+            // Add both raw IP and IPv4-mapped IPv6 format
+            serverIPs.add(net.address);
+            if (net.family === 'IPv4') {
+                serverIPs.add(`::ffff:${net.address}`);
+            }
+        }
+    }
+    console.log('🔍 Server IPs for localhost check:', Array.from(serverIPs));
+    return serverIPs;
+}
+/**
+ * Check if a request is coming from localhost or the server's own IP
+ */
+function isLocalhost(ip) {
+    if (!ip)
+        return false;
+    return getServerIPs().has(ip);
 }
 /**
  * Middleware that only allows requests from localhost

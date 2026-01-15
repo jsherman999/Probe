@@ -34,6 +34,7 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
 - **Game History**: View completed games with turn-by-turn replays
 - **Viewer Guessing**: Observers can submit word guesses (revealed after game ends)
 - **Eliminated Play**: Eliminated players can continue guessing to improve scores
+- **Debug Window**: Live backend log viewer for localhost users (Ctrl+Shift+D)
 - **Modern UI**: Tailwind CSS with smooth animations
 
 ## 🚀 Quick Start
@@ -212,6 +213,27 @@ npm run test:coverage
 | `./scripts/build.sh` | Production build |
 | `./scripts/lint.sh` | Code quality checks |
 | `./scripts/deploy.sh` | Deploy with Podman |
+
+## 🐛 Debug Window
+
+A live backend log viewer is available for users on the hosting server (localhost only).
+
+### Access
+- **Toggle Button**: Click the 🔍 button in the bottom-right corner
+- **Keyboard Shortcut**: `Ctrl+Shift+D` (or `Cmd+Shift+D` on Mac)
+
+### Features
+- Real-time streaming of `logs/backend.log` via WebSocket
+- Color-coded log output (errors in red, warnings in yellow, bot actions in purple)
+- Filter/search logs
+- Auto-scroll toggle
+- Copy logs to clipboard
+- Clear log display
+
+### Security
+- Only available from localhost (the hosting machine)
+- Remote players cannot access the debug window
+- Uses Socket.IO with IP address verification
 
 ## 🐳 Deployment
 

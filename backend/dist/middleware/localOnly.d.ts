@@ -6,7 +6,7 @@
  */
 import { Request, Response, NextFunction } from 'express';
 /**
- * Check if a request is coming from localhost
+ * Check if a request is coming from localhost or the server's own IP
  */
 export declare function isLocalhost(ip: string | undefined): boolean;
 /**

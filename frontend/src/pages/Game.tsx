@@ -513,6 +513,18 @@ export default function Game() {
       setToastMessage(`${data.timedOutPlayerName}'s turn timed out!`);
     };
 
+    const onTurnSkipped = (data: any) => {
+      console.log('⏭️ Turn skipped:', data);
+      dispatch(setGame(data.game));
+      // Find the bot name for the toast
+      const skippedPlayer = data.game.players?.find((p: any) =>
+        p.odId === data.skippedPlayerId || p.userId === data.skippedPlayerId
+      );
+      if (skippedPlayer?.isBot) {
+        setToastMessage(`${skippedPlayer.displayName} skipped - nothing to guess`);
+      }
+    };
+
     const onTurnChanged = (data: any) => {
       console.log('🔄 Turn changed:', data);
       setPendingGuess(null); // Clear pending state on turn change
@@ -734,6 +746,7 @@ export default function Game() {
     socket.on('gameEnded', onGameEnded);
     socket.on('playerLeft', onPlayerLeft);
     socket.on('turnTimeout', onTurnTimeout);
+    socket.on('turnSkipped', onTurnSkipped);
     socket.on('turnChanged', onTurnChanged);
     socket.on('viewerGuessResult', onViewerGuessResult);
     socket.on('turnCardDrawn', onTurnCardDrawn);
@@ -773,6 +786,7 @@ export default function Game() {
       socket.off('gameEnded', onGameEnded);
       socket.off('playerLeft', onPlayerLeft);
       socket.off('turnTimeout', onTurnTimeout);
+      socket.off('turnSkipped', onTurnSkipped);
       socket.off('turnChanged', onTurnChanged);
       socket.off('viewerGuessResult', onViewerGuessResult);
       socket.off('turnCardDrawn', onTurnCardDrawn);

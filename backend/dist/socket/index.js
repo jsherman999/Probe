@@ -5,13 +5,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSocketHandlers = setupSocketHandlers;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const child_process_1 = require("child_process");
 const GameManager_1 = require("../game/GameManager");
 const client_1 = require("@prisma/client");
 const bot_1 = require("../bot");
+const localOnly_1 = require("../middleware/localOnly");
 const prisma = new client_1.PrismaClient();
 const gameManager = new GameManager_1.GameManager();
 // Store active game timers by roomCode
 const gameTimers = new Map();
+// Track which player ID the timer is for (to prevent race conditions)
+const timerPlayerIds = new Map();
 // Store blank selection timers and pending data
 const blankSelectionTimers = new Map();
 const pendingBlankSelections = new Map();
@@ -26,8 +30,44 @@ const exposeSelectionTimers = new Map();
 const pendingExposeSelections = new Map();
 // Bot turn timer constant (30 seconds for bots, regardless of game setting)
 const BOT_TIMER_SECONDS = 30;
+// Debug log streaming - localhost only
+const LOG_FILE_PATH = '/Users/jay/cc_projects/Probe/logs/backend.log';
+const debugLogSubscribers = new Set(); // socket IDs subscribed to debug logs
+let tailProcess = null;
+let activeIo = null;
+function startTailProcess(io) {
+    if (tailProcess)
+        return; // Already running
+    activeIo = io;
+    console.log('🔍 Starting debug log tail process...');
+    tailProcess = (0, child_process_1.spawn)('tail', ['-f', LOG_FILE_PATH]);
+    tailProcess.stdout?.on('data', (data) => {
+        const lines = data.toString().split('\n').filter(line => line.trim());
+        if (debugLogSubscribers.size > 0 && activeIo) {
+            lines.forEach(line => {
+                debugLogSubscribers.forEach(socketId => {
+                    activeIo?.to(socketId).emit('debugLogLine', { line, timestamp: new Date().toISOString() });
+                });
+            });
+        }
+    });
+    tailProcess.stderr?.on('data', (data) => {
+        console.error('🔍 Debug log tail error:', data.toString());
+    });
+    tailProcess.on('close', (code) => {
+        console.log(`🔍 Debug log tail process exited with code ${code}`);
+        tailProcess = null;
+    });
+}
+function stopTailProcess() {
+    if (tailProcess) {
+        console.log('🔍 Stopping debug log tail process...');
+        tailProcess.kill();
+        tailProcess = null;
+    }
+}
 // Start or reset timer for a game
-function startTurnTimer(io, roomCode, turnTimerSeconds, isBot = false) {
+function startTurnTimer(io, roomCode, turnTimerSeconds, isBot = false, currentPlayerId) {
     // Clear existing timer if any
     const existingTimer = gameTimers.get(roomCode);
     if (existingTimer) {
@@ -37,7 +77,7 @@ function startTurnTimer(io, roomCode, turnTimerSeconds, isBot = false) {
     let safeTimerSeconds;
     if (isBot) {
         safeTimerSeconds = BOT_TIMER_SECONDS;
-        console.log(`🤖 Bot turn - using ${BOT_TIMER_SECONDS}s timer for room ${roomCode}`);
+        console.log(`🤖 Bot turn - using ${BOT_TIMER_SECONDS}s timer for room ${roomCode} (player: ${currentPlayerId?.substring(0, 8) || 'unknown'})`);
     }
     else {
         // Safety check: ensure timer is at least 10 seconds, default to 300 (5 min) if invalid
@@ -45,19 +85,34 @@ function startTurnTimer(io, roomCode, turnTimerSeconds, isBot = false) {
         if (!turnTimerSeconds || turnTimerSeconds <= 0) {
             console.warn(`⚠️ Invalid turnTimerSeconds (${turnTimerSeconds}) for room ${roomCode}, using default ${safeTimerSeconds}s`);
         }
-        console.log(`⏱️ Starting ${safeTimerSeconds}s timer for room ${roomCode}`);
+        console.log(`⏱️ Starting ${safeTimerSeconds}s timer for room ${roomCode} (player: ${currentPlayerId?.substring(0, 8) || 'unknown'})`);
+    }
+    // Track which player this timer is for
+    if (currentPlayerId) {
+        timerPlayerIds.set(roomCode, currentPlayerId);
     }
     // Set new timer
     const timer = setTimeout(() => {
-        console.log(`⏰ Timer expired for room ${roomCode}`);
-        executeTurnTimeout(io, roomCode);
+        console.log(`⏰ Timer expired for room ${roomCode} (expected player: ${currentPlayerId?.substring(0, 8) || 'unknown'})`);
+        executeTurnTimeout(io, roomCode, currentPlayerId);
     }, safeTimerSeconds * 1000);
     gameTimers.set(roomCode, timer);
 }
 // Execute turn timeout logic (advances to next player)
-async function executeTurnTimeout(io, roomCode) {
+async function executeTurnTimeout(io, roomCode, expectedPlayerId) {
     try {
+        // If we have an expected player ID, verify it matches the current turn player
+        // This prevents race conditions where multiple timeouts fire for the same room
+        if (expectedPlayerId) {
+            const trackedPlayerId = timerPlayerIds.get(roomCode);
+            if (trackedPlayerId && trackedPlayerId !== expectedPlayerId) {
+                console.log(`⏰ Ignoring stale timeout for ${roomCode} - expected player ${expectedPlayerId.substring(0, 8)} but current timer is for ${trackedPlayerId.substring(0, 8)}`);
+                return;
+            }
+        }
         const result = await gameManager.handleTurnTimeout(roomCode);
+        // Clear the tracked player ID
+        timerPlayerIds.delete(roomCode);
         // Broadcast timeout to all players
         io.to(roomCode).emit('turnTimeout', {
             timedOutPlayerId: result.timedOutPlayerId,
@@ -71,7 +126,7 @@ async function executeTurnTimeout(io, roomCode) {
             // Check if next player is a bot
             const nextPlayer = result.game.players?.find((p) => p.userId === result.nextPlayerId || p.botId === result.nextPlayerId);
             const isNextPlayerBot = nextPlayer?.isBot || false;
-            startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isNextPlayerBot);
+            startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isNextPlayerBot, result.nextPlayerId);
             // Also emit turn changed for UI refresh
             io.to(roomCode).emit('turnChanged', {
                 previousPlayerId: result.timedOutPlayerId,
@@ -94,6 +149,7 @@ function stopTurnTimer(roomCode) {
     if (timer) {
         clearTimeout(timer);
         gameTimers.delete(roomCode);
+        timerPlayerIds.delete(roomCode);
         console.log(`⏱️ Timer stopped for room ${roomCode}`);
     }
 }
@@ -109,12 +165,13 @@ async function buildBotGameContext(roomCode, botPlayerId) {
     const botPlayer = game.players.find((p) => p.botId === botPlayerId || p.id === botPlayerId);
     const players = game.players.map((p) => ({
         id: p.botId || p.userId || p.id,
-        displayName: p.isBot ? p.botDisplayName : p.user?.displayName || 'Unknown',
+        displayName: p.displayName || (p.isBot ? p.botDisplayName : p.user?.displayName) || 'Unknown',
         userId: p.userId,
         isBot: p.isBot || false,
-        wordLength: p.paddedWord?.length || p.secretWord?.length || 0,
+        wordLength: p.wordLength || 0, // Use pre-computed wordLength from getGameByRoomCode
         revealedPositions: p.revealedPositions || [],
         missedLetters: p.missedLetters || [],
+        guessedWords: p.guessedWords || [],
         totalScore: p.totalScore || 0,
         isEliminated: p.isEliminated || false,
         turnOrder: p.turnOrder || 0,
@@ -147,6 +204,33 @@ async function triggerBotTurn(io, roomCode, botId) {
         const ctx = await buildBotGameContext(roomCode, botId);
         console.log(`🤖 [${botName}] Context built. Players: ${ctx.players.map(p => `${p.displayName}(${p.id.substring(0, 8)})`).join(', ')}`);
         console.log(`🤖 [${botName}] Bot's word: ${ctx.myWord}, current turn: ${ctx.currentTurnPlayerId?.substring(0, 8)}`);
+        // Check if there's anything to guess - if all other players are fully revealed, skip the turn
+        const otherPlayers = ctx.players.filter(p => p.id !== botId && !p.isEliminated);
+        const playersWithUnrevealed = otherPlayers.filter(p => {
+            const unrevealedCount = p.revealedPositions.filter(pos => pos === null).length;
+            return unrevealedCount > 0;
+        });
+        if (playersWithUnrevealed.length === 0) {
+            console.log(`🤖 [${botName}] No targets with unrevealed positions - skipping turn`);
+            io.to(roomCode).emit('botThinking', { botId, botName, status: 'skipping', message: 'Nothing to guess, skipping turn...' });
+            // Advance to next player's turn
+            const skipResult = await gameManager.handleTurnTimeout(roomCode);
+            if (skipResult.gameOver) {
+                io.to(roomCode).emit('gameOver', skipResult.finalResults);
+                stopTurnTimer(roomCode);
+                bot_1.botManager.cleanupGame(roomCode);
+            }
+            else {
+                io.to(roomCode).emit('turnSkipped', {
+                    skippedPlayerId: botId,
+                    reason: 'nothing_to_guess',
+                    game: skipResult.game,
+                });
+                // Check if next player is a bot
+                checkAndTriggerBotTurn(io, roomCode, skipResult.game);
+            }
+            return;
+        }
         io.to(roomCode).emit('botThinking', { botId, botName, status: 'analyzing', message: 'Analyzing game state...' });
         console.log(`🤖 [${botName}] Calling handleBotTurn...`);
         const action = await bot_1.botManager.handleBotTurn(botId, ctx);
@@ -219,8 +303,15 @@ async function triggerBotTurn(io, roomCode, botId) {
         console.error(`❌ Error: ${error.message}`);
         console.error(`❌ Stack:`, error.stack);
         io.to(roomCode).emit('botThinking', { botId, botName, status: 'error', message: `Error: ${error.message}` });
-        // Force a turn timeout so the game continues
-        await executeTurnTimeout(io, roomCode);
+        // Only force turn timeout if it's NOT a "not your turn" error
+        // This prevents cascade timeouts when a bot's LLM is slow and their turn already timed out
+        if (!error.message?.includes('Not your turn') && !error.message?.includes('not your turn')) {
+            // Force a turn timeout so the game continues
+            await executeTurnTimeout(io, roomCode);
+        }
+        else {
+            console.log(`🤖 [${botName}] Turn already moved on - skipping forced timeout`);
+        }
     }
     console.log(`🤖 ====== BOT TURN END ======`);
 }
@@ -242,7 +333,7 @@ function handlePostGuessLogic(io, roomCode, result) {
         const currentPlayer = result.game.players?.find((p) => p.userId === result.currentTurnPlayerId || p.botId === result.currentTurnPlayerId);
         const isCurrentPlayerBot = currentPlayer?.isBot || false;
         console.log(`⏱️ Correct guess (bot flow) - resetting timer for continued turn (isBot: ${isCurrentPlayerBot})`);
-        startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isCurrentPlayerBot);
+        startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isCurrentPlayerBot, result.currentTurnPlayerId);
         // Same player continues (could be bot)
         checkAndTriggerBotTurn(io, roomCode, result.game);
     }
@@ -253,7 +344,7 @@ function handlePostGuessLogic(io, roomCode, result) {
             p.botId === result.currentTurnPlayerId ||
             p.id === result.currentTurnPlayerId);
         const isNextPlayerBot = nextPlayer?.isBot || false;
-        startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isNextPlayerBot);
+        startTurnTimer(io, roomCode, result.game.turnTimerSeconds, isNextPlayerBot, result.currentTurnPlayerId);
         // Use displayName which is pre-resolved in sanitizeGame for both humans and bots
         const nextPlayerName = nextPlayer?.displayName || 'Unknown';
         io.to(roomCode).emit('turnChanged', {
@@ -503,7 +594,7 @@ async function triggerBotWordSelection(io, roomCode, botId) {
             // Check if first player is a bot for timer duration
             const firstPlayer = game.players?.find((p) => p.userId === game.currentTurnPlayerId || p.botId === game.currentTurnPlayerId);
             const isFirstPlayerBot = firstPlayer?.isBot || false;
-            startTurnTimer(io, roomCode, game.turnTimerSeconds, isFirstPlayerBot);
+            startTurnTimer(io, roomCode, game.turnTimerSeconds, isFirstPlayerBot, game.currentTurnPlayerId);
             // Check if first player is a bot
             checkAndTriggerBotTurn(io, roomCode, game);
             // Handle any pending expose card at game start (affects bots auto-exposing)
@@ -827,7 +918,7 @@ function setupSocketHandlers(io) {
                     // Start the turn timer - check if first player is a bot
                     const firstPlayer = game.players?.find((p) => p.userId === game.currentTurnPlayerId || p.botId === game.currentTurnPlayerId);
                     const isFirstPlayerBot = firstPlayer?.isBot || false;
-                    startTurnTimer(io, data.roomCode, game.turnTimerSeconds, isFirstPlayerBot);
+                    startTurnTimer(io, data.roomCode, game.turnTimerSeconds, isFirstPlayerBot, game.currentTurnPlayerId);
                     // Check if first player is a bot
                     checkAndTriggerBotTurn(io, data.roomCode, game);
                     // Handle any pending expose card at game start (affects bots auto-exposing)
@@ -1015,14 +1106,14 @@ function setupSocketHandlers(io) {
                     // Correct guess - reset timer for same player's continued turn
                     // Human correct guess - never a bot (socket.userId is always human)
                     console.log(`⏱️ Correct guess - resetting timer for continued turn`);
-                    startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, false);
+                    startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, false, socket.userId);
                 }
                 else {
                     // Miss - reset timer for next player's turn
                     // Check if next player is a bot
                     const nextPlayer = result.game.players?.find((p) => p.userId === result.currentTurnPlayerId || p.botId === result.currentTurnPlayerId);
                     const isNextPlayerBot = nextPlayer?.isBot || false;
-                    startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, isNextPlayerBot);
+                    startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, isNextPlayerBot, result.currentTurnPlayerId);
                     // If a turn card was drawn for the next player, emit it
                     if (result.turnCardInfo) {
                         console.log(`🎴 Turn card drawn for next player: ${result.turnCardInfo.type}`);
@@ -1444,7 +1535,7 @@ function setupSocketHandlers(io) {
                     // Check if next player is a bot
                     const nextPlayer = result.game.players.find((p) => p.userId === result.game.currentTurnPlayerId || p.botId === result.game.currentTurnPlayerId);
                     const isNextPlayerBot = nextPlayer?.isBot || false;
-                    startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, isNextPlayerBot);
+                    startTurnTimer(io, data.roomCode, result.game.turnTimerSeconds, isNextPlayerBot, result.game.currentTurnPlayerId);
                     // Emit turn changed event for UI refresh
                     // Use displayName which is pre-resolved in sanitizeGame for both humans and bots
                     const nextPlayerName = nextPlayer?.displayName || 'Unknown';
@@ -1504,9 +1595,40 @@ function setupSocketHandlers(io) {
                 callback({ success: false, error: error.message });
             }
         });
+        // Debug log subscription - localhost only
+        socket.on('subscribeDebugLogs', (callback) => {
+            const clientAddress = socket.handshake.address;
+            console.log(`🔍 Debug log subscription attempt from: "${clientAddress}"`);
+            if (!(0, localOnly_1.isSocketFromLocalhost)(clientAddress)) {
+                console.warn(`🔍 Debug log subscription denied for non-localhost: ${clientAddress}`);
+                callback({ success: false, error: `Debug logs only available from localhost (your address: ${clientAddress})` });
+                return;
+            }
+            console.log(`🔍 Debug log subscription started for ${socket.username} (${socket.id})`);
+            debugLogSubscribers.add(socket.id);
+            // Start the tail process if not already running
+            startTailProcess(io);
+            callback({ success: true });
+        });
+        socket.on('unsubscribeDebugLogs', (callback) => {
+            console.log(`🔍 Debug log subscription ended for ${socket.username} (${socket.id})`);
+            debugLogSubscribers.delete(socket.id);
+            // Stop tail process if no more subscribers
+            if (debugLogSubscribers.size === 0) {
+                stopTailProcess();
+            }
+            callback({ success: true });
+        });
         // Disconnect
         socket.on('disconnect', (reason) => {
             console.log(`✗ User disconnected: ${socket.username} (${socket.userId}) - Reason: ${reason}`);
+            // Clean up debug log subscription if active
+            if (debugLogSubscribers.has(socket.id)) {
+                debugLogSubscribers.delete(socket.id);
+                if (debugLogSubscribers.size === 0) {
+                    stopTailProcess();
+                }
+            }
             // Notify rooms about disconnection
             const rooms = Array.from(socket.rooms).filter(room => room !== socket.id);
             rooms.forEach(roomCode => {

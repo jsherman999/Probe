@@ -6,22 +6,43 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { networkInterfaces } from 'os';
 
-/**
- * Check if a request is coming from localhost
- */
-export function isLocalhost(ip: string | undefined): boolean {
-  if (!ip) return false;
+// Cache the server's own IP addresses
+let serverIPs: Set<string> | null = null;
 
-  // Check various localhost representations
-  const localhostIPs = [
+function getServerIPs(): Set<string> {
+  if (serverIPs) return serverIPs;
+
+  serverIPs = new Set([
     '127.0.0.1',
     '::1',
     '::ffff:127.0.0.1',
     'localhost',
-  ];
+  ]);
 
-  return localhostIPs.includes(ip);
+  // Add all local network interface IPs
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      // Add both raw IP and IPv4-mapped IPv6 format
+      serverIPs.add(net.address);
+      if (net.family === 'IPv4') {
+        serverIPs.add(`::ffff:${net.address}`);
+      }
+    }
+  }
+
+  console.log('🔍 Server IPs for localhost check:', Array.from(serverIPs));
+  return serverIPs;
+}
+
+/**
+ * Check if a request is coming from localhost or the server's own IP
+ */
+export function isLocalhost(ip: string | undefined): boolean {
+  if (!ip) return false;
+  return getServerIPs().has(ip);
 }
 
 /**
