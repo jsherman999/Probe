@@ -3,8 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { logout } from '../store/slices/authSlice';
 import socketService from '../services/socket';
+import { getApiBaseUrl } from '../utils/config';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = getApiBaseUrl();
 
 interface LobbyGame {
   roomCode: string;

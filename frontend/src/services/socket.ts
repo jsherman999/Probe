@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
+import { getSocketUrl, getServerUrl } from '../utils/config';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+const SOCKET_URL = getSocketUrl();
 
 interface SocketConfig {
   reconnectionAttempts: number;
@@ -97,8 +98,8 @@ class SocketService {
             return;
           }
 
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-          const response = await fetch(`${API_URL}/api/auth/refresh`, {
+          const serverUrl = getServerUrl();
+          const response = await fetch(`${serverUrl}/api/auth/refresh`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refreshToken }),

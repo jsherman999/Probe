@@ -11,8 +11,9 @@ import DebugWindow from './components/DebugWindow';
 import { useAppSelector, useAppDispatch } from './store/hooks';
 import { logout, updateToken } from './store/slices/authSlice';
 import socketService from './services/socket';
+import { getServerUrl } from './utils/config';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = getServerUrl();
 
 function App() {
   const { user, refreshToken } = useAppSelector((state) => state.auth);
