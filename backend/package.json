@@ -4,7 +4,7 @@
   "description": "Backend server for Probe multiplayer word game",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch src/server.ts 2>&1 | tee -a ../logs/backend.log",
     "build": "tsc",
     "start": "node dist/server.js",
     "start:prod": "NODE_ENV=production node dist/server.js",
