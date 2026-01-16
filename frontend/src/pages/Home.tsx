@@ -366,25 +366,30 @@ export default function Home() {
           )}
         </div>
 
-        <div className="flex justify-center gap-6 flex-wrap">
-          <Link
-            to="/history"
-            className="text-text-secondary hover:text-accent transition-colors"
-          >
-            Game History &rarr;
-          </Link>
-          <Link
-            to="/ai-stats"
-            className="text-text-secondary hover:text-accent transition-colors"
-          >
-            AI Stats &rarr;
-          </Link>
-          <Link
-            to="/bot-creator"
-            className="text-text-secondary hover:text-accent transition-colors"
-          >
-            Bot Creator &rarr;
-          </Link>
+        <div className="card">
+          <div className="grid grid-cols-3 gap-3">
+            <Link
+              to="/history"
+              className="flex flex-col items-center justify-center p-4 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 text-white font-semibold transition-all hover:scale-105 hover:shadow-lg"
+            >
+              <span className="text-2xl mb-1">📜</span>
+              <span className="text-sm">Game History</span>
+            </Link>
+            <Link
+              to="/ai-stats"
+              className="flex flex-col items-center justify-center p-4 rounded-lg bg-gradient-to-br from-purple-600 to-purple-800 hover:from-purple-500 hover:to-purple-700 text-white font-semibold transition-all hover:scale-105 hover:shadow-lg"
+            >
+              <span className="text-2xl mb-1">📊</span>
+              <span className="text-sm">AI Stats</span>
+            </Link>
+            <Link
+              to="/bot-creator"
+              className="flex flex-col items-center justify-center p-4 rounded-lg bg-gradient-to-br from-green-600 to-green-800 hover:from-green-500 hover:to-green-700 text-white font-semibold transition-all hover:scale-105 hover:shadow-lg"
+            >
+              <span className="text-2xl mb-1">🤖</span>
+              <span className="text-sm">Bot Creator</span>
+            </Link>
+          </div>
         </div>
 
         <div className="card">
