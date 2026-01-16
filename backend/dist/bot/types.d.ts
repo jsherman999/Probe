@@ -116,9 +116,12 @@ export interface PlayerInfo {
     wordLength: number;
     revealedPositions: (string | null)[];
     missedLetters: string[];
+    guessedWords: string[];
     totalScore: number;
     isEliminated: boolean;
     turnOrder: number;
+    frontPadding: number;
+    backPadding: number;
 }
 export interface GameContext {
     roomCode: string;

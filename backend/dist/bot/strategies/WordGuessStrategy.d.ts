@@ -17,8 +17,14 @@ export declare class WordGuessStrategy {
     /**
      * Decide whether the bot should attempt a full word guess
      * More aggressive than before - bots will try guessing earlier
+     * ALWAYS attempts when only 1 position remains unrevealed
      */
     shouldGuessWord(_ctx: GameContext, targetPlayer: PlayerInfo, config: BotConfig): Promise<boolean>;
+    /**
+     * Build a clean pattern for LLM, handling blanks properly
+     * Returns { pattern, actualLength } where pattern uses * for blanks and _ for unknown letters
+     */
+    private buildPatternForLLM;
     /**
      * Generate a word candidate (without committing to guessing)
      */
@@ -26,12 +32,13 @@ export declare class WordGuessStrategy {
     /**
      * Generate a word guess for the target player's word
      * Only called when shouldGuessWord returned true
+     * Checks guessedWords to avoid duplicate guesses
      */
     guessWord(_ctx: GameContext, targetPlayer: PlayerInfo, config: BotConfig): Promise<string>;
     /**
-     * Check if a word matches the revealed pattern
+     * Check if a word matches the core pattern (excluding blank padding positions)
      */
-    private matchesPattern;
+    private matchesCorePattern;
     /**
      * Extract a clean word from LLM response
      */

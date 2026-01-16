@@ -25,24 +25,38 @@ export class WordGuessStrategy {
   /**
    * Decide whether the bot should attempt a full word guess
    * More aggressive than before - bots will try guessing earlier
+   * ALWAYS attempts when only 1 position remains unrevealed
    */
   async shouldGuessWord(
     _ctx: GameContext,
     targetPlayer: PlayerInfo,
     config: BotConfig
   ): Promise<boolean> {
-    // Calculate how much of the word is revealed
-    const revealedCount = targetPlayer.revealedPositions.filter(p => p !== null).length;
-    const totalLength = targetPlayer.wordLength;
-    const revealedPct = revealedCount / totalLength;
-    const hiddenCount = totalLength - revealedCount;
+    // Calculate based on actual word (excluding blank padding)
+    const frontPadding = targetPlayer.frontPadding || 0;
+    const backPadding = targetPlayer.backPadding || 0;
+    const actualLength = targetPlayer.wordLength - frontPadding - backPadding;
 
-    console.log(`🎲 [WordGuess ${config.displayName}] Checking word guess: ${revealedCount}/${totalLength} revealed (${(revealedPct * 100).toFixed(0)}%), ${hiddenCount} hidden`);
+    // Get core positions (excluding blank padding)
+    const corePositions = targetPlayer.revealedPositions.slice(frontPadding, targetPlayer.wordLength - backPadding);
 
-    // No point guessing if word is complete or only blanks remain
+    // Count revealed letters in the actual word
+    const revealedCount = corePositions.filter(p => p !== null && p !== 'BLANK').length;
+    const revealedPct = revealedCount / actualLength;
+    const hiddenCount = actualLength - revealedCount;
+
+    console.log(`🎲 [WordGuess ${config.displayName}] Checking word guess: ${revealedCount}/${actualLength} revealed (${(revealedPct * 100).toFixed(0)}%), ${hiddenCount} hidden (padding: front=${frontPadding}, back=${backPadding})`);
+
+    // No point guessing if actual word is complete
     if (hiddenCount === 0) {
-      console.log(`🎲 [WordGuess ${config.displayName}] Word already complete, no guess needed`);
+      console.log(`🎲 [WordGuess ${config.displayName}] Actual word already complete, no guess needed`);
       return false;
+    }
+
+    // CRITICAL: When only 1 position remains, ALWAYS attempt word guess (all difficulties)
+    if (hiddenCount === 1) {
+      console.log(`🎲 [WordGuess ${config.displayName}] Only 1 position hidden - MUST attempt word guess`);
+      return true;
     }
 
     // Threshold varies by difficulty
@@ -74,9 +88,9 @@ export class WordGuessStrategy {
       return false;
     }
 
-    // With very few letters remaining (1-2), always try word guess for all difficulties
-    if (hiddenCount <= 2) {
-      console.log(`🎲 [WordGuess ${config.displayName}] Only ${hiddenCount} hidden - will attempt word guess`);
+    // With 2 letters remaining, always try word guess for all difficulties
+    if (hiddenCount === 2) {
+      console.log(`🎲 [WordGuess ${config.displayName}] Only 2 hidden - will attempt word guess`);
       return true;
     }
 
@@ -103,19 +117,40 @@ export class WordGuessStrategy {
   }
 
   /**
+   * Build a clean pattern for LLM, handling blanks properly
+   * Returns { pattern, actualLength } where pattern uses * for blanks and _ for unknown letters
+   */
+  private buildPatternForLLM(targetPlayer: PlayerInfo): { pattern: string; actualLength: number } {
+    const frontPadding = targetPlayer.frontPadding || 0;
+    const backPadding = targetPlayer.backPadding || 0;
+    const actualLength = targetPlayer.wordLength - frontPadding - backPadding;
+
+    // Build pattern: * for revealed blanks, _ for unrevealed, letter for revealed letters
+    // Skip blank positions entirely in the pattern we show to LLM
+    const corePositions = targetPlayer.revealedPositions.slice(frontPadding, targetPlayer.wordLength - backPadding);
+    const pattern = corePositions
+      .map(pos => {
+        if (pos === null) return '_';
+        if (pos === 'BLANK') return '_'; // Shouldn't happen in core positions, but handle it
+        return pos;
+      })
+      .join('');
+
+    return { pattern, actualLength };
+  }
+
+  /**
    * Generate a word candidate (without committing to guessing)
    */
   private async generateWordCandidate(
     targetPlayer: PlayerInfo,
     config: BotConfig
   ): Promise<string | null> {
-    const pattern = targetPlayer.revealedPositions
-      .map(pos => pos || '_')
-      .join('');
+    const { pattern, actualLength } = this.buildPatternForLLM(targetPlayer);
 
     const prompt = `What English word matches this pattern: ${pattern}
 Letters NOT in the word: ${targetPlayer.missedLetters.join(', ') || 'none'}
-The word is ${targetPlayer.wordLength} letters long.
+The word is ${actualLength} letters long.
 Reply with just ONE word in uppercase, or "UNKNOWN" if you can't determine it.`;
 
     try {
@@ -125,11 +160,11 @@ Reply with just ONE word in uppercase, or "UNKNOWN" if you can't determine it.`;
         { ...config.ollamaOptions, temperature: 0.3, num_predict: 20 }
       );
 
-      const word = this.extractWord(response, targetPlayer.wordLength);
+      const word = this.extractWord(response, actualLength);
 
       if (word && word !== 'UNKNOWN') {
-        // Also verify it matches the revealed pattern
-        if (this.matchesPattern(word, targetPlayer.revealedPositions)) {
+        // Also verify it matches the revealed pattern (core letters only)
+        if (this.matchesCorePattern(word, targetPlayer)) {
           return word;
         }
       }
@@ -143,82 +178,112 @@ Reply with just ONE word in uppercase, or "UNKNOWN" if you can't determine it.`;
   /**
    * Generate a word guess for the target player's word
    * Only called when shouldGuessWord returned true
+   * Checks guessedWords to avoid duplicate guesses
    */
   async guessWord(
     _ctx: GameContext,
     targetPlayer: PlayerInfo,
     config: BotConfig
   ): Promise<string> {
-    const pattern = targetPlayer.revealedPositions
-      .map(pos => pos || '_')
-      .join('');
+    const { pattern, actualLength } = this.buildPatternForLLM(targetPlayer);
+    const frontPadding = targetPlayer.frontPadding || 0;
+    const backPadding = targetPlayer.backPadding || 0;
 
-    const revealedLetters = targetPlayer.revealedPositions
-      .filter((p): p is string => p !== null);
+    // Get revealed letters from the core word (excluding blanks)
+    const corePositions = targetPlayer.revealedPositions.slice(frontPadding, targetPlayer.wordLength - backPadding);
+    const revealedLetters = corePositions
+      .filter((p): p is string => p !== null && p !== 'BLANK');
+
+    // Get already guessed words to avoid duplicates
+    const alreadyGuessed = targetPlayer.guessedWords || [];
 
     const systemPrompt = 'You are playing a word guessing game. Give only single-word answers.';
 
+    const alreadyGuessedInfo = alreadyGuessed.length > 0
+      ? `\n- Words already guessed (DO NOT guess these again): ${alreadyGuessed.join(', ')}`
+      : '';
+
     const prompt = `Complete this word pattern: ${pattern}
-- Word length: ${targetPlayer.wordLength} letters
+- Word length: ${actualLength} letters
 - Revealed letters: ${revealedLetters.join(', ') || 'none'}
-- Letters NOT in word: ${targetPlayer.missedLetters.join(', ') || 'none'}
+- Letters NOT in word: ${targetPlayer.missedLetters.join(', ') || 'none'}${alreadyGuessedInfo}
 
 Think about what common English word this could be. What is the COMPLETE word?
 Reply with ONLY the word in uppercase letters.`;
 
-    console.log(`🎲 [WordGuess ${config.displayName}] Asking LLM for word guess, pattern: ${pattern}`);
+    console.log(`🎲 [WordGuess ${config.displayName}] Asking LLM for word guess, pattern: ${pattern}, actualLength: ${actualLength}`);
+    if (alreadyGuessed.length > 0) {
+      console.log(`🎲 [WordGuess ${config.displayName}] Already guessed words: ${alreadyGuessed.join(', ')}`);
+    }
 
-    try {
-      const response = await this.llm.generate(
-        config.modelName,
-        prompt,
-        {
-          ...config.ollamaOptions,
-          temperature: 0.3,
-          num_predict: 25,
-        },
-        systemPrompt
-      );
+    // Try multiple times to get a word that hasn't been guessed
+    const maxAttempts = 3;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await this.llm.generate(
+          config.modelName,
+          prompt,
+          {
+            ...config.ollamaOptions,
+            temperature: 0.3 + (attempt * 0.2), // Increase temperature on retries
+            num_predict: 25,
+          },
+          systemPrompt
+        );
 
-      console.log(`🎲 [WordGuess ${config.displayName}] Raw LLM response: "${response}"`);
+        console.log(`🎲 [WordGuess ${config.displayName}] Raw LLM response (attempt ${attempt + 1}): "${response}"`);
 
-      const word = this.extractWord(response, targetPlayer.wordLength);
+        const word = this.extractWord(response, actualLength);
 
-      if (word) {
-        // Validate the word is a real English word
-        const isValid = await this.wordValidator.isValidWord(word);
-        console.log(`🎲 [WordGuess ${config.displayName}] Extracted word "${word}", valid: ${isValid}`);
+        if (word) {
+          // Check if this word was already guessed
+          if (alreadyGuessed.includes(word)) {
+            console.log(`🎲 [WordGuess ${config.displayName}] Word "${word}" already guessed, trying again...`);
+            continue;
+          }
 
-        if (isValid) {
-          // Also check the word matches the revealed pattern
-          if (this.matchesPattern(word, targetPlayer.revealedPositions)) {
-            console.log(`[Bot ${config.displayName}] Guessing word: ${word} for pattern: ${pattern}`);
-            return word;
-          } else {
-            console.log(`🎲 [WordGuess ${config.displayName}] Word "${word}" doesn't match pattern`);
+          // Validate the word is a real English word
+          const isValid = await this.wordValidator.isValidWord(word);
+          console.log(`🎲 [WordGuess ${config.displayName}] Extracted word "${word}", valid: ${isValid}`);
+
+          if (isValid) {
+            // Also check the word matches the revealed pattern (core letters only)
+            if (this.matchesCorePattern(word, targetPlayer)) {
+              console.log(`[Bot ${config.displayName}] Guessing word: ${word} for pattern: ${pattern}`);
+              return word;
+            } else {
+              console.log(`🎲 [WordGuess ${config.displayName}] Word "${word}" doesn't match pattern`);
+            }
           }
         }
+      } catch (error: any) {
+        console.error(`[Bot ${config.displayName}] Word guess error (attempt ${attempt + 1}): ${error.message}`);
       }
-    } catch (error: any) {
-      console.error(`[Bot ${config.displayName}] Word guess error: ${error.message}`);
     }
 
     // If we can't get a valid word, throw to force letter guessing instead
-    console.log(`🎲 [WordGuess ${config.displayName}] No valid word found, will fall back to letter guess`);
+    console.log(`🎲 [WordGuess ${config.displayName}] No valid word found after ${maxAttempts} attempts, will fall back to letter guess`);
     throw new Error('No valid word candidate found');
   }
 
   /**
-   * Check if a word matches the revealed pattern
+   * Check if a word matches the core pattern (excluding blank padding positions)
    */
-  private matchesPattern(word: string, revealedPositions: (string | null)[]): boolean {
-    if (word.length !== revealedPositions.length) {
+  private matchesCorePattern(word: string, targetPlayer: PlayerInfo): boolean {
+    const frontPadding = targetPlayer.frontPadding || 0;
+    const backPadding = targetPlayer.backPadding || 0;
+    const actualLength = targetPlayer.wordLength - frontPadding - backPadding;
+
+    if (word.length !== actualLength) {
       return false;
     }
 
+    // Check against core positions only (skip padding)
+    const corePositions = targetPlayer.revealedPositions.slice(frontPadding, targetPlayer.wordLength - backPadding);
+
     for (let i = 0; i < word.length; i++) {
-      const revealed = revealedPositions[i];
-      if (revealed !== null && revealed.toUpperCase() !== word[i].toUpperCase()) {
+      const revealed = corePositions[i];
+      if (revealed !== null && revealed !== 'BLANK' && revealed.toUpperCase() !== word[i].toUpperCase()) {
         return false;
       }
     }

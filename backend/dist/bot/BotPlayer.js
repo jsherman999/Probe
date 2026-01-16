@@ -176,7 +176,7 @@ class BotPlayer {
     /**
      * Get serializable player info
      */
-    toPlayerInfo(wordLength, revealedPositions, missedLetters, totalScore, isEliminated, turnOrder) {
+    toPlayerInfo(wordLength, revealedPositions, missedLetters, guessedWords, totalScore, isEliminated, turnOrder, frontPadding = 0, backPadding = 0) {
         return {
             id: this.id,
             displayName: this.displayName,
@@ -185,9 +185,12 @@ class BotPlayer {
             wordLength,
             revealedPositions,
             missedLetters,
+            guessedWords,
             totalScore,
             isEliminated,
             turnOrder,
+            frontPadding,
+            backPadding,
         };
     }
 }

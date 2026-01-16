@@ -39,6 +39,6 @@ export declare class BotPlayer {
     /**
      * Get serializable player info
      */
-    toPlayerInfo(wordLength: number, revealedPositions: (string | null)[], missedLetters: string[], totalScore: number, isEliminated: boolean, turnOrder: number): PlayerInfo;
+    toPlayerInfo(wordLength: number, revealedPositions: (string | null)[], missedLetters: string[], guessedWords: string[], totalScore: number, isEliminated: boolean, turnOrder: number, frontPadding?: number, backPadding?: number): PlayerInfo;
 }
 //# sourceMappingURL=BotPlayer.d.ts.map

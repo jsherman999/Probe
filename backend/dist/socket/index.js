@@ -175,6 +175,8 @@ async function buildBotGameContext(roomCode, botPlayerId) {
         totalScore: p.totalScore || 0,
         isEliminated: p.isEliminated || false,
         turnOrder: p.turnOrder || 0,
+        frontPadding: p.frontPadding || 0,
+        backPadding: p.backPadding || 0,
     }));
     return {
         roomCode,

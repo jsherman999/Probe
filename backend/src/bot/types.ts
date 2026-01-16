@@ -157,9 +157,12 @@ export interface PlayerInfo {
   wordLength: number;
   revealedPositions: (string | null)[];  // letter or null for each position
   missedLetters: string[];
+  guessedWords: string[];  // Words that have been guessed against this player
   totalScore: number;
   isEliminated: boolean;
   turnOrder: number;
+  frontPadding: number;  // Number of blank padding positions at front
+  backPadding: number;   // Number of blank padding positions at back
 }
 
 export interface GameContext {

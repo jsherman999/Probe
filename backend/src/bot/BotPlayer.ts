@@ -221,9 +221,12 @@ export class BotPlayer {
     wordLength: number,
     revealedPositions: (string | null)[],
     missedLetters: string[],
+    guessedWords: string[],
     totalScore: number,
     isEliminated: boolean,
-    turnOrder: number
+    turnOrder: number,
+    frontPadding: number = 0,
+    backPadding: number = 0
   ): PlayerInfo {
     return {
       id: this.id,
@@ -233,9 +236,12 @@ export class BotPlayer {
       wordLength,
       revealedPositions,
       missedLetters,
+      guessedWords,
       totalScore,
       isEliminated,
       turnOrder,
+      frontPadding,
+      backPadding,
     };
   }
 }
