@@ -247,6 +247,8 @@ async function triggerBotTurn(io, roomCode, botId) {
             // Check if duplicate selection is required
             if (result.duplicateSelectionRequired) {
                 console.log(`🎲 Bot needs to wait for duplicate selection`);
+                // Clear bot thinking since bot's turn action is done, now waiting for selection
+                io.to(roomCode).emit('botThinking', { botId, botName, status: 'done', message: '' });
                 // The target player (or bot) needs to select position
                 const targetIsBot = bot_1.botManager.isBot(action.targetPlayerId);
                 if (targetIsBot) {
@@ -263,11 +265,27 @@ async function triggerBotTurn(io, roomCode, botId) {
                         handlePostGuessLogic(io, roomCode, resolveResult);
                     }, 1000);
                 }
+                else {
+                    // Human target - emit event so frontend shows selection modal
+                    const targetPlayer = result.game?.players?.find((p) => p.userId === action.targetPlayerId || p.id === action.targetPlayerId);
+                    io.to(roomCode).emit('duplicateSelectionRequired', {
+                        guessingPlayerId: botId,
+                        guessingPlayerName: botName,
+                        targetPlayerId: action.targetPlayerId,
+                        targetPlayerName: targetPlayer?.displayName || 'Player',
+                        letter: result.letter,
+                        positions: result.positions,
+                        deadline: Date.now() + 15000,
+                        game: result.game,
+                    });
+                }
                 return;
             }
             // Check if blank selection is required
             if (result.blankSelectionRequired) {
                 console.log(`🎲 Bot needs to wait for blank selection`);
+                // Clear bot thinking since bot's turn action is done, now waiting for selection
+                io.to(roomCode).emit('botThinking', { botId, botName, status: 'done', message: '' });
                 const targetIsBot = bot_1.botManager.isBot(action.targetPlayerId);
                 if (targetIsBot) {
                     setTimeout(async () => {
@@ -281,15 +299,33 @@ async function triggerBotTurn(io, roomCode, botId) {
                         handlePostGuessLogic(io, roomCode, resolveResult);
                     }, 1000);
                 }
+                else {
+                    // Human target - emit event so frontend shows selection modal
+                    const targetPlayer = result.game?.players?.find((p) => p.userId === action.targetPlayerId || p.id === action.targetPlayerId);
+                    io.to(roomCode).emit('blankSelectionRequired', {
+                        guessingPlayerId: botId,
+                        guessingPlayerName: botName,
+                        targetPlayerId: action.targetPlayerId,
+                        targetPlayerName: targetPlayer?.displayName || 'Player',
+                        positions: result.positions,
+                        paddedWord: result.paddedWord,
+                        deadline: Date.now() + 15000,
+                        game: result.game,
+                    });
+                }
                 return;
             }
-            // Broadcast result
+            // Clear bot thinking status and broadcast result
+            io.to(roomCode).emit('botThinking', { botId, botName, status: 'done', message: '' });
             io.to(roomCode).emit('letterGuessed', result);
             handlePostGuessLogic(io, roomCode, result);
         }
         else if (action.type === 'wordGuess') {
+            io.to(roomCode).emit('botThinking', { botId, botName, status: 'guessing', message: `Guessing word "${action.word}"...` });
             // Process word guess
             const result = await gameManager.processWordGuess(roomCode, botId, action.targetPlayerId, action.word);
+            // Clear bot thinking status
+            io.to(roomCode).emit('botThinking', { botId, botName, status: 'done', message: '' });
             io.to(roomCode).emit('wordGuessResult', {
                 ...result,
                 timedOut: false,

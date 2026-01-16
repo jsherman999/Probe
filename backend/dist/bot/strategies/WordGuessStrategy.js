@@ -125,10 +125,20 @@ class WordGuessStrategy {
      */
     async generateWordCandidate(targetPlayer, config) {
         const { pattern, actualLength } = this.buildPatternForLLM(targetPlayer);
-        const prompt = `What English word matches this pattern: ${pattern}
-Letters NOT in the word: ${targetPlayer.missedLetters.join(', ') || 'none'}
-The word is ${actualLength} letters long.
-Reply with just ONE word in uppercase, or "UNKNOWN" if you can't determine it.`;
+        const frontPadding = targetPlayer.frontPadding || 0;
+        const backPadding = targetPlayer.backPadding || 0;
+        const corePositions = targetPlayer.revealedPositions.slice(frontPadding, targetPlayer.wordLength - backPadding);
+        // Build position hints
+        const positionHints = corePositions.map((pos, i) => {
+            if (pos === null || pos === 'BLANK')
+                return `${i + 1}:?`;
+            return `${i + 1}:${pos}`;
+        }).join(' ');
+        const prompt = `Pattern: ${pattern} (${actualLength} letters)
+Positions: ${positionHints}
+Not in word: ${targetPlayer.missedLetters.join(', ') || 'none'}
+Letters shown are FIXED in position. What word matches exactly?
+Reply with ONE word in uppercase, or UNKNOWN.`;
         try {
             const response = await this.llm.generate(config.modelName, prompt, { ...config.ollamaOptions, temperature: 0.3, num_predict: 20 });
             const word = this.extractWord(response, actualLength);
@@ -161,14 +171,25 @@ Reply with just ONE word in uppercase, or "UNKNOWN" if you can't determine it.`;
         const alreadyGuessed = targetPlayer.guessedWords || [];
         const systemPrompt = 'You are playing a word guessing game. Give only single-word answers.';
         const alreadyGuessedInfo = alreadyGuessed.length > 0
-            ? `\n- Words already guessed (DO NOT guess these again): ${alreadyGuessed.join(', ')}`
+            ? `\nWords already guessed (DO NOT guess these): ${alreadyGuessed.join(', ')}`
             : '';
-        const prompt = `Complete this word pattern: ${pattern}
-- Word length: ${actualLength} letters
-- Revealed letters: ${revealedLetters.join(', ') || 'none'}
-- Letters NOT in word: ${targetPlayer.missedLetters.join(', ') || 'none'}${alreadyGuessedInfo}
+        // Build position-by-position breakdown for clarity
+        const positionBreakdown = corePositions.map((pos, i) => {
+            if (pos === null || pos === 'BLANK') {
+                return `Position ${i + 1}: ? (unknown)`;
+            }
+            return `Position ${i + 1}: ${pos} (FIXED - must be ${pos})`;
+        }).join('\n');
+        const prompt = `Guess the ${actualLength}-letter English word from this pattern: ${pattern}
 
-Think about what common English word this could be. What is the COMPLETE word?
+IMPORTANT: The pattern shows the word with _ for unknown letters. Letters that are shown are FIXED in their exact positions and cannot move.
+
+Position breakdown:
+${positionBreakdown}
+
+Letters confirmed NOT in the word: ${targetPlayer.missedLetters.join(', ') || 'none'}${alreadyGuessedInfo}
+
+What common English word matches this EXACT pattern? The revealed letters must stay in their exact positions.
 Reply with ONLY the word in uppercase letters.`;
         console.log(`🎲 [WordGuess ${config.displayName}] Asking LLM for word guess, pattern: ${pattern}, actualLength: ${actualLength}`);
         if (alreadyGuessed.length > 0) {
