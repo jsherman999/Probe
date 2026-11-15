@@ -6,7 +6,7 @@
 // LLM Provider Types
 // ============================================================================
 
-export type LLMProviderType = 'ollama' | 'openrouter';
+export type LLMProviderType = 'ollama' | 'openrouter' | 'lmstudio';
 
 /**
  * Common interface for LLM providers (Ollama, OpenRouter, etc.)
@@ -64,6 +64,7 @@ export interface OllamaGenerateOptions {
   repeat_penalty?: number;   // default 1.1
   seed?: number;             // for reproducibility
   num_ctx?: number;          // context window size
+  reasoning_effort?: 'low' | 'medium' | 'high'; // OpenAI-standard (used by LM Studio for thinking models)
 }
 
 export interface OllamaGenerateRequest {

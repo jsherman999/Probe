@@ -10,6 +10,7 @@ interface Player {
   backPadding: number;
   revealedPositions: (string | null)[];
   missedLetters: string[];
+  guessedWords?: string[]; // Words this player has guessed (optional, UI-only)
   totalScore: number;
   isEliminated: boolean;
   turnOrder: number;

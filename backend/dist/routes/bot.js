@@ -42,9 +42,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const zod_1 = require("zod");
 const bot_1 = require("../bot");
-const server_1 = require("../server");
+const db_1 = require("../db");
 const router = (0, express_1.Router)();
 // Bot routes are now available to all players (no localhost restriction)
+/**
+ * Default LLM provider for requests that don't specify one.
+ * Honors the LLM_PROVIDER env var (ollama | openrouter | lmstudio).
+ */
+const DEFAULT_LLM_PROVIDER = process.env.LLM_PROVIDER === 'openrouter' || process.env.LLM_PROVIDER === 'lmstudio'
+    ? process.env.LLM_PROVIDER
+    : 'ollama';
+const LLM_PROVIDERS = ['ollama', 'openrouter', 'lmstudio'];
 // ============================================================================
 // Validation Schemas
 // ============================================================================
@@ -52,7 +60,7 @@ const BotConfigSchema = zod_1.z.object({
     displayName: zod_1.z.string().min(1).max(30).default('Bot Player'),
     modelName: zod_1.z.string().min(1),
     difficulty: zod_1.z.enum(['easy', 'medium', 'hard']).default('medium'),
-    provider: zod_1.z.enum(['ollama', 'openrouter']).optional().default('ollama'),
+    provider: zod_1.z.enum(LLM_PROVIDERS).optional().default(DEFAULT_LLM_PROVIDER),
     personality: zod_1.z.string().max(500).optional(),
     ollamaOptions: zod_1.z.object({
         temperature: zod_1.z.number().min(0).max(2).optional(),
@@ -68,8 +76,9 @@ const BotPresetSchema = zod_1.z.object({
     displayName: zod_1.z.string().min(1).max(30),
     modelName: zod_1.z.string().min(1),
     difficulty: zod_1.z.enum(['easy', 'medium', 'hard']).default('medium'),
-    provider: zod_1.z.enum(['ollama', 'openrouter']).optional().default('ollama'),
+    provider: zod_1.z.enum(LLM_PROVIDERS).optional().default(DEFAULT_LLM_PROVIDER),
     personality: zod_1.z.string().max(500).optional(),
+    iconSvg: zod_1.z.string().optional(), // Custom SVG icon from robot generator
     ollamaConfig: zod_1.z.object({
         temperature: zod_1.z.number().min(0).max(2).optional(),
         top_p: zod_1.z.number().min(0).max(1).optional(),
@@ -79,6 +88,8 @@ const BotPresetSchema = zod_1.z.object({
         seed: zod_1.z.number().optional(),
     }).optional(),
 });
+// Robot SVG Generator API base URL
+const ROBOT_API_URL = process.env.ROBOT_API_URL || 'http://localhost:9009';
 // ============================================================================
 // Ollama Status & Models
 // ============================================================================
@@ -104,14 +115,35 @@ router.get('/ollama/status', async (req, res) => {
     }
 });
 /**
+ * GET /api/bot/lmstudio/status
+ * Check if the local LM Studio server is running and accessible
+ */
+router.get('/lmstudio/status', async (req, res) => {
+    try {
+        const available = await bot_1.botManager.isLmStudioAvailable();
+        const version = available ? await bot_1.botManager.getLmStudioVersion() : null;
+        res.json({
+            available,
+            version,
+            baseUrl: bot_1.lmstudioService.getBaseUrl(),
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            available: false,
+            error: error.message,
+        });
+    }
+});
+/**
  * GET /api/bot/ollama/models
  * List all available models from specified provider (default: ollama)
  */
 router.get('/ollama/models', async (req, res) => {
     try {
-        const provider = req.query.provider || 'ollama';
+        const provider = req.query.provider || DEFAULT_LLM_PROVIDER;
         // Validate provider
-        if (provider !== 'ollama' && provider !== 'openrouter') {
+        if (!LLM_PROVIDERS.includes(provider)) {
             return res.status(400).json({ error: 'Invalid provider' });
         }
         const models = await bot_1.botManager.getAvailableModels(provider);
@@ -178,6 +210,67 @@ router.post('/ollama/pull', async (req, res) => {
     }
 });
 // ============================================================================
+// Robot Icon Generator (proxy to port 9009)
+// ============================================================================
+/**
+ * GET /api/bot/robot-icon
+ * Generate a single random robot SVG icon
+ */
+router.get('/robot-icon', async (req, res) => {
+    try {
+        const response = await fetch(`${ROBOT_API_URL}/bot`);
+        if (!response.ok) {
+            throw new Error(`Robot API returned ${response.status}`);
+        }
+        const svg = await response.text();
+        res.type('image/svg+xml').send(svg);
+    }
+    catch (error) {
+        res.status(503).json({
+            error: 'Robot icon generator unavailable',
+            message: error.message,
+        });
+    }
+});
+/**
+ * GET /api/bot/robot-icons?count=N
+ * Generate multiple random robot SVG icons as JSON array
+ */
+router.get('/robot-icons', async (req, res) => {
+    try {
+        const count = Math.min(Math.max(parseInt(req.query.count) || 5, 1), 20);
+        const response = await fetch(`${ROBOT_API_URL}/bots/json?count=${count}`);
+        if (!response.ok) {
+            throw new Error(`Robot API returned ${response.status}`);
+        }
+        const data = await response.json();
+        res.json(data);
+    }
+    catch (error) {
+        res.status(503).json({
+            error: 'Robot icon generator unavailable',
+            message: error.message,
+        });
+    }
+});
+/**
+ * GET /api/bot/robot-icon/health
+ * Check if robot icon generator is available
+ */
+router.get('/robot-icon/health', async (req, res) => {
+    try {
+        const response = await fetch(`${ROBOT_API_URL}/health`);
+        if (!response.ok) {
+            throw new Error(`Robot API returned ${response.status}`);
+        }
+        const data = (await response.json());
+        res.json({ available: true, ...data });
+    }
+    catch (error) {
+        res.json({ available: false, error: error.message });
+    }
+});
+// ============================================================================
 // Bot Presets (Saved Configurations)
 // ============================================================================
 /**
@@ -186,7 +279,7 @@ router.post('/ollama/pull', async (req, res) => {
  */
 router.get('/presets', async (req, res) => {
     try {
-        const presets = await server_1.prisma.botPreset.findMany({
+        const presets = await db_1.prisma.botPreset.findMany({
             orderBy: { createdAt: 'desc' },
         });
         res.json({ presets });
@@ -204,7 +297,7 @@ router.get('/presets', async (req, res) => {
  */
 router.get('/presets/:id', async (req, res) => {
     try {
-        const preset = await server_1.prisma.botPreset.findUnique({
+        const preset = await db_1.prisma.botPreset.findUnique({
             where: { id: req.params.id },
         });
         if (!preset) {
@@ -226,7 +319,7 @@ router.get('/presets/:id', async (req, res) => {
 router.post('/presets', async (req, res) => {
     try {
         const data = BotPresetSchema.parse(req.body);
-        const preset = await server_1.prisma.botPreset.create({
+        const preset = await db_1.prisma.botPreset.create({
             data: {
                 presetName: data.presetName,
                 displayName: data.displayName,
@@ -234,6 +327,7 @@ router.post('/presets', async (req, res) => {
                 difficulty: data.difficulty,
                 provider: data.provider || 'ollama',
                 personality: data.personality,
+                iconSvg: data.iconSvg,
                 ollamaConfig: data.ollamaConfig || {},
             },
         });
@@ -265,7 +359,7 @@ router.post('/presets', async (req, res) => {
 router.put('/presets/:id', async (req, res) => {
     try {
         const data = BotPresetSchema.partial().parse(req.body);
-        const preset = await server_1.prisma.botPreset.update({
+        const preset = await db_1.prisma.botPreset.update({
             where: { id: req.params.id },
             data: {
                 presetName: data.presetName,
@@ -274,6 +368,7 @@ router.put('/presets/:id', async (req, res) => {
                 difficulty: data.difficulty,
                 provider: data.provider,
                 personality: data.personality,
+                iconSvg: data.iconSvg,
                 ollamaConfig: data.ollamaConfig,
             },
         });
@@ -301,7 +396,7 @@ router.put('/presets/:id', async (req, res) => {
  */
 router.delete('/presets/:id', async (req, res) => {
     try {
-        await server_1.prisma.botPreset.delete({
+        await db_1.prisma.botPreset.delete({
             where: { id: req.params.id },
         });
         res.json({ success: true });
@@ -327,9 +422,11 @@ router.get('/stats', async (req, res) => {
     try {
         const stats = bot_1.botManager.getStats();
         const ollamaAvailable = await bot_1.botManager.isOllamaAvailable();
+        const lmstudioAvailable = await bot_1.botManager.isLmStudioAvailable();
         res.json({
             ...stats,
             ollamaAvailable,
+            lmstudioAvailable,
         });
     }
     catch (error) {
@@ -355,7 +452,9 @@ router.post('/validate', async (req, res) => {
         if (!providerAvailable) {
             const errorMsg = providerType === 'openrouter'
                 ? 'OpenRouter API is not accessible (check API key)'
-                : 'Ollama server is not available';
+                : providerType === 'lmstudio'
+                    ? `LM Studio server is not available at ${bot_1.botManager.getProviderBaseUrl('lmstudio')}`
+                    : 'Ollama server is not available';
             return res.status(503).json({
                 valid: false,
                 error: errorMsg,
@@ -387,6 +486,9 @@ router.post('/validate', async (req, res) => {
         if (providerType === 'openrouter') {
             const { openRouterService } = await Promise.resolve().then(() => __importStar(require('../bot/OpenRouterService')));
             testResponse = await openRouterService.generate(data.modelName, prompt, options);
+        }
+        else if (providerType === 'lmstudio') {
+            testResponse = await bot_1.lmstudioService.generate(data.modelName, prompt, options);
         }
         else {
             const { ollamaService } = await Promise.resolve().then(() => __importStar(require('../bot/OllamaService')));

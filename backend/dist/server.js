@@ -12,15 +12,14 @@ const path_1 = __importDefault(require("path"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
 const dotenv_1 = __importDefault(require("dotenv"));
-const client_1 = require("@prisma/client");
+const db_1 = require("./db");
+Object.defineProperty(exports, "prisma", { enumerable: true, get: function () { return db_1.prisma; } });
 const socket_1 = require("./socket");
 const auth_1 = __importDefault(require("./routes/auth"));
 const game_1 = __importDefault(require("./routes/game"));
 const bot_1 = __importDefault(require("./routes/bot"));
 // Load environment variables
 dotenv_1.default.config();
-// Initialize Prisma
-exports.prisma = new client_1.PrismaClient();
 // Create Express app
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);
@@ -38,8 +37,9 @@ const corsOriginHandler = (origin, callback) => {
         callback(null, true);
         return;
     }
-    // Allow ngrok, localtunnel, and other tunneling services
-    if (origin.includes('ngrok') || origin.includes('loca.lt') || origin.includes('localhost')) {
+    // Allow ngrok, localtunnel, cloudflare tunnels, and other tunneling services
+    if (origin.includes('ngrok') || origin.includes('loca.lt') || origin.includes('localhost') ||
+        origin.includes('trycloudflare.com') || origin.includes('cloudflare')) {
         callback(null, true);
         return;
     }
@@ -104,7 +104,7 @@ httpServer.listen(PORT, () => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
     console.log('SIGTERM received, shutting down gracefully...');
-    await exports.prisma.$disconnect();
+    await db_1.prisma.$disconnect();
     httpServer.close(() => {
         console.log('Server closed');
         process.exit(0);
@@ -112,7 +112,7 @@ process.on('SIGTERM', async () => {
 });
 process.on('SIGINT', async () => {
     console.log('SIGINT received, shutting down gracefully...');
-    await exports.prisma.$disconnect();
+    await db_1.prisma.$disconnect();
     httpServer.close(() => {
         console.log('Server closed');
         process.exit(0);

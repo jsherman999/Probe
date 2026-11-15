@@ -4,7 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GameManager = void 0;
-const server_1 = require("../server");
+const db_1 = require("../db");
 const WordValidator_1 = require("./WordValidator");
 const ScoringEngine_1 = require("./ScoringEngine");
 const crypto_1 = __importDefault(require("crypto"));
@@ -101,7 +101,7 @@ class GameManager {
         const validTimer = turnTimerSeconds
             ? Math.max(10, Math.min(1800, turnTimerSeconds))
             : 300; // default 5 minutes
-        const game = await server_1.prisma.game.create({
+        const game = await db_1.prisma.game.create({
             data: {
                 roomCode,
                 status: 'WAITING',
@@ -125,7 +125,7 @@ class GameManager {
         return this.sanitizeGame(game);
     }
     async getGameByRoomCode(roomCode, forUserId) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -141,7 +141,7 @@ class GameManager {
         return this.sanitizeGame(game, forUserId);
     }
     async joinGame(roomCode, userId) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: true,
@@ -162,7 +162,7 @@ class GameManager {
             throw new Error('Game is full');
         }
         try {
-            const updatedGame = await server_1.prisma.game.update({
+            const updatedGame = await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: {
                     players: {
@@ -192,7 +192,7 @@ class GameManager {
         }
     }
     async leaveGame(roomCode, userId) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -209,14 +209,14 @@ class GameManager {
         }
         // If game is in WAITING status, simply remove the player
         if (game.status === 'WAITING') {
-            await server_1.prisma.gamePlayer.delete({
+            await db_1.prisma.gamePlayer.delete({
                 where: { id: player.id },
             });
             // If host left, assign new host or delete game if no players
             if (game.hostId === userId) {
                 const remainingPlayers = game.players.filter(p => p.userId !== userId);
                 if (remainingPlayers.length > 0) {
-                    await server_1.prisma.game.update({
+                    await db_1.prisma.game.update({
                         where: { id: game.id },
                         data: { hostId: remainingPlayers[0].userId },
                     });
@@ -224,7 +224,7 @@ class GameManager {
                     return { gameEnded: false, game: updatedGame };
                 }
                 else {
-                    await server_1.prisma.game.delete({
+                    await db_1.prisma.game.delete({
                         where: { id: game.id },
                     });
                     return { gameEnded: true, game: null };
@@ -236,7 +236,7 @@ class GameManager {
         // For active/word selection games, eliminate the player instead of removing
         if (game.status === 'ACTIVE' || game.status === 'WORD_SELECTION') {
             // Mark player as eliminated
-            await server_1.prisma.gamePlayer.update({
+            await db_1.prisma.gamePlayer.update({
                 where: { id: player.id },
                 data: { isEliminated: true },
             });
@@ -244,7 +244,7 @@ class GameManager {
             const activePlayers = game.players.filter(p => p.userId !== userId && !p.isEliminated);
             if (activePlayers.length <= 1) {
                 // Game over - the remaining player wins
-                await server_1.prisma.game.update({
+                await db_1.prisma.game.update({
                     where: { id: game.id },
                     data: {
                         status: 'COMPLETED',
@@ -252,12 +252,12 @@ class GameManager {
                     },
                 });
                 // Record results (only for human players)
-                const allPlayers = await server_1.prisma.gamePlayer.findMany({
+                const allPlayers = await db_1.prisma.gamePlayer.findMany({
                     where: { gameId: game.id },
                 });
                 const sortedPlayers = [...allPlayers].sort((a, b) => b.totalScore - a.totalScore);
                 const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
-                await Promise.all(humanPlayers.map(async (p, index) => server_1.prisma.gameResult.create({
+                await Promise.all(humanPlayers.map(async (p, index) => db_1.prisma.gameResult.create({
                     data: {
                         gameId: game.id,
                         playerId: p.userId,
@@ -284,7 +284,7 @@ class GameManager {
                     nextIndex = (nextIndex + 1) % game.players.length;
                     nextPlayer = game.players[nextIndex];
                 }
-                await server_1.prisma.game.update({
+                await db_1.prisma.game.update({
                     where: { id: game.id },
                     data: {
                         currentTurnPlayerId: nextPlayer.userId || nextPlayer.botId,
@@ -300,7 +300,7 @@ class GameManager {
     }
     // Force end a game (host/admin only)
     async endGame(roomCode, userId, force = false) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -319,7 +319,7 @@ class GameManager {
             throw new Error('Game already completed');
         }
         // Mark game as completed
-        await server_1.prisma.game.update({
+        await db_1.prisma.game.update({
             where: { id: game.id },
             data: {
                 status: 'COMPLETED',
@@ -329,7 +329,7 @@ class GameManager {
         // Record results based on current scores (only for human players)
         const sortedPlayers = [...game.players].sort((a, b) => b.totalScore - a.totalScore);
         const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
-        await Promise.all(humanPlayers.map(async (p, index) => server_1.prisma.gameResult.create({
+        await Promise.all(humanPlayers.map(async (p, index) => db_1.prisma.gameResult.create({
             data: {
                 gameId: game.id,
                 playerId: p.userId,
@@ -347,7 +347,7 @@ class GameManager {
         return updatedGame;
     }
     async startGame(roomCode, userId) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: true,
@@ -362,7 +362,7 @@ class GameManager {
         if (game.players.length < 2) {
             throw new Error('Need at least 2 players');
         }
-        const updatedGame = await server_1.prisma.game.update({
+        const updatedGame = await db_1.prisma.game.update({
             where: { id: game.id },
             data: {
                 status: 'WORD_SELECTION',
@@ -399,7 +399,7 @@ class GameManager {
         if (!(await this.wordValidator.isValidWord(word))) {
             throw new Error('Not a valid English word');
         }
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: true,
@@ -422,7 +422,7 @@ class GameManager {
         const wordHash = crypto_1.default.createHash('sha256').update(word).digest('hex');
         // Initialize revealed positions for padded word length
         const revealedPositions = new Array(paddedWord.length).fill(false);
-        await server_1.prisma.gamePlayer.update({
+        await db_1.prisma.gamePlayer.update({
             where: { id: player.id },
             data: {
                 secretWord: word,
@@ -434,7 +434,7 @@ class GameManager {
             },
         });
         // Check if all players have selected words
-        const updatedPlayers = await server_1.prisma.gamePlayer.findMany({
+        const updatedPlayers = await db_1.prisma.gamePlayer.findMany({
             where: { gameId: game.id },
         });
         const allReady = updatedPlayers.every(p => p.secretWord !== null);
@@ -456,7 +456,7 @@ class GameManager {
             }
             // Handle bonus_20 for initial player
             if (initialCard.type === 'bonus_20') {
-                await server_1.prisma.gamePlayer.update({
+                await db_1.prisma.gamePlayer.update({
                     where: { id: firstPlayer.id },
                     data: {
                         totalScore: firstPlayer.totalScore + 20,
@@ -464,7 +464,7 @@ class GameManager {
                 });
             }
             // Start the game with initial turn card
-            const updatedGame = await server_1.prisma.game.update({
+            const updatedGame = await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: {
                     status: 'ACTIVE',
@@ -486,7 +486,7 @@ class GameManager {
             });
             return this.sanitizeGame(updatedGame);
         }
-        const gameWithPlayers = await server_1.prisma.game.findUnique({
+        const gameWithPlayers = await db_1.prisma.game.findUnique({
             where: { id: game.id },
             include: {
                 players: {
@@ -500,7 +500,7 @@ class GameManager {
     }
     async processGuess(roomCode, playerId, targetPlayerId, letter) {
         letter = letter.toUpperCase();
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -590,7 +590,7 @@ class GameManager {
             pointsScored = -50;
             // Deduct points from the guessing player
             if (currentPlayer) {
-                await server_1.prisma.gamePlayer.update({
+                await db_1.prisma.gamePlayer.update({
                     where: { id: currentPlayer.id },
                     data: {
                         totalScore: currentPlayer.totalScore - 50, // Allow negative scores
@@ -634,7 +634,7 @@ class GameManager {
                 console.log(`🏆 WORD COMPLETED! Adding ${completionBonus} point bonus (total: ${pointsScored})`);
             }
             // Update target player's revealed positions and elimination status
-            await server_1.prisma.gamePlayer.update({
+            await db_1.prisma.gamePlayer.update({
                 where: { id: targetPlayer.id },
                 data: {
                     revealedPositions: JSON.stringify(revealedPositions),
@@ -645,7 +645,7 @@ class GameManager {
             if (pointsScored > 0) {
                 if (currentPlayer) {
                     console.log(`💰 Awarding ${pointsScored} points to GUESSING player ${playerId} (was ${currentPlayer.totalScore}, now ${currentPlayer.totalScore + pointsScored})`);
-                    await server_1.prisma.gamePlayer.update({
+                    await db_1.prisma.gamePlayer.update({
                         where: { id: currentPlayer.id },
                         data: {
                             totalScore: currentPlayer.totalScore + pointsScored,
@@ -655,7 +655,7 @@ class GameManager {
             }
             // Mark turn card as used after first successful hit (for multiplier cards)
             // Also reset currentTurnStartedAt so frontend timer resets for continued turn
-            await server_1.prisma.game.update({
+            await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: {
                     ...(multiplierApplied ? { turnCardUsed: true } : {}),
@@ -664,7 +664,7 @@ class GameManager {
             });
         }
         // Record turn
-        await server_1.prisma.gameTurn.create({
+        await db_1.prisma.gameTurn.create({
             data: {
                 gameId: game.id,
                 playerId: currentPlayer.id,
@@ -684,7 +684,7 @@ class GameManager {
             // Add letter to target player's missed letters
             const currentMissed = targetPlayer.missedLetters || [];
             if (!currentMissed.includes(letter)) {
-                await server_1.prisma.gamePlayer.update({
+                await db_1.prisma.gamePlayer.update({
                     where: { id: targetPlayer.id },
                     data: {
                         missedLetters: [...currentMissed, letter],
@@ -695,7 +695,7 @@ class GameManager {
             if (game.currentTurnCard === 'additional' && !game.turnCardUsed) {
                 // Player gets to keep their turn despite miss, but card is consumed
                 nextTurnPlayerId = playerId;
-                await server_1.prisma.game.update({
+                await db_1.prisma.game.update({
                     where: { id: game.id },
                     data: {
                         turnCardUsed: true,
@@ -742,7 +742,7 @@ class GameManager {
                     const nextPlayerId = this.getPlayerId(nextPlayer);
                     const playerToBonus = game.players.find(p => this.getPlayerId(p) === nextPlayerId);
                     if (playerToBonus) {
-                        await server_1.prisma.gamePlayer.update({
+                        await db_1.prisma.gamePlayer.update({
                             where: { id: playerToBonus.id },
                             data: {
                                 totalScore: playerToBonus.totalScore + 20,
@@ -766,7 +766,7 @@ class GameManager {
                 if (drawnCard.multiplier && drawnCard.multiplier > 1) {
                     console.log(`🎴 MULTIPLIER CARD DRAWN: ${drawnCard.type} (x${drawnCard.multiplier}) for player ${nextPlayer.userId || nextPlayer.botId}`);
                 }
-                await server_1.prisma.game.update({
+                await db_1.prisma.game.update({
                     where: { id: game.id },
                     data: {
                         currentTurnPlayerId: nextPlayer.userId || nextPlayer.botId,
@@ -780,7 +780,7 @@ class GameManager {
             }
         }
         // Check if game is over
-        const updatedPlayers = await server_1.prisma.gamePlayer.findMany({
+        const updatedPlayers = await db_1.prisma.gamePlayer.findMany({
             where: { gameId: game.id },
         });
         const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
@@ -788,7 +788,7 @@ class GameManager {
         const gameOver = playersWithUnrevealedWords.length === 0;
         let finalResults = null;
         if (gameOver) {
-            await server_1.prisma.game.update({
+            await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: {
                     status: 'COMPLETED',
@@ -798,7 +798,7 @@ class GameManager {
             // Record results (only for human players - bots don't have User records)
             const sorted = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
             const humanPlayers = sorted.filter(p => p.userId !== null);
-            finalResults = await Promise.all(humanPlayers.map((p, index) => server_1.prisma.gameResult.create({
+            finalResults = await Promise.all(humanPlayers.map((p, index) => db_1.prisma.gameResult.create({
                 data: {
                     gameId: game.id,
                     playerId: p.userId,
@@ -837,7 +837,7 @@ class GameManager {
     }
     // Resolve blank selection when target player chooses which blank to reveal
     async resolveBlankSelection(roomCode, guessingPlayerId, targetPlayerId, selectedPosition) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -871,7 +871,7 @@ class GameManager {
         // Score blanks like regular letters using position-based scoring
         const pointsScored = this.scoringEngine.getPositionPoints(selectedPosition);
         // Update target player
-        await server_1.prisma.gamePlayer.update({
+        await db_1.prisma.gamePlayer.update({
             where: { id: targetPlayer.id },
             data: {
                 revealedPositions: JSON.stringify(revealedPositions),
@@ -882,7 +882,7 @@ class GameManager {
         if (pointsScored > 0) {
             const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
             if (guessingPlayer) {
-                await server_1.prisma.gamePlayer.update({
+                await db_1.prisma.gamePlayer.update({
                     where: { id: guessingPlayer.id },
                     data: {
                         totalScore: guessingPlayer.totalScore + pointsScored,
@@ -893,7 +893,7 @@ class GameManager {
         // Record turn
         const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
         if (guessingPlayer) {
-            await server_1.prisma.gameTurn.create({
+            await db_1.prisma.gameTurn.create({
                 data: {
                     gameId: game.id,
                     playerId: guessingPlayer.id,
@@ -907,7 +907,7 @@ class GameManager {
             });
         }
         // Check for game over - fetch fresh player data after update
-        const updatedPlayers = await server_1.prisma.gamePlayer.findMany({
+        const updatedPlayers = await db_1.prisma.gamePlayer.findMany({
             where: { gameId: game.id },
         });
         const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
@@ -915,13 +915,13 @@ class GameManager {
         const gameOver = playersWithUnrevealedWords.length === 0;
         let finalResults = null;
         if (gameOver) {
-            await server_1.prisma.game.update({
+            await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: { status: 'COMPLETED', completedAt: new Date() },
             });
             const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
             const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
-            finalResults = await Promise.all(humanPlayers.map(async (p, index) => server_1.prisma.gameResult.create({
+            finalResults = await Promise.all(humanPlayers.map(async (p, index) => db_1.prisma.gameResult.create({
                 data: {
                     gameId: game.id,
                     playerId: p.userId,
@@ -956,7 +956,7 @@ class GameManager {
     }
     // Resolve duplicate letter selection when target player chooses which duplicate to reveal
     async resolveDuplicateSelection(roomCode, guessingPlayerId, targetPlayerId, selectedPosition, letter) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -991,7 +991,7 @@ class GameManager {
         const isBlankPosition = (pos) => word[pos] === this.BLANK_CHAR;
         const pointsScored = this.scoringEngine.calculateScore([selectedPosition], isBlankPosition);
         // Update target player's revealed positions
-        await server_1.prisma.gamePlayer.update({
+        await db_1.prisma.gamePlayer.update({
             where: { id: targetPlayer.id },
             data: {
                 revealedPositions: JSON.stringify(revealedPositions),
@@ -1002,7 +1002,7 @@ class GameManager {
         if (pointsScored > 0) {
             const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
             if (guessingPlayer) {
-                await server_1.prisma.gamePlayer.update({
+                await db_1.prisma.gamePlayer.update({
                     where: { id: guessingPlayer.id },
                     data: {
                         totalScore: guessingPlayer.totalScore + pointsScored,
@@ -1013,7 +1013,7 @@ class GameManager {
         // Record turn
         const guessingPlayer = game.players.find(p => this.getPlayerId(p) === guessingPlayerId);
         if (guessingPlayer) {
-            await server_1.prisma.gameTurn.create({
+            await db_1.prisma.gameTurn.create({
                 data: {
                     gameId: game.id,
                     playerId: guessingPlayer.id,
@@ -1027,7 +1027,7 @@ class GameManager {
             });
         }
         // Check for game over
-        const updatedPlayers = await server_1.prisma.gamePlayer.findMany({
+        const updatedPlayers = await db_1.prisma.gamePlayer.findMany({
             where: { gameId: game.id },
         });
         const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
@@ -1035,13 +1035,13 @@ class GameManager {
         const gameOver = playersWithUnrevealedWords.length === 0;
         let finalResults = null;
         if (gameOver) {
-            await server_1.prisma.game.update({
+            await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: { status: 'COMPLETED', completedAt: new Date() },
             });
             const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
             const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
-            finalResults = await Promise.all(humanPlayers.map(async (p, index) => server_1.prisma.gameResult.create({
+            finalResults = await Promise.all(humanPlayers.map(async (p, index) => db_1.prisma.gameResult.create({
                 data: {
                     gameId: game.id,
                     playerId: p.userId,
@@ -1076,7 +1076,7 @@ class GameManager {
     }
     // Resolve expose card selection - affected player chooses which of their letters to expose
     async resolveExposeCard(roomCode, affectedPlayerId, selectedPosition) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -1114,7 +1114,7 @@ class GameManager {
         // Calculate points for the exposed position (active player gets these points)
         const pointsScored = this.scoringEngine.getPositionPoints(selectedPosition);
         // Update affected player's revealed positions
-        await server_1.prisma.gamePlayer.update({
+        await db_1.prisma.gamePlayer.update({
             where: { id: affectedPlayer.id },
             data: {
                 revealedPositions: JSON.stringify(revealedPositions),
@@ -1126,7 +1126,7 @@ class GameManager {
         const affectedPlayerName = this.getPlayerDisplayName(affectedPlayer);
         // Award points to the active player who drew the expose card
         if (activePlayer) {
-            await server_1.prisma.gamePlayer.update({
+            await db_1.prisma.gamePlayer.update({
                 where: { id: activePlayer.id },
                 data: {
                     totalScore: { increment: pointsScored },
@@ -1140,14 +1140,14 @@ class GameManager {
             console.log(`🎴 EXPOSE CARD RESOLVED: ${affectedPlayerName} exposed letter "${exposedLetter}" at position ${selectedPosition}`);
         }
         // Clear the pending expose selection
-        await server_1.prisma.game.update({
+        await db_1.prisma.game.update({
             where: { id: game.id },
             data: {
                 pendingExposePlayerId: null,
             },
         });
         // Check for game over
-        const updatedPlayers = await server_1.prisma.gamePlayer.findMany({
+        const updatedPlayers = await db_1.prisma.gamePlayer.findMany({
             where: { gameId: game.id },
         });
         const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
@@ -1155,13 +1155,13 @@ class GameManager {
         const gameOver = playersWithUnrevealedWords.length === 0;
         let finalResults = null;
         if (gameOver) {
-            await server_1.prisma.game.update({
+            await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: { status: 'COMPLETED', completedAt: new Date() },
             });
             const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
             const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
-            finalResults = await Promise.all(humanPlayers.map(async (p, index) => server_1.prisma.gameResult.create({
+            finalResults = await Promise.all(humanPlayers.map(async (p, index) => db_1.prisma.gameResult.create({
                 data: {
                     gameId: game.id,
                     playerId: p.userId,
@@ -1198,7 +1198,7 @@ class GameManager {
     // Process a full word guess attempt ("Guess Now!" feature)
     async processWordGuess(roomCode, guessingPlayerId, targetPlayerId, guessedWord) {
         guessedWord = guessedWord.toUpperCase().trim();
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -1246,7 +1246,7 @@ class GameManager {
             console.log(`   Total award: ${pointsChange} points`);
             // Reveal all positions and eliminate the target
             const allRevealed = new Array(paddedWord.length).fill(true);
-            await server_1.prisma.gamePlayer.update({
+            await db_1.prisma.gamePlayer.update({
                 where: { id: targetPlayer.id },
                 data: {
                     revealedPositions: JSON.stringify(allRevealed),
@@ -1260,7 +1260,7 @@ class GameManager {
             console.log(`❌ WORD GUESS INCORRECT: ${guessedWord} != ${actualWord} (-50 points)`);
         }
         // Update guessing player's score
-        await server_1.prisma.gamePlayer.update({
+        await db_1.prisma.gamePlayer.update({
             where: { id: guessingPlayer.id },
             data: {
                 totalScore: guessingPlayer.totalScore + pointsChange, // Allow negative scores
@@ -1279,7 +1279,7 @@ class GameManager {
             }
             const nextPlayer = game.players[nextIndex];
             const nextPlayerId = this.getPlayerId(nextPlayer);
-            await server_1.prisma.game.update({
+            await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: {
                     currentTurnPlayerId: nextPlayerId,
@@ -1288,7 +1288,7 @@ class GameManager {
             });
         }
         // Record the word guess as a turn
-        await server_1.prisma.gameTurn.create({
+        await db_1.prisma.gameTurn.create({
             data: {
                 gameId: game.id,
                 playerId: guessingPlayer.id,
@@ -1301,7 +1301,7 @@ class GameManager {
             },
         });
         // Check if game is over
-        const updatedPlayers = await server_1.prisma.gamePlayer.findMany({
+        const updatedPlayers = await db_1.prisma.gamePlayer.findMany({
             where: { gameId: game.id },
         });
         const playersWithUnrevealedWords = updatedPlayers.filter(p => !p.isEliminated);
@@ -1309,7 +1309,7 @@ class GameManager {
         const gameOver = playersWithUnrevealedWords.length === 0;
         let finalResults = null;
         if (gameOver) {
-            await server_1.prisma.game.update({
+            await db_1.prisma.game.update({
                 where: { id: game.id },
                 data: {
                     status: 'COMPLETED',
@@ -1318,7 +1318,7 @@ class GameManager {
             });
             const sortedPlayers = [...updatedPlayers].sort((a, b) => b.totalScore - a.totalScore);
             const humanPlayers = sortedPlayers.filter(p => p.userId !== null);
-            finalResults = await Promise.all(humanPlayers.map(async (p, index) => server_1.prisma.gameResult.create({
+            finalResults = await Promise.all(humanPlayers.map(async (p, index) => db_1.prisma.gameResult.create({
                 data: {
                     gameId: game.id,
                     playerId: p.userId,
@@ -1351,7 +1351,7 @@ class GameManager {
         };
     }
     async handleTurnTimeout(roomCode) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -1389,7 +1389,7 @@ class GameManager {
         }
         const nextPlayer = activePlayers[nextActiveIndex];
         const nextPlayerId = this.getPlayerId(nextPlayer);
-        await server_1.prisma.game.update({
+        await db_1.prisma.game.update({
             where: { id: game.id },
             data: {
                 currentTurnPlayerId: nextPlayerId,
@@ -1406,7 +1406,7 @@ class GameManager {
         };
     }
     async updateTimerSettings(roomCode, userId, turnTimerSeconds) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
         });
         if (!game) {
@@ -1420,7 +1420,7 @@ class GameManager {
         }
         // Validate timer: minimum 10 seconds, maximum 30 minutes
         const validTimer = Math.max(10, Math.min(1800, turnTimerSeconds));
-        const updatedGame = await server_1.prisma.game.update({
+        const updatedGame = await db_1.prisma.game.update({
             where: { id: game.id },
             data: { turnTimerSeconds: validTimer },
             include: {
@@ -1435,7 +1435,7 @@ class GameManager {
     }
     async archiveGame(gameId) {
         // Fetch full game data with all relationships
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { id: gameId },
             include: {
                 players: {
@@ -1529,7 +1529,7 @@ class GameManager {
     }
     // Re-archive a game by room code (for migrating old files)
     async reArchiveGame(roomCode) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
         });
         if (!game) {
@@ -1540,7 +1540,7 @@ class GameManager {
     }
     // Re-archive all completed games that are still in the database
     async migrateAllGameHistory() {
-        const completedGames = await server_1.prisma.game.findMany({
+        const completedGames = await db_1.prisma.game.findMany({
             where: { status: 'COMPLETED' },
         });
         const migrated = [];
@@ -1560,7 +1560,7 @@ class GameManager {
     }
     // Handle viewer (observer) word guess
     async submitViewerGuess(roomCode, viewerId, viewerName, targetPlayerId, guessedWord) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -1697,7 +1697,7 @@ class GameManager {
         const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
         // Find stale WAITING games (30 minutes old)
-        const staleWaitingGames = await server_1.prisma.game.findMany({
+        const staleWaitingGames = await db_1.prisma.game.findMany({
             where: {
                 status: 'WAITING',
                 createdAt: {
@@ -1706,7 +1706,7 @@ class GameManager {
             },
         });
         // Find stale ACTIVE/WORD_SELECTION games (2 hours old or no activity)
-        const staleActiveGames = await server_1.prisma.game.findMany({
+        const staleActiveGames = await db_1.prisma.game.findMany({
             where: {
                 status: { in: ['ACTIVE', 'WORD_SELECTION'] },
                 OR: [
@@ -1720,19 +1720,19 @@ class GameManager {
         if (allStaleGames.length > 0) {
             const gameIds = allStaleGames.map(g => g.id);
             // Delete turns first
-            await server_1.prisma.gameTurn.deleteMany({
+            await db_1.prisma.gameTurn.deleteMany({
                 where: { gameId: { in: gameIds } },
             });
             // Delete results
-            await server_1.prisma.gameResult.deleteMany({
+            await db_1.prisma.gameResult.deleteMany({
                 where: { gameId: { in: gameIds } },
             });
             // Delete players due to foreign key constraints
-            await server_1.prisma.gamePlayer.deleteMany({
+            await db_1.prisma.gamePlayer.deleteMany({
                 where: { gameId: { in: gameIds } },
             });
             // Delete the games
-            await server_1.prisma.game.deleteMany({
+            await db_1.prisma.game.deleteMany({
                 where: { id: { in: gameIds } },
             });
             console.log(`🧹 Cleaned up ${allStaleGames.length} stale games: ${roomCodes.join(', ')}`);
@@ -1742,7 +1742,7 @@ class GameManager {
     // Force cleanup ALL non-completed games (for admin use)
     async forceCleanupAllGames() {
         console.log('🧹 forceCleanupAllGames called');
-        const nonCompletedGames = await server_1.prisma.game.findMany({
+        const nonCompletedGames = await db_1.prisma.game.findMany({
             where: {
                 status: { in: ['WAITING', 'ACTIVE', 'WORD_SELECTION'] },
             },
@@ -1752,19 +1752,19 @@ class GameManager {
         if (nonCompletedGames.length > 0) {
             const gameIds = nonCompletedGames.map(g => g.id);
             // Delete turns first
-            await server_1.prisma.gameTurn.deleteMany({
+            await db_1.prisma.gameTurn.deleteMany({
                 where: { gameId: { in: gameIds } },
             });
             // Delete results
-            await server_1.prisma.gameResult.deleteMany({
+            await db_1.prisma.gameResult.deleteMany({
                 where: { gameId: { in: gameIds } },
             });
             // Delete players due to foreign key constraints
-            await server_1.prisma.gamePlayer.deleteMany({
+            await db_1.prisma.gamePlayer.deleteMany({
                 where: { gameId: { in: gameIds } },
             });
             // Delete the games
-            await server_1.prisma.game.deleteMany({
+            await db_1.prisma.game.deleteMany({
                 where: { id: { in: gameIds } },
             });
             console.log(`🧹 FORCE cleaned up ${nonCompletedGames.length} games: ${roomCodes.join(', ')}`);
@@ -1773,7 +1773,7 @@ class GameManager {
     }
     // Remove a game from the lobby (only host can remove, or force remove for admin)
     async removeGame(roomCode, userId, force = false) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: { players: true },
         });
@@ -1785,10 +1785,10 @@ class GameManager {
             throw new Error('Only host can remove the game');
         }
         // Delete related records first
-        await server_1.prisma.gameTurn.deleteMany({ where: { gameId: game.id } });
-        await server_1.prisma.gameResult.deleteMany({ where: { gameId: game.id } });
-        await server_1.prisma.gamePlayer.deleteMany({ where: { gameId: game.id } });
-        await server_1.prisma.game.delete({ where: { id: game.id } });
+        await db_1.prisma.gameTurn.deleteMany({ where: { gameId: game.id } });
+        await db_1.prisma.gameResult.deleteMany({ where: { gameId: game.id } });
+        await db_1.prisma.gamePlayer.deleteMany({ where: { gameId: game.id } });
+        await db_1.prisma.game.delete({ where: { id: game.id } });
         console.log(`🗑️ Game ${roomCode} removed`);
     }
     // Remove a game from history (archived JSON files)
@@ -1862,7 +1862,7 @@ class GameManager {
      * Add a bot player to a game
      */
     async addBotPlayer(roomCode, bot) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: { players: true },
         });
@@ -1880,7 +1880,7 @@ class GameManager {
         if (existingBot) {
             return this.getGameByRoomCode(roomCode);
         }
-        const updatedGame = await server_1.prisma.game.update({
+        const updatedGame = await db_1.prisma.game.update({
             where: { id: game.id },
             data: {
                 players: {
@@ -1909,7 +1909,7 @@ class GameManager {
      * Remove a bot player from a game
      */
     async removeBotPlayer(roomCode, botId) {
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: { players: true },
         });
@@ -1923,14 +1923,14 @@ class GameManager {
         if (!botPlayer) {
             throw new Error('Bot not in this game');
         }
-        await server_1.prisma.gamePlayer.delete({
+        await db_1.prisma.gamePlayer.delete({
             where: { id: botPlayer.id },
         });
         // Re-order remaining players
         const remainingPlayers = game.players
             .filter(p => p.botId !== botId)
             .sort((a, b) => a.turnOrder - b.turnOrder);
-        await Promise.all(remainingPlayers.map((p, index) => server_1.prisma.gamePlayer.update({
+        await Promise.all(remainingPlayers.map((p, index) => db_1.prisma.gamePlayer.update({
             where: { id: p.id },
             data: { turnOrder: index },
         })));

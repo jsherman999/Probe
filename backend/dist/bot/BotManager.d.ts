@@ -3,16 +3,32 @@
  */
 import { OllamaService } from './OllamaService';
 import { OpenRouterService } from './OpenRouterService';
+import { LMStudioService } from './LMStudioService';
 import { WordValidator } from '../game/WordValidator';
 import { BotPlayer } from './BotPlayer';
 import { BotConfigInput, BotPreset, GameContext, TurnAction, OllamaModel, LLMProviderType } from './types';
 export declare class BotManager {
     private ollama;
     private openRouter;
+    private lmstudio;
     private bots;
     private gameBots;
     private wordValidator;
-    constructor(ollama?: OllamaService, openRouter?: OpenRouterService, wordValidator?: WordValidator);
+    constructor(ollama?: OllamaService, openRouter?: OpenRouterService, lmstudio?: LMStudioService, wordValidator?: WordValidator);
+    /**
+     * Resolve the default LLM provider.
+     * Honors the LLM_PROVIDER env var (ollama | openrouter | lmstudio),
+     * falling back to 'ollama' for backward compatibility.
+     */
+    private static defaultProvider;
+    /**
+     * Get the default LLM provider (from LLM_PROVIDER env, else 'ollama')
+     */
+    getDefaultProvider(): LLMProviderType;
+    /**
+     * Resolve a provider name to its service instance
+     */
+    private resolveProvider;
     /**
      * Check if a provider is available
      */
@@ -22,6 +38,10 @@ export declare class BotManager {
      */
     isOllamaAvailable(): Promise<boolean>;
     /**
+     * Check if LM Studio is available
+     */
+    isLmStudioAvailable(): Promise<boolean>;
+    /**
      * Get list of available models from a provider
      */
     getAvailableModels(provider?: LLMProviderType): Promise<OllamaModel[]>;
@@ -29,6 +49,14 @@ export declare class BotManager {
      * Get Ollama version
      */
     getOllamaVersion(): Promise<string | null>;
+    /**
+     * Get LM Studio version (null when the native API is unavailable)
+     */
+    getLmStudioVersion(): Promise<string | null>;
+    /**
+     * Get the base URL of a provider (for status responses)
+     */
+    getProviderBaseUrl(provider?: LLMProviderType): string;
     /**
      * Create a new bot player
      */

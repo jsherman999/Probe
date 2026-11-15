@@ -6,7 +6,7 @@ import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './db';
 import { setupSocketHandlers } from './socket';
 import authRoutes from './routes/auth';
 import gameRoutes from './routes/game';
@@ -15,8 +15,8 @@ import botRoutes from './routes/bot';
 // Load environment variables
 dotenv.config();
 
-// Initialize Prisma
-export const prisma = new PrismaClient();
+// Initialize Prisma (shared singleton; re-exported for backward compatibility)
+export { prisma };
 
 // Create Express app
 const app = express();

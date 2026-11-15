@@ -5,7 +5,7 @@
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 
-A modern, real-time multiplayer implementation of the classic Parker Brothers (1964) word guessing board game Probe. Features AI bot players powered by local (Ollama) or cloud (OpenRouter) language models, position-based scoring, and advanced gameplay mechanics. Built with React, Node.js, Socket.io, and PostgreSQL.
+A modern, real-time multiplayer implementation of the classic Parker Brothers (1964) word guessing board game Probe. Features AI bot players powered by local language models (LM Studio or Ollama) or cloud models (OpenRouter), position-based scoring, and advanced gameplay mechanics. Built with React, Node.js, Socket.io, and PostgreSQL.
 
 ## 🎮 Features
 
@@ -21,6 +21,7 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
 
 ### AI Bot Players
 - **LLM-Powered Bots**: Play against AI opponents powered by local or cloud language models
+- **LM Studio Support** (default): Use any model loaded in a local [LM Studio](https://lmstudio.ai) instance via its OpenAI-compatible API — no cloud, no Ollama required
 - **Ollama Support**: Use local Ollama models (llama3.2, mistral, etc.)
 - **OpenRouter Integration**: Access free cloud models via OpenRouter API
 - **Difficulty Levels**: Easy, Medium, and Hard bot configurations
@@ -47,7 +48,8 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
 - npm or yarn
 
 **Optional (for AI bots):**
-- [Ollama](https://ollama.ai) - For local AI bot players
+- [LM Studio](https://lmstudio.ai) - For local AI bot players (default provider; any model you load works)
+- [Ollama](https://ollama.ai) - Alternative local model server
 - OpenRouter API Key - For cloud-based AI bot players
 
 ### Installation
@@ -66,6 +68,15 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
 
 3. **(Optional) Configure AI Bot Providers**
 
+   For **LM Studio** (local models, default):
+   ```bash
+   # 1. Install LM Studio from https://lmstudio.ai and load a model
+   #    (e.g. openai/gpt-oss-120b, qwen3.8-27b)
+   # 2. Start the local server: Developer tab -> Start Server (port 1234)
+   # 3. Confirm it is reachable:
+   curl http://localhost:1234/v1/models
+   ```
+
    For **Ollama** (local models):
    ```bash
    # Install Ollama from https://ollama.ai
@@ -77,6 +88,10 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
    # Add to backend/.env
    OPENROUTER_API_KEY=your_api_key_here
    ```
+
+   The default provider is set with `LLM_PROVIDER` in `backend/.env`
+   (`lmstudio`, `ollama`, or `openrouter`). See [AI Bot Players](#-ai-bot-players)
+   for all LM Studio tuning options.
 
 4. **Start development servers**
    ```bash
@@ -145,6 +160,7 @@ Probe/
 │   │   ├── bot/           # AI bot system
 │   │   │   ├── BotManager.ts        # Bot lifecycle management
 │   │   │   ├── BotPlayer.ts         # Individual bot player
+│   │   │   ├── LMStudioService.ts   # Local LM Studio (OpenAI-compatible) integration
 │   │   │   ├── OllamaService.ts     # Local Ollama integration
 │   │   │   ├── OpenRouterService.ts # Cloud model integration
 │   │   │   ├── WordHistory.ts       # Bot word tracking
@@ -324,14 +340,14 @@ Points are awarded based on the **position** of revealed letters, not the letter
 **Example:** If you guess a letter that appears at positions 0, 2, and 5 in a word, you earn:
 - Position 0: 5 points
 - Position 2: 15 points
-- Position 5: 10 points
-- **Total: 30 points**
+- Position 5: 15 points
+- **Total: 35 points**
 
 ### Special Scoring
 - **Word Guess Bonus**: When you correctly guess another player's word:
   - Base bonus: 50 points (or 100 points if 5+ positions are unrevealed)
   - PLUS: Sum of position values for ALL unrevealed positions (including blanks)
-  - Example: Guessing a 7-letter word with 4 unrevealed positions at 2, 3, 5, 6 = 50 + (15+5+10+5) = 85 points
+  - Example: Guessing a 7-letter word with 4 unrevealed positions at 2, 3, 5, 6 = 50 + (15+5+15+5) = 90 points
 - **Word Completion Bonus**: 50 points for revealing the final letter of a word through letter guessing
 - **Incorrect Word Guess Penalty**: -50 points
 - **Blank Padding**:
@@ -346,7 +362,25 @@ Play against intelligent AI opponents powered by large language models. Bots use
 
 ### Supported LLM Providers
 
-#### Local Ollama (Recommended)
+#### Local LM Studio (Default, Recommended)
+- Run any model you have loaded in [LM Studio](https://lmstudio.ai), served through its OpenAI-compatible API
+- **Setup**: Load a model in LM Studio, then start the local server (Developer tab → Start Server, default port 1234)
+- **Privacy**: All computation happens locally, no data sent to external services
+- **Cost**: Free
+- **Example models**: `openai/gpt-oss-120b`, `qwen3.8-27b`, any GGUF/MLX model you've downloaded
+- **Tuning** (environment variables in `backend/.env`):
+
+  | Variable | Default | Purpose |
+  |----------|---------|---------|
+  | `LLM_PROVIDER` | `lmstudio` | Default bot provider (`lmstudio`, `ollama`, or `openrouter`) |
+  | `LMSTUDIO_BASE_URL` | `http://localhost:1234/v1` | OpenAI-compatible API base URL |
+  | `LMSTUDIO_TIMEOUT_MS` | `55000` | Generation timeout (keep under the 60s turn timer) |
+  | `LMSTUDIO_MIN_MAX_TOKENS` | `2048` | Floor for the completion token budget — thinking models spend their budget on reasoning, so a tiny `num_predict` would otherwise return empty content |
+  | `LMSTUDIO_REASONING_EFFORT` | `low` | OpenAI-standard reasoning control (`low`, `medium`, or `high`) for models that support it, e.g. gpt-oss |
+
+  > **Note on thinking models:** Models like qwen3.8 and ornith spend their entire token budget on internal reasoning, which can leave the visible response empty. `LMSTUDIO_MIN_MAX_TOKENS` plus a low `reasoning_effort` keeps responses fast and non-empty. Non-thinking models stop early, so the floor does not slow them down.
+
+#### Local Ollama
 - Run models locally on your machine
 - **Setup**: Install [Ollama](https://ollama.ai) and pull models like `llama3.2:3b` or `mistral`
 - **Privacy**: All computation happens locally, no data sent to external services
@@ -372,8 +406,8 @@ Play against intelligent AI opponents powered by large language models. Bots use
 - **Performance Tracking**: View detailed AI statistics at `/ai-stats`
 
 ### Usage in Lobby
-1. Click "Add Bot" in the game lobby
-2. Select Ollama or OpenRouter provider
+1. Click "Add Bot" in the game lobby (or open **Bot Creator** to save reusable bot presets)
+2. Models from every available provider (LM Studio, Ollama, OpenRouter) appear in one list, labeled with their source
 3. Choose a model from available options
 4. Set difficulty level (Easy/Medium/Hard)
 5. Bot joins the game with a unique robot avatar
@@ -407,7 +441,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 🗺️ Roadmap
 
 ### Completed ✅
-- [x] AI/Bot players with LLM integration (Ollama & OpenRouter)
+- [x] AI/Bot players with LLM integration (LM Studio, Ollama & OpenRouter)
 - [x] Position-based scoring system
 - [x] Word padding with blanks
 - [x] Turn timer system

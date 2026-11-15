@@ -4,62 +4,74 @@ import { ScoringEngine } from '../game/ScoringEngine';
 describe('ScoringEngine', () => {
   const engine = new ScoringEngine();
 
-  it('should calculate score for 1-point letters', () => {
-    expect(engine.calculateScore('E', 1)).toBe(1);
-    expect(engine.calculateScore('A', 2)).toBe(2);
-    expect(engine.calculateScore('I', 3)).toBe(3);
+  describe('getPositionPoints', () => {
+    it('should award 5 points for positions 0, 3, 6...', () => {
+      expect(engine.getPositionPoints(0)).toBe(5);
+      expect(engine.getPositionPoints(3)).toBe(5);
+      expect(engine.getPositionPoints(6)).toBe(5);
+    });
+
+    it('should award 10 points for positions 1, 4, 7...', () => {
+      expect(engine.getPositionPoints(1)).toBe(10);
+      expect(engine.getPositionPoints(4)).toBe(10);
+      expect(engine.getPositionPoints(7)).toBe(10);
+    });
+
+    it('should award 15 points for positions 2, 5, 8...', () => {
+      expect(engine.getPositionPoints(2)).toBe(15);
+      expect(engine.getPositionPoints(5)).toBe(15);
+      expect(engine.getPositionPoints(8)).toBe(15);
+    });
+
+    it('should repeat the 5/10/15 pattern for long words', () => {
+      expect(engine.getPositionPoints(11)).toBe(15); // 11 % 3 = 2
+    });
   });
 
-  it('should calculate score for 2-point letters', () => {
-    expect(engine.calculateScore('D', 1)).toBe(2);
-    expect(engine.calculateScore('G', 2)).toBe(4);
+  describe('calculateScore', () => {
+    it('should sum position values for revealed positions', () => {
+      expect(engine.calculateScore([0])).toBe(5);
+      expect(engine.calculateScore([1])).toBe(10);
+      expect(engine.calculateScore([2])).toBe(15);
+    });
+
+    it('should handle multiple positions', () => {
+      // Positions 0, 2, 5 -> 5 + 15 + 15 = 35
+      expect(engine.calculateScore([0, 2, 5])).toBe(35);
+    });
+
+    it('should return 0 for no revealed positions', () => {
+      expect(engine.calculateScore([])).toBe(0);
+    });
+
+    it('should score a fully revealed 7-letter word at 65', () => {
+      // [5,10,15,5,10,15,5] = 65
+      const positions = [0, 1, 2, 3, 4, 5, 6];
+      expect(engine.calculateScore(positions)).toBe(65);
+    });
   });
 
-  it('should calculate score for 3-point letters', () => {
-    expect(engine.calculateScore('B', 1)).toBe(3);
-    expect(engine.calculateScore('C', 2)).toBe(6);
+  describe('getPositionPointsArray', () => {
+    it('should return the repeating pattern for a word length', () => {
+      expect(engine.getPositionPointsArray(3)).toEqual([5, 10, 15]);
+      expect(engine.getPositionPointsArray(7)).toEqual([5, 10, 15, 5, 10, 15, 5]);
+    });
+
+    it('should return an empty array for length 0', () => {
+      expect(engine.getPositionPointsArray(0)).toEqual([]);
+    });
   });
 
-  it('should calculate score for 4-point letters', () => {
-    expect(engine.calculateScore('F', 1)).toBe(4);
-    expect(engine.calculateScore('H', 2)).toBe(8);
+  describe('calculateScoreLegacy', () => {
+    it('should use the average position value (10) per occurrence', () => {
+      expect(engine.calculateScoreLegacy('E', 1)).toBe(10);
+      expect(engine.calculateScoreLegacy('Q', 3)).toBe(30);
+    });
   });
 
-  it('should calculate score for 5-point letters', () => {
-    expect(engine.calculateScore('K', 1)).toBe(5);
-    expect(engine.calculateScore('K', 2)).toBe(10);
-  });
-
-  it('should calculate score for 8-point letters', () => {
-    expect(engine.calculateScore('J', 1)).toBe(8);
-    expect(engine.calculateScore('X', 2)).toBe(16);
-  });
-
-  it('should calculate score for 10-point letters', () => {
-    expect(engine.calculateScore('Q', 1)).toBe(10);
-    expect(engine.calculateScore('Z', 2)).toBe(20);
-  });
-
-  it('should return 0 for unknown letters', () => {
-    expect(engine.calculateScore('1', 1)).toBe(0);
-    expect(engine.calculateScore('$', 1)).toBe(0);
-  });
-
-  it('should handle lowercase letters', () => {
-    expect(engine.calculateScore('e', 1)).toBe(1);
-    expect(engine.calculateScore('z', 1)).toBe(10);
-  });
-
-  it('should get correct letter value', () => {
-    expect(engine.getLetterValue('E')).toBe(1);
-    expect(engine.getLetterValue('Q')).toBe(10);
-    expect(engine.getLetterValue('K')).toBe(5);
-  });
-
-  it('should return all letter values', () => {
-    const values = engine.getAllLetterValues();
-    expect(values.size).toBeGreaterThan(0);
-    expect(values.get('E')).toBe(1);
-    expect(values.get('Z')).toBe(10);
+  describe('word completion bonus', () => {
+    it('should expose a 50-point completion bonus constant', () => {
+      expect(engine.WORD_COMPLETION_BONUS).toBe(50);
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { prisma } from '../server';
+import { prisma } from '../db';
 import { WordValidator } from './WordValidator';
 import { ScoringEngine } from './ScoringEngine';
 import crypto from 'crypto';

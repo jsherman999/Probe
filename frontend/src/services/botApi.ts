@@ -9,6 +9,7 @@ export interface OllamaModel {
   size: number;
   sizeFormatted: string;
   modifiedAt: string;
+  provider?: LLMProvider;
   details?: {
     family: string;
     parameter_size: string;
@@ -16,7 +17,7 @@ export interface OllamaModel {
   };
 }
 
-export type LLMProvider = 'ollama' | 'openrouter';
+export type LLMProvider = 'ollama' | 'openrouter' | 'lmstudio';
 
 export interface BotConfig {
   displayName: string;
@@ -62,13 +63,21 @@ export async function getOllamaStatus(): Promise<OllamaStatus> {
 }
 
 /**
+ * Check if the local LM Studio server is available
+ */
+export async function getLmStudioStatus(): Promise<OllamaStatus> {
+  const response = await api.get('/bot/lmstudio/status');
+  return response.data;
+}
+
+/**
  * Get list of available models from specified provider
  */
 export async function getOllamaModels(provider: LLMProvider = 'ollama'): Promise<OllamaModel[]> {
   const response = await api.get('/bot/ollama/models', {
     params: { provider }
   });
-  return response.data.models;
+  return response.data.models.map((m: OllamaModel) => ({ ...m, provider }));
 }
 
 /**
@@ -141,6 +150,7 @@ export async function getBotStats(): Promise<{
   totalBots: number;
   gamesWithBots: number;
   ollamaAvailable: boolean;
+  lmstudioAvailable?: boolean;
 }> {
   const response = await api.get('/bot/stats');
   return response.data;

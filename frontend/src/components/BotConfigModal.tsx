@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BotConfig, getBotPresets, BotPreset } from '../services/botApi';
+import { BotConfig, getBotPresets, BotPreset, LLMProvider } from '../services/botApi';
 import Modal from './Modal';
 
 interface BotConfigModalProps {
@@ -34,7 +34,7 @@ export default function BotConfigModal({ isOpen, onClose, onAdd }: BotConfigModa
       displayName: preset.displayName,
       modelName: preset.modelName,
       difficulty: preset.difficulty as 'easy' | 'medium' | 'hard',
-      provider: (preset.provider as 'ollama' | 'openrouter') || 'ollama',
+      provider: (preset.provider as LLMProvider) || 'ollama',
       personality: preset.personality || undefined,
       ollamaOptions: {
         temperature: preset.ollamaConfig?.temperature || 0.7,

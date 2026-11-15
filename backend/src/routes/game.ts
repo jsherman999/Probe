@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../server';
+import { prisma } from '../db';
 import { GameManager } from '../game/GameManager';
 
 const router = Router();

@@ -1,7 +1,7 @@
 /**
  * Type definitions for the LLM Bot Player system
  */
-export type LLMProviderType = 'ollama' | 'openrouter';
+export type LLMProviderType = 'ollama' | 'openrouter' | 'lmstudio';
 /**
  * Common interface for LLM providers (Ollama, OpenRouter, etc.)
  */
@@ -41,6 +41,7 @@ export interface OllamaGenerateOptions {
     repeat_penalty?: number;
     seed?: number;
     num_ctx?: number;
+    reasoning_effort?: 'low' | 'medium' | 'high';
 }
 export interface OllamaGenerateRequest {
     model: string;

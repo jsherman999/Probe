@@ -4,6 +4,7 @@
 
 import { OllamaService, ollamaService } from './OllamaService';
 import { OpenRouterService, openRouterService } from './OpenRouterService';
+import { LMStudioService, lmstudioService } from './LMStudioService';
 import { WordValidator } from '../game/WordValidator';
 import { BotPlayer } from './BotPlayer';
 import {
@@ -24,9 +25,39 @@ export class BotManager {
   constructor(
     private ollama: OllamaService = ollamaService,
     private openRouter: OpenRouterService = openRouterService,
+    private lmstudio: LMStudioService = lmstudioService,
     wordValidator?: WordValidator
   ) {
     this.wordValidator = wordValidator || new WordValidator();
+  }
+
+  /**
+   * Resolve the default LLM provider.
+   * Honors the LLM_PROVIDER env var (ollama | openrouter | lmstudio),
+   * falling back to 'ollama' for backward compatibility.
+   */
+  private static defaultProvider(): LLMProviderType {
+    const env = process.env.LLM_PROVIDER;
+    if (env === 'ollama' || env === 'openrouter' || env === 'lmstudio') {
+      return env;
+    }
+    return 'ollama';
+  }
+
+  /**
+   * Get the default LLM provider (from LLM_PROVIDER env, else 'ollama')
+   */
+  getDefaultProvider(): LLMProviderType {
+    return BotManager.defaultProvider();
+  }
+
+  /**
+   * Resolve a provider name to its service instance
+   */
+  private resolveProvider(providerType: LLMProviderType): LLMProvider {
+    if (providerType === 'openrouter') return this.openRouter;
+    if (providerType === 'lmstudio') return this.lmstudio;
+    return this.ollama;
   }
 
   // ============================================================================
@@ -37,10 +68,7 @@ export class BotManager {
    * Check if a provider is available
    */
   async isProviderAvailable(provider: LLMProviderType = 'ollama'): Promise<boolean> {
-    if (provider === 'openrouter') {
-      return this.openRouter.isAvailable();
-    }
-    return this.ollama.isAvailable();
+    return this.resolveProvider(provider).isAvailable();
   }
 
   /**
@@ -51,13 +79,17 @@ export class BotManager {
   }
 
   /**
+   * Check if LM Studio is available
+   */
+  async isLmStudioAvailable(): Promise<boolean> {
+    return this.lmstudio.isAvailable();
+  }
+
+  /**
    * Get list of available models from a provider
    */
   async getAvailableModels(provider: LLMProviderType = 'ollama'): Promise<OllamaModel[]> {
-    if (provider === 'openrouter') {
-      return this.openRouter.listModels();
-    }
-    return this.ollama.listModels();
+    return this.resolveProvider(provider).listModels();
   }
 
   /**
@@ -65,6 +97,22 @@ export class BotManager {
    */
   async getOllamaVersion(): Promise<string | null> {
     return this.ollama.getVersion();
+  }
+
+  /**
+   * Get LM Studio version (null when the native API is unavailable)
+   */
+  async getLmStudioVersion(): Promise<string | null> {
+    return this.lmstudio.getVersion();
+  }
+
+  /**
+   * Get the base URL of a provider (for status responses)
+   */
+  getProviderBaseUrl(provider: LLMProviderType = 'ollama'): string {
+    if (provider === 'lmstudio') return this.lmstudio.getBaseUrl();
+    if (provider === 'openrouter') return 'https://openrouter.ai/api/v1';
+    return 'http://localhost:11434';
   }
 
   // ============================================================================
@@ -80,10 +128,8 @@ export class BotManager {
       throw new Error('Model name is required');
     }
 
-    const providerType = configInput.provider || 'ollama';
-    const provider: LLMProvider = providerType === 'openrouter'
-      ? this.openRouter
-      : this.ollama;
+    const providerType = configInput.provider || BotManager.defaultProvider();
+    const provider: LLMProvider = this.resolveProvider(providerType);
 
     const bot = new BotPlayer(configInput, provider, this.wordValidator);
     this.bots.set(bot.id, bot);

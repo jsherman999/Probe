@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const server_1 = require("../server");
+const db_1 = require("../db");
 const GameManager_1 = require("../game/GameManager");
 const router = (0, express_1.Router)();
 const gameManager = new GameManager_1.GameManager();
@@ -71,7 +71,7 @@ router.post('/history/migrate', authenticate, async (req, res) => {
 // Get all waiting games (lobby) - MUST be before /:roomCode
 router.get('/lobby/all', authenticate, async (req, res) => {
     try {
-        const games = await server_1.prisma.game.findMany({
+        const games = await db_1.prisma.game.findMany({
             where: { status: 'WAITING' },
             include: {
                 players: true,
@@ -94,7 +94,7 @@ router.get('/lobby/all', authenticate, async (req, res) => {
 // Get all running games (for observer mode) - MUST be before /:roomCode
 router.get('/running/all', authenticate, async (req, res) => {
     try {
-        const games = await server_1.prisma.game.findMany({
+        const games = await db_1.prisma.game.findMany({
             where: {
                 status: { in: ['ACTIVE', 'WORD_SELECTION'] }
             },
@@ -125,7 +125,7 @@ router.get('/running/all', authenticate, async (req, res) => {
 router.get('/:roomCode', authenticate, async (req, res) => {
     try {
         const { roomCode } = req.params;
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
             include: {
                 players: {
@@ -157,13 +157,13 @@ router.get('/:roomCode', authenticate, async (req, res) => {
 router.get('/:roomCode/history', authenticate, async (req, res) => {
     try {
         const { roomCode } = req.params;
-        const game = await server_1.prisma.game.findUnique({
+        const game = await db_1.prisma.game.findUnique({
             where: { roomCode },
         });
         if (!game) {
             return res.status(404).json({ error: 'Game not found' });
         }
-        const turns = await server_1.prisma.gameTurn.findMany({
+        const turns = await db_1.prisma.gameTurn.findMany({
             where: { gameId: game.id },
             include: {
                 player: true,

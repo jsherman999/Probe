@@ -7,12 +7,22 @@
 
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { botManager, OllamaService } from '../bot';
-import { prisma } from '../server';
+import { botManager, OllamaService, lmstudioService } from '../bot';
+import { prisma } from '../db';
 
 const router = Router();
 
 // Bot routes are now available to all players (no localhost restriction)
+
+/**
+ * Default LLM provider for requests that don't specify one.
+ * Honors the LLM_PROVIDER env var (ollama | openrouter | lmstudio).
+ */
+const DEFAULT_LLM_PROVIDER = process.env.LLM_PROVIDER === 'openrouter' || process.env.LLM_PROVIDER === 'lmstudio'
+  ? (process.env.LLM_PROVIDER as 'openrouter' | 'lmstudio')
+  : 'ollama';
+
+const LLM_PROVIDERS = ['ollama', 'openrouter', 'lmstudio'] as const;
 
 // ============================================================================
 // Validation Schemas
@@ -22,7 +32,7 @@ const BotConfigSchema = z.object({
   displayName: z.string().min(1).max(30).default('Bot Player'),
   modelName: z.string().min(1),
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
-  provider: z.enum(['ollama', 'openrouter']).optional().default('ollama'),
+  provider: z.enum(LLM_PROVIDERS).optional().default(DEFAULT_LLM_PROVIDER),
   personality: z.string().max(500).optional(),
   ollamaOptions: z.object({
     temperature: z.number().min(0).max(2).optional(),
@@ -39,7 +49,7 @@ const BotPresetSchema = z.object({
   displayName: z.string().min(1).max(30),
   modelName: z.string().min(1),
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
-  provider: z.enum(['ollama', 'openrouter']).optional().default('ollama'),
+  provider: z.enum(LLM_PROVIDERS).optional().default(DEFAULT_LLM_PROVIDER),
   personality: z.string().max(500).optional(),
   iconSvg: z.string().optional(), // Custom SVG icon from robot generator
   ollamaConfig: z.object({
@@ -82,15 +92,37 @@ router.get('/ollama/status', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/bot/lmstudio/status
+ * Check if the local LM Studio server is running and accessible
+ */
+router.get('/lmstudio/status', async (req: Request, res: Response) => {
+  try {
+    const available = await botManager.isLmStudioAvailable();
+    const version = available ? await botManager.getLmStudioVersion() : null;
+
+    res.json({
+      available,
+      version,
+      baseUrl: lmstudioService.getBaseUrl(),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      available: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
  * GET /api/bot/ollama/models
  * List all available models from specified provider (default: ollama)
  */
 router.get('/ollama/models', async (req: Request, res: Response) => {
   try {
-    const provider = (req.query.provider as string) || 'ollama';
+    const provider = (req.query.provider as string) || DEFAULT_LLM_PROVIDER;
 
     // Validate provider
-    if (provider !== 'ollama' && provider !== 'openrouter') {
+    if (!LLM_PROVIDERS.includes(provider as (typeof LLM_PROVIDERS)[number])) {
       return res.status(400).json({ error: 'Invalid provider' });
     }
 
@@ -219,7 +251,7 @@ router.get('/robot-icon/health', async (req: Request, res: Response) => {
     if (!response.ok) {
       throw new Error(`Robot API returned ${response.status}`);
     }
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, unknown>;
     res.json({ available: true, ...data });
   } catch (error: any) {
     res.json({ available: false, error: error.message });
@@ -393,10 +425,12 @@ router.get('/stats', async (req: Request, res: Response) => {
   try {
     const stats = botManager.getStats();
     const ollamaAvailable = await botManager.isOllamaAvailable();
+    const lmstudioAvailable = await botManager.isLmStudioAvailable();
 
     res.json({
       ...stats,
       ollamaAvailable,
+      lmstudioAvailable,
     });
   } catch (error: any) {
     res.status(500).json({
@@ -424,7 +458,9 @@ router.post('/validate', async (req: Request, res: Response) => {
     if (!providerAvailable) {
       const errorMsg = providerType === 'openrouter'
         ? 'OpenRouter API is not accessible (check API key)'
-        : 'Ollama server is not available';
+        : providerType === 'lmstudio'
+          ? `LM Studio server is not available at ${botManager.getProviderBaseUrl('lmstudio')}`
+          : 'Ollama server is not available';
 
       return res.status(503).json({
         valid: false,
@@ -462,6 +498,8 @@ router.post('/validate', async (req: Request, res: Response) => {
     if (providerType === 'openrouter') {
       const { openRouterService } = await import('../bot/OpenRouterService');
       testResponse = await openRouterService.generate(data.modelName, prompt, options);
+    } else if (providerType === 'lmstudio') {
+      testResponse = await lmstudioService.generate(data.modelName, prompt, options);
     } else {
       const { ollamaService } = await import('../bot/OllamaService');
       testResponse = await ollamaService.generate(data.modelName, prompt, options);

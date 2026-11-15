@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const zod_1 = require("zod");
-const server_1 = require("../server");
+const db_1 = require("../db");
 const router = (0, express_1.Router)();
 // Validation schemas
 const registerSchema = zod_1.z.object({
@@ -21,11 +21,11 @@ router.post('/login', async (req, res) => {
     try {
         const { username, displayName } = registerSchema.parse(req.body);
         // Find or create user
-        let user = await server_1.prisma.user.findUnique({
+        let user = await db_1.prisma.user.findUnique({
             where: { username },
         });
         if (!user) {
-            user = await server_1.prisma.user.create({
+            user = await db_1.prisma.user.create({
                 data: {
                     username,
                     displayName: displayName || username,
@@ -34,7 +34,7 @@ router.post('/login', async (req, res) => {
         }
         else {
             // Update last seen
-            user = await server_1.prisma.user.update({
+            user = await db_1.prisma.user.update({
                 where: { id: user.id },
                 data: { lastSeen: new Date() },
             });
@@ -67,7 +67,7 @@ router.post('/refresh', async (req, res) => {
             return res.status(400).json({ error: 'Refresh token required' });
         }
         const decoded = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-        const user = await server_1.prisma.user.findUnique({
+        const user = await db_1.prisma.user.findUnique({
             where: { id: decoded.userId },
         });
         if (!user) {
@@ -89,7 +89,7 @@ router.get('/me', async (req, res) => {
             return res.status(401).json({ error: 'No token provided' });
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        const user = await server_1.prisma.user.findUnique({
+        const user = await db_1.prisma.user.findUnique({
             where: { id: decoded.userId },
         });
         if (!user) {

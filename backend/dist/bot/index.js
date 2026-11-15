@@ -17,7 +17,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BotStrategy = exports.botManager = exports.BotManager = exports.BotPlayer = exports.openRouterService = exports.OpenRouterService = exports.ollamaService = exports.OllamaService = void 0;
+exports.BotStrategy = exports.botManager = exports.BotManager = exports.BotPlayer = exports.lmstudioService = exports.LMStudioService = exports.openRouterService = exports.OpenRouterService = exports.ollamaService = exports.OllamaService = void 0;
 // Types
 __exportStar(require("./types"), exports);
 // Services
@@ -27,6 +27,9 @@ Object.defineProperty(exports, "ollamaService", { enumerable: true, get: functio
 var OpenRouterService_1 = require("./OpenRouterService");
 Object.defineProperty(exports, "OpenRouterService", { enumerable: true, get: function () { return OpenRouterService_1.OpenRouterService; } });
 Object.defineProperty(exports, "openRouterService", { enumerable: true, get: function () { return OpenRouterService_1.openRouterService; } });
+var LMStudioService_1 = require("./LMStudioService");
+Object.defineProperty(exports, "LMStudioService", { enumerable: true, get: function () { return LMStudioService_1.LMStudioService; } });
+Object.defineProperty(exports, "lmstudioService", { enumerable: true, get: function () { return LMStudioService_1.lmstudioService; } });
 var BotPlayer_1 = require("./BotPlayer");
 Object.defineProperty(exports, "BotPlayer", { enumerable: true, get: function () { return BotPlayer_1.BotPlayer; } });
 var BotManager_1 = require("./BotManager");

@@ -2,11 +2,9 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { spawn, ChildProcess } from 'child_process';
 import { GameManager } from '../game/GameManager';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../db';
 import { botManager, BotConfigInput, GameContext, PlayerInfo } from '../bot';
 import { isSocketFromLocalhost } from '../middleware/localOnly';
-
-const prisma = new PrismaClient();
 
 const gameManager = new GameManager();
 

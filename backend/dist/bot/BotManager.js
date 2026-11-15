@@ -6,18 +6,49 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.botManager = exports.BotManager = void 0;
 const OllamaService_1 = require("./OllamaService");
 const OpenRouterService_1 = require("./OpenRouterService");
+const LMStudioService_1 = require("./LMStudioService");
 const WordValidator_1 = require("../game/WordValidator");
 const BotPlayer_1 = require("./BotPlayer");
 class BotManager {
     ollama;
     openRouter;
+    lmstudio;
     bots = new Map();
     gameBots = new Map();
     wordValidator;
-    constructor(ollama = OllamaService_1.ollamaService, openRouter = OpenRouterService_1.openRouterService, wordValidator) {
+    constructor(ollama = OllamaService_1.ollamaService, openRouter = OpenRouterService_1.openRouterService, lmstudio = LMStudioService_1.lmstudioService, wordValidator) {
         this.ollama = ollama;
         this.openRouter = openRouter;
+        this.lmstudio = lmstudio;
         this.wordValidator = wordValidator || new WordValidator_1.WordValidator();
+    }
+    /**
+     * Resolve the default LLM provider.
+     * Honors the LLM_PROVIDER env var (ollama | openrouter | lmstudio),
+     * falling back to 'ollama' for backward compatibility.
+     */
+    static defaultProvider() {
+        const env = process.env.LLM_PROVIDER;
+        if (env === 'ollama' || env === 'openrouter' || env === 'lmstudio') {
+            return env;
+        }
+        return 'ollama';
+    }
+    /**
+     * Get the default LLM provider (from LLM_PROVIDER env, else 'ollama')
+     */
+    getDefaultProvider() {
+        return BotManager.defaultProvider();
+    }
+    /**
+     * Resolve a provider name to its service instance
+     */
+    resolveProvider(providerType) {
+        if (providerType === 'openrouter')
+            return this.openRouter;
+        if (providerType === 'lmstudio')
+            return this.lmstudio;
+        return this.ollama;
     }
     // ============================================================================
     // Provider Status & Models
@@ -26,10 +57,7 @@ class BotManager {
      * Check if a provider is available
      */
     async isProviderAvailable(provider = 'ollama') {
-        if (provider === 'openrouter') {
-            return this.openRouter.isAvailable();
-        }
-        return this.ollama.isAvailable();
+        return this.resolveProvider(provider).isAvailable();
     }
     /**
      * Legacy: Check if Ollama is available
@@ -38,19 +66,38 @@ class BotManager {
         return this.ollama.isAvailable();
     }
     /**
+     * Check if LM Studio is available
+     */
+    async isLmStudioAvailable() {
+        return this.lmstudio.isAvailable();
+    }
+    /**
      * Get list of available models from a provider
      */
     async getAvailableModels(provider = 'ollama') {
-        if (provider === 'openrouter') {
-            return this.openRouter.listModels();
-        }
-        return this.ollama.listModels();
+        return this.resolveProvider(provider).listModels();
     }
     /**
      * Get Ollama version
      */
     async getOllamaVersion() {
         return this.ollama.getVersion();
+    }
+    /**
+     * Get LM Studio version (null when the native API is unavailable)
+     */
+    async getLmStudioVersion() {
+        return this.lmstudio.getVersion();
+    }
+    /**
+     * Get the base URL of a provider (for status responses)
+     */
+    getProviderBaseUrl(provider = 'ollama') {
+        if (provider === 'lmstudio')
+            return this.lmstudio.getBaseUrl();
+        if (provider === 'openrouter')
+            return 'https://openrouter.ai/api/v1';
+        return 'http://localhost:11434';
     }
     // ============================================================================
     // Bot Creation & Management
@@ -63,10 +110,8 @@ class BotManager {
         if (!configInput.modelName) {
             throw new Error('Model name is required');
         }
-        const providerType = configInput.provider || 'ollama';
-        const provider = providerType === 'openrouter'
-            ? this.openRouter
-            : this.ollama;
+        const providerType = configInput.provider || BotManager.defaultProvider();
+        const provider = this.resolveProvider(providerType);
         const bot = new BotPlayer_1.BotPlayer(configInput, provider, this.wordValidator);
         this.bots.set(bot.id, bot);
         console.log(`[BotManager] Created bot: ${bot.displayName} (${bot.id}) using ${providerType} model: ${configInput.modelName}`);

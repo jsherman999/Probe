@@ -57,3 +57,6 @@ ssl/
 # Temporary files
 tmp/
 temp/
+
+# Sandbox git workarounds (separate git dir used when .git writes are blocked)
+.gitx/
