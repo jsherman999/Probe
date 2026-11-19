@@ -44,7 +44,7 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
 
 **Required:**
 - Node.js 20+ LTS
-- PostgreSQL 16+
+- PostgreSQL 16+ (or the embedded PGlite server: `npm run db:local`, see below)
 - npm or yarn
 
 **Optional (for AI bots):**
@@ -65,6 +65,22 @@ A modern, real-time multiplayer implementation of the classic Parker Brothers (1
    ./scripts/setup.sh
    ```
    This will install dependencies, setup PostgreSQL database, and configure environment variables.
+
+   **No PostgreSQL / Podman on this machine?** Use the embedded Postgres (PGlite) that ships as a dev dependency:
+   ```bash
+   cd backend
+   npm install && npx prisma generate
+   # in backend/.env:
+   # DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable&connection_limit=5
+   npm run db:local      # terminal 1: Postgres-compatible server on localhost:5432 (data in backend/data/pglite)
+   npm run db:push       # terminal 2 (once): create the tables
+   npm run dev           # start the backend
+   ```
+
+   **End-to-end check** (backend running, LM Studio serving a model): registers a user, saves and reloads an `lmstudio` bot preset, creates a game, adds the bot and waits for one model-driven bot turn:
+   ```bash
+   cd backend && node scripts/e2e-local.mjs http://localhost:3000
+   ```
 
 3. **(Optional) Configure AI Bot Providers**
 

@@ -1,3 +1,4 @@
+import './env';
 import { Server } from 'socket.io';
 import { prisma } from './db';
 export { prisma };

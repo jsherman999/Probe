@@ -4,6 +4,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.io = exports.prisma = void 0;
+// MUST be the first import: loads backend/.env before any module that reads
+// process.env at import time (LM Studio singleton, route defaults, ...).
+require("./env");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
@@ -11,15 +14,12 @@ const compression_1 = __importDefault(require("compression"));
 const path_1 = __importDefault(require("path"));
 const http_1 = require("http");
 const socket_io_1 = require("socket.io");
-const dotenv_1 = __importDefault(require("dotenv"));
 const db_1 = require("./db");
 Object.defineProperty(exports, "prisma", { enumerable: true, get: function () { return db_1.prisma; } });
 const socket_1 = require("./socket");
 const auth_1 = __importDefault(require("./routes/auth"));
 const game_1 = __importDefault(require("./routes/game"));
 const bot_1 = __importDefault(require("./routes/bot"));
-// Load environment variables
-dotenv_1.default.config();
 // Create Express app
 const app = (0, express_1.default)();
 const httpServer = (0, http_1.createServer)(app);

@@ -1,3 +1,6 @@
+// MUST be the first import: loads backend/.env before any module that reads
+// process.env at import time (LM Studio singleton, route defaults, ...).
+import './env';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -5,15 +8,11 @@ import compression from 'compression';
 import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import dotenv from 'dotenv';
 import { prisma } from './db';
 import { setupSocketHandlers } from './socket';
 import authRoutes from './routes/auth';
 import gameRoutes from './routes/game';
 import botRoutes from './routes/bot';
-
-// Load environment variables
-dotenv.config();
 
 // Initialize Prisma (shared singleton; re-exported for backward compatibility)
 export { prisma };

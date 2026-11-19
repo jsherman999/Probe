@@ -42,6 +42,7 @@ logs/
 Thumbs.db
 
 # Database
+backend/data/pglite/
 *.db
 *.sqlite
 
